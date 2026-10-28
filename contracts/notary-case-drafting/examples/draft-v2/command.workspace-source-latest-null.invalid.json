@@ -1,0 +1,11 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.20: payload phải là object rỗng, null bị từ chối."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2038-4038-8038-000000000038",
+  "command": "notary.workspace_source_latest",
+  "payload": null,
+  "expected_error": "validation_error"
+}

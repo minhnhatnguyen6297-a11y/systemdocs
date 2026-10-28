@@ -23,7 +23,7 @@ ordinal: 13000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Owner yêu cầu phân loại E1-E7 và sửa lỗi đánh giá/regex rõ, đặt ranh giới chấp nhận. Phần regex lấy được từ nguồn lỗi điền vào ô Stage tương ứng đang có để user sửa; không thêm luật sửa lỗi nguồn hoặc UI/nút. Mẫu lạ ghi ngoài phạm vi/ứng viên phiên bản riêng; không tự đoán/sửa tên hay dữ liệu nguồn. Giữ F01/F04/F05, TASK-10.2 evidence và working tree.
+Owner yêu cầu phân loại E1-E7 và sửa lỗi đánh giá/regex rõ, đặt ranh giới chấp nhận. Phần regex lấy được từ nguồn lỗi điền vào ô Stage tương ứng đang có để user sửa; không thêm luật sửa lỗi nguồn hoặc UI/nút. Mẫu lạ ghi ngoài phạm vi/ứng viên phiên bản riêng; không tự đoán/sửa tên hay dữ liệu nguồn. Giữ F04/F05, TASK-10.2 evidence và working tree.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -56,7 +56,7 @@ Owner làm rõ lần cuối: không thêm luật xử lý lỗi nguồn. Regex l
 
 Decision-74 ghi quyết định owner; lý do và phạm vi tại docs/spec/upload_lab/regex-acceptance.md. Đã chạy độc lập native baseline50:61 người/4 bản ghi đất; hash nguồn50/50. Giữ đáp án/bằng chứng cũ; địa chỉ3970 đính chính theo nguồn line42.
 
-Hoàn tất: .agents/task-10.3/RESULT.md. Fresh50-final-reviewed:76người/13mô tả đất;48file khớp trường đã kiểm+2source_review do chữ dính;638checked/520unanswered. Payload độc lập50/50; nguồn50 và110evidence cũ giữ nguyên. Source-party41người/15file:0sai sau sửa. Review patches đã kiểm/mirror; F01/F04/F05 nguyên trạng. Stage Chromium+realDB nhận chữ nguồn/sửa tay/lưu/mở lại và chặn ngày sai đạt. Upload424/2skip,Tool207/1skip,DOCX62,renderer99pass;3Word-dialog failures có sẵn tái hiện trên beforeview, không thuộc task. Decision74/spec đã ghi là gì/tại sao; không commit/push.
+Hoàn tất: .agents/task-10.3/RESULT.md. Fresh50-final-reviewed:76người/13mô tả đất;48file khớp trường đã kiểm+2source_review do chữ dính;638checked/520unanswered. Payload độc lập50/50; nguồn50 và110evidence cũ giữ nguyên. Source-party41người/15file:0sai sau sửa. Review patches đã kiểm/mirror; F04/F05 nguyên trạng. Stage Chromium+realDB nhận chữ nguồn/sửa tay/lưu/mở lại và chặn ngày sai đạt. Upload424/2skip,Tool207/1skip,DOCX62,renderer99pass;3Word-dialog failures có sẵn tái hiện trên beforeview, không thuộc task. Decision74/spec đã ghi là gì/tại sao; không commit/push.
 
 Owner 08/10/2026 yêu cầu commit và gộp vào nhánh chính, xử lý xung đột. Cho phép commit thay giới hạn no-commit trước đó. Main consolidate/monorepo tại76bb9a8 đã chuyển SOT sang _bmad-output/specs, bỏ Backlog live. Khi gộp giữ cấu trúc/quyết định48 của main; chuyển các spec và decision mới, lưu task cũ ở archive. Giữ corpus/bằng chứng cá nhân tại máy, không đưa môi trường test/database/Word thật vào commit. Kiểm lại kết quả sau gộp; không push.
 <!-- SECTION:NOTES:END -->
@@ -64,5 +64,5 @@ Owner 08/10/2026 yêu cầu commit và gộp vào nhánh chính, xử lý xung �
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Sửa lỗi rõ E1-E7 và bộ chấm theo ranh giới owner; giữ chữ nguồn tại ô Stage hiện có để sửa tay. Fresh50:48khớp các trường đã kiểm,2cần kiểm nguồn; đủ76người/13mô tả đất. Native/mutation/review/Stage thực đã kiểm; các test liên quan đạt,3lỗi Word-dialog cũ tách riêng. Bằng chứng .agents/task-10.3/RESULT.md, final-evidence.json. F01/F04/F05 Pending; mốc3980.
+Sửa lỗi rõ E1-E7 và bộ chấm theo ranh giới owner; giữ chữ nguồn tại ô Stage hiện có để sửa tay. Fresh50:48khớp các trường đã kiểm,2cần kiểm nguồn; đủ76người/13mô tả đất. Native/mutation/review/Stage thực đã kiểm; các test liên quan đạt,3lỗi Word-dialog cũ tách riêng. Bằng chứng .agents/task-10.3/RESULT.md, final-evidence.json. F04/F05 Pending; mốc3980.
 <!-- SECTION:FINAL_SUMMARY:END -->

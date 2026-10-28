@@ -20,7 +20,6 @@
         "case_type": "inheritance",
         "document_type": "khai_nhan",
         "status": "draft",
-        "locked": false,
         "revision": 12,
         "ngay_lap_ho_so": "2020-03-15",
         "noi_niem_yet": null,
@@ -154,7 +153,9 @@
               ],
               "receivePositions": [],
               "hidden": false,
-              "deleted": false
+              "deleted": false,
+              "spouseSlotIds": [],
+              "spouseSuggestionId": null
             },
             {
               "id": "child_1",
@@ -170,7 +171,9 @@
                 3
               ],
               "hidden": false,
-              "deleted": false
+              "deleted": false,
+              "spouseSlotIds": [],
+              "spouseSuggestionId": null
             }
           ]
         },

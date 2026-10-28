@@ -1,0 +1,21 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "duplicate_key_registry": {
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb": {
+        "command": "workspace_duplicate",
+        "intent": "draft",
+        "source_case_id": 77
+      }
+    },
+    "note": "§13.21: cùng key đã dùng cho source khác → idempotency_conflict; hash gồm command+intent+source_case_id."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2035-4035-8035-000000000035",
+  "command": "notary.workspace_duplicate",
+  "payload": {
+    "source_case_id": 48,
+    "idempotency_key": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  },
+  "expected_error": "idempotency_conflict"
+}

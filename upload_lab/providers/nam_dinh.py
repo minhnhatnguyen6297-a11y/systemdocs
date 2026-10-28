@@ -29,7 +29,6 @@ NAM_DINH_CAPABILITIES = (
     "scan",
     "prepare",
     "staff_options",
-    "reconcile",
 )
 
 # Khoa .env cong khai theo schema — khong bao gio tra toan bo .env cho UI.

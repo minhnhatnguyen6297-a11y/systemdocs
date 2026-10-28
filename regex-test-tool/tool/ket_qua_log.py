@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from upload_lab.extraction_adapter import case_from_payload
+
 REPO_ROOT = Path(__file__).resolve().parent
 
 
@@ -61,14 +63,15 @@ def truong_trong(record: dict, fields: tuple[str, ...]) -> list[str]:
 def payload_thanh_ban_ghi(payload: dict, filepath: str | Path, engine_version: str) -> dict:
     raw = payload.get("raw", {}) if not payload.get("error") else {}
     web = payload.get("web_form", {})
+    case = {} if payload.get("error") else case_from_payload(payload)
     return {
         "app": "regex-test-tool",
         "engine_version": engine_version,
         "thoi_gian": datetime.now().isoformat(timespec="seconds"),
         "file": str(filepath),
         "ten_file": Path(str(filepath)).name,
-        "kind": raw.get("document_kind", ""),
-        "ten_hd": web.get("ten_hop_dong", ""),
+        "kind": case.get("loaivanbannhandien") or "",
+        "ten_hd": case.get("tenvanban") or "",
         "tai_san": str(web.get("tai_san", "")),
         "nguoi": raw.get("ben_a", {}).get("nguoi", []) + raw.get("ben_b", {}).get("nguoi", []),
         "nguoi_chet": raw.get("nguoi_chet", []),

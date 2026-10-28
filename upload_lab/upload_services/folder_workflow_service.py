@@ -5,9 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from batch_scan import BASE_DIR, finalize_manifest, run_batch_scan
-from extract_contract import extract
+from extraction_adapter import extract
 from playwright_uploader import (
-    finalize_uploaded_records,
     load_upload_queue,
     read_exported_contract_numbers,
     split_records_by_existing_contract_nos,
@@ -106,7 +105,3 @@ def load_selected_queue_records(
         cong_chung_vien=cong_chung_vien,
         thu_ky=thu_ky,
     )
-
-
-def finalize_selected_records(record_ids: list[int], *, working_dir: Path = BASE_DIR) -> int:
-    return finalize_uploaded_records(record_ids, working_dir=working_dir)

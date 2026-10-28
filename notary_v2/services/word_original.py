@@ -5,6 +5,7 @@ import hashlib
 import json
 from .document_intake.docx_source import read_docx, replace_spans
 from . import word_engine, word_batch_export as batch
+from .case_rows import materialize_case_state
 
 PERSON_LABELS = {"ho_ten": "Họ tên", "so_giay_to": "Số giấy tờ", "ngay_sinh": "Ngày sinh",
                  "ngay_cap": "Ngày cấp", "noi_cap": "Nơi cấp", "dia_chi": "Địa chỉ", "ngay_chet": "Ngày chết"}
@@ -41,8 +42,13 @@ def slot_for(snapshot, target, row_id, field_key, ref=None, record=None):
     return f"[{prefix} - {label}]"
 
 
-def validate_context(context, stage, store):
-    """Validate opaque references before the Stage transaction; prune removed rows."""
+def validate_context(context, stage, store, *, read_only=False):
+    """Validate opaque references before the Stage transaction; prune removed rows.
+
+    `read_only=True` (bản sao Hồ sơ) chỉ kiểm shape/bytes/candidate/record/
+    occurrence: không prune record/binding, không đổi label/template_sha256
+    và không `save_template`. Mọi tham chiếu thiếu dòng đích là lỗi, không
+    âm thầm bỏ nội dung."""
     if not isinstance(context, dict) or set(context) != {"version", "sources"} or type(context["version"]) is not int or context["version"] != 1:
         raise ValueError("Đối chiếu nguồn Word không hợp lệ")
     if not isinstance(context["sources"], list) or len(context["sources"]) > 8:
@@ -61,7 +67,8 @@ def validate_context(context, stage, store):
         if store is None:
             raise ValueError("Kho nguồn Word chưa sẵn sàng")
         content, package = store.load(source["source_id"], source["sha256"])
-        source['label'] = package.get('label', 'Hợp đồng Word')
+        if not read_only:
+            source['label'] = package.get('label', 'Hợp đồng Word')
         candidates = {s["suggestion_id"]: s for s in package["suggestions"]}
         retained, seen = [], set()
         for record in source["records"]:
@@ -72,6 +79,8 @@ def validate_context(context, stage, store):
                 raise ValueError("Ứng viên Word không hợp lệ hoặc bị lặp")
             seen.add(record["candidate_id"])
             if record["row_id"] not in rows:
+                if read_only:
+                    raise ValueError("Dòng đối chiếu Word không có trong Hồ sơ sao")
                 continue
             if rows[record["row_id"]] != candidate["target"]:
                 raise ValueError("Không thể gắn người với dòng tài sản")
@@ -91,11 +100,15 @@ def validate_context(context, stage, store):
             if not isinstance(binding, dict) or set(binding) != {"candidate_id", "occurrence_id", "field_key", "slot"}:
                 raise ValueError("Vị trí Word không hợp lệ")
             if binding["candidate_id"] not in valid:
+                if read_only:
+                    raise ValueError("Vị trí Word trỏ ứng viên đã mất")
                 continue
             candidate = candidates[binding["candidate_id"]]
             refs = candidate["fields"].get(binding["field_key"], {}).get("source_refs", [])
             record = next(r for r in retained if r['candidate_id'] == binding['candidate_id'])
             if binding['field_key'] == 'land_rows' and not any(r['occurrence_id'] == binding['occurrence_id'] and r['land_row'] in record.get('land_rows', []) for r in refs):
+                if read_only:
+                    raise ValueError("Vị trí đất không còn thuộc dòng nguồn")
                 continue  # Deleted source row cannot transfer its occurrence to a surviving row.
             if not any(ref["occurrence_id"] == binding["occurrence_id"] for ref in refs):
                 raise ValueError("Vị trí không thuộc trường của ứng viên")
@@ -104,6 +117,8 @@ def validate_context(context, stage, store):
             occurrences.add(binding["occurrence_id"])
             bindings.append(binding)
         source["bindings"] = bindings
+        if read_only:
+            continue
         if bindings:
             replacements = []
             for binding in bindings:
@@ -119,8 +134,7 @@ def validate_context(context, stage, store):
 
 def validate_new_bindings(case, context, previous, store):
     """Check new confirmations against the composed committed rows/seats before DB commit."""
-    snapshot = json.loads(case.case_state_json or '{}')
-    values = word_engine.build_template_mapping(case, static=True)
+    snapshot = values = None
     old = {(s['source_id'], json.dumps(b, sort_keys=True), json.dumps(next((r for r in s['records'] if r['candidate_id'] == b['candidate_id']), {}), sort_keys=True))
            for s in (previous or {}).get('sources', []) for b in s['bindings']}
     for source in context.get('sources', []):
@@ -130,6 +144,9 @@ def validate_new_bindings(case, context, previous, store):
             record = next(r for r in source['records'] if r['candidate_id'] == binding['candidate_id'])
             if (source['source_id'], json.dumps(binding, sort_keys=True), json.dumps(record, sort_keys=True)) in old:
                 continue
+            if values is None:
+                snapshot = materialize_case_state(case)
+                values = word_engine.build_binding_mapping(case)
             candidate = candidates[binding['candidate_id']]
             ref = next(r for r in candidate['fields'][binding['field_key']]['source_refs'] if r['occurrence_id'] == binding['occurrence_id'])
             slot = slot_for(snapshot, candidate['target'], record['row_id'], binding['field_key'], ref, record)
@@ -137,8 +154,13 @@ def validate_new_bindings(case, context, previous, store):
                 raise ValueError('Vị trí Word không khớp dòng/ô đã lưu hoặc chưa có giá trị: ' + slot)
 
 
-def reviewed_template(case, source_id, store):
-    snapshot = json.loads(case.case_state_json or "{}")
+def reviewed_template(case, source_id, store, *, missing=None):
+    """Dựng bản gốc đã thay tại đúng span đã xác nhận.
+
+    Vị trí đã xác nhận nhưng trường chưa có giá trị đã lưu KHÔNG chặn
+    xuất (owner 23/10/2026 phần W): chỗ đó để trống và ghi vào `missing`.
+    Lệch slot/hash vẫn là lỗi mapping thật (hồ sơ đổi cấu trúc)."""
+    snapshot = materialize_case_state(case)
     source = next((s for s in snapshot.get("docx_import", {}).get("sources", []) if s["source_id"] == source_id), None)
     if source is None or not source["bindings"]:
         raise ValueError("Chưa xác nhận các vị trí của nguồn Word trong hồ sơ này")
@@ -155,9 +177,12 @@ def reviewed_template(case, source_id, store):
         slot = slot_for(snapshot, candidate["target"], record['row_id'], binding["field_key"], ref, record)
         if slot != binding["slot"]:
             raise ValueError("Thứ tự người/tài sản hoặc ô Bên A/B đã đổi; xác nhận lại vị trí")
-        if slot not in values or values[slot] in (None, ""):
-            raise ValueError("Vị trí đã chọn chưa có giá trị đã lưu: " + slot)
         tokens.append((ref["span"], slot))
+        if slot not in values or values[slot] in (None, ""):
+            if missing is not None and slot not in missing:
+                missing.append(slot)
+            replacements.append((ref["span"], ""))
+            continue
         replacements.append((ref["span"], str(values[slot])))
     derivative = replace_spans(content, reader, tokens)
     derivative_hash = hashlib.sha256(derivative).hexdigest()
@@ -171,14 +196,14 @@ def reviewed_template(case, source_id, store):
 
 
 def binding_proposals(case, source_id, store):
-    snapshot = json.loads(case.case_state_json or "{}")
+    snapshot = materialize_case_state(case)
     source = next((s for s in snapshot.get("docx_import", {}).get("sources", []) if s["source_id"] == source_id), None)
     if source is None:
         raise ValueError("Nguồn Word không thuộc hồ sơ")
     content, package = store.load(source_id, source["sha256"])
     reader = read_docx(content)
     candidates = {s["suggestion_id"]: s for s in package["suggestions"]}
-    values = word_engine.build_template_mapping(case, static=True)
+    values = word_engine.build_binding_mapping(case)
     proposals = []
     for record in source["records"]:
         candidate = candidates[record["candidate_id"]]
@@ -203,13 +228,26 @@ def binding_proposals(case, source_id, store):
 
 
 def export_original(case, source_id, store, destination, *, check_cancel=None):
-    try:
-        rendered, _ = reviewed_template(case, source_id, store)
-    except (ValueError, OSError, KeyError, TypeError) as exc:
-        raise batch.WordBatchError("word.original_mapping_invalid", str(exc)) from exc
     from pathlib import Path
     dest = Path(destination)
     spec = batch.WordDocumentSpec("original.docx", "Hợp đồng Word gốc", "hop_dong_goc", True)
+    reason = word_engine.word_block_reason(
+        word_engine.build_word_context(case), static=True)
+    if reason is not None:
+        entry = batch._failed_entry(spec, reason, batch._block_message(reason))
+        data = batch._batch_data(
+            dest, [entry], succeeded=[], failed=[spec.document_key], skipped=[])
+        raise batch.WordBatchError(
+            "word_batch_failed", "Toàn bộ văn bản trong lượt xuất đều lỗi",
+            details={"documents": [{"document_key": spec.document_key,
+                                   **entry["error"]}]},
+            result_data=data)
+    missing = []
+    try:
+        rendered, _ = reviewed_template(case, source_id, store,
+                                        missing=missing)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        raise batch.WordBatchError("word.original_mapping_invalid", str(exc)) from exc
     temp = None
     try:
         temp = batch._temp_file_in(dest, prefix=".word_export_", suffix=".docx")
@@ -226,4 +264,4 @@ def export_original(case, source_id, store, destination, *, check_cancel=None):
             temp.unlink(missing_ok=True)
     return batch._batch_data(dest, [{"document_key": "original.docx", "display_name": spec.display_name,
         "status": "saved", "actual_filename": name, "output_file": {"path": str(dest / name), "scope": "machine_local"},
-        "error": None}], succeeded=["original.docx"], failed=[], skipped=[])
+        "error": None, "missing": missing}], succeeded=["original.docx"], failed=[], skipped=[])

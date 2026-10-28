@@ -1,0 +1,13 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.20: payload source_latest phải rỗng — case_id/filter là key thừa."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2030-4030-8030-000000000030",
+  "command": "notary.workspace_source_latest",
+  "payload": {
+    "case_id": 48
+  },
+  "expected_error": "validation_error"
+}

@@ -1,0 +1,31 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.20: source_case_id/source_status phải null đồng thời; id có thì status phải done."
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_source_pair_bad",
+  "command_id": "a1b2c3d4-2037-4037-8037-000000000037",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_source_latest",
+    "data": {
+      "schema_version": "notary.case-drafting.v2",
+      "backend_mode": "real",
+      "source_case_id": null,
+      "source_status": "done",
+      "stage": {
+        "people": [],
+        "assets": []
+      }
+    },
+    "evidence": [],
+    "warnings": [],
+    "source_files": []
+  },
+  "error": null,
+  "updated_at": "2026-10-22T08:00:03.500000+00:00",
+  "expected_error": "validation_error"
+}

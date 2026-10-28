@@ -33,8 +33,13 @@
         }
       }
     },
+    "payload_v2": {
+      "description": "Wrapper vòng 2 — payload workspace_create dùng stage partial (≥0, tên null, owner null) và diagram optional; mọi ràng buộc strict của save_case/commit không nằm ở đây.",
+      "$ref": "draft-v2.schema.json#/definitions/payload_workspace_create_v2"
+    },
     "payload": {
       "type": "object",
+      "description": "Shape v1 lịch sử; v2 hiện hành dùng payload_v2/draft-v2.",
       "required": ["idempotency_key", "case", "stage", "diagram"],
       "additionalProperties": false,
       "properties": {

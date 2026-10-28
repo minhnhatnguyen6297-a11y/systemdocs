@@ -12,10 +12,11 @@ from fastapi.templating import Jinja2Templates
 from database import (
     Base,
     engine,
-    migrate_customers_nullable,
+    migrate_customers_document_number,
     migrate_inheritance_case_properties_schema,
     migrate_inheritance_cases_schema,
     migrate_properties_schema,
+    migrate_properties_serial,
     migrate_property_land_rows,
     migrate_zalo_exchange_schema,
     migrate_zalo_schema,
@@ -32,9 +33,10 @@ app_logger = logging.getLogger("notary.web")
 app_logger.info("Web logging initialized at %s", WEB_LOG_PATH)
 
 # Run schema migration before create_all.
-migrate_customers_nullable()
+migrate_customers_document_number()
 migrate_inheritance_cases_schema()
 migrate_properties_schema()
+migrate_properties_serial()
 migrate_property_land_rows()
 migrate_inheritance_case_properties_schema()
 migrate_zalo_schema()
@@ -164,7 +166,12 @@ async def stats():
             "customers": len(customer_ids),
             "properties": len(property_ids),
             "cases": db.query(InheritanceCase).count(),
-            "locked": db.query(InheritanceCase).filter(InheritanceCase.trang_thai == "locked").count(),
+            # Trạng thái chỉ còn draft/done; giữ shape cũ bằng cách thay
+            # `locked` bằng `done` và thêm `draft`.
+            "draft": db.query(InheritanceCase).filter(
+                InheritanceCase.trang_thai == "draft").count(),
+            "done": db.query(InheritanceCase).filter(
+                InheritanceCase.trang_thai == "done").count(),
         }
     finally:
         db.close()

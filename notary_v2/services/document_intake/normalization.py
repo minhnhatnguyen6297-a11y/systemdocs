@@ -115,22 +115,38 @@ def norm_gender(raw: str):
     if not cleaned:
         return None, "observed", None
     folded = _fold(cleaned)
-    if folded in ("nam", "male", "m"):
+    if folded in ("nam", "male", "m", "ong"):
         return "Nam", "observed" if cleaned == "Nam" else "normalized", None
-    if folded in ("nu", "female", "f"):
+    if folded in ("nu", "female", "f", "ba"):
         return "Nữ", "observed" if cleaned == "Nữ" else "normalized", None
     return None, "observed", None
 
 
 def norm_doc_no(raw: str):
-    """Số giấy tờ/CCCD: bỏ ký tự không phải chữ-số — canonical → normalized."""
+    """Freeform paper value; only numeric card grouping and labels normalize."""
     cleaned = clean_ws(raw)
     if not cleaned:
         return None, "observed", None
-    compact = re.sub(r"[^0-9A-Za-z]", "", cleaned)
-    if not compact:
-        return None, "observed", None
-    return compact, "normalized", None
+    value = re.sub(
+        r"(?i)^(?:(?:Trích\s+lục\s+khai\s+tử|Giấy\s+chứng\s+tử)"
+        r"(?:\s*\(\s*bản\s+sao\s*\))?\s+số|(?:CCCD|CMND)\s*(?:số)?)\s*:?\s*",
+        "", cleaned).strip().strip('\"“”').strip()
+    if re.fullmatch(r"[\d\s]+", value):
+        value = re.sub(r"\s+", "", value)
+    return value or None, "normalized" if value != cleaned else "observed", None
+
+
+def norm_document_type(raw: str):
+    value = clean_ws(raw)
+    key = re.sub(r"\s+", " ", _fold(value))
+    key = re.sub(r"\s*\(\s*ban sao\s*\)", " (ban sao)", key)
+    canonical = {
+        "trich luc khai tu": "Trích lục khai tử",
+        "trich luc khai tu (ban sao)": "Trích lục khai tử (bản sao)",
+        "giay chung tu": "Giấy chứng tử",
+        "giay chung tu (ban sao)": "Giấy chứng tử",
+    }.get(key, value)
+    return canonical or None, "normalized" if canonical != value else "observed", None
 
 
 _SERIAL_PATTERN = re.compile(r"^[A-Z]{2}\d{6,8}$")
@@ -223,6 +239,9 @@ _PERSON_FIELD_NORMALIZERS = {
     "ngay_cap": norm_date,
     "ngay_het_han": norm_date,
     "ngay_chet": norm_date,
+    "noi_cap": norm_text,
+    "loai_giay_to": norm_document_type,
+    "loai_dia_chi": norm_text,
 }
 
 _PROPERTY_FIELD_NORMALIZERS = {

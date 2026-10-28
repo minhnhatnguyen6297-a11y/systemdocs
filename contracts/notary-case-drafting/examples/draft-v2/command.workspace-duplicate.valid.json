@@ -1,0 +1,18 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "source_case_type": "inheritance",
+    "note": "§13.21: chỉ source_case_id + idempotency_key; cấm case_id/base_revision/case/stage/diagram/status."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2010-4010-8010-000000000010",
+  "command": "notary.workspace_duplicate",
+  "payload": {
+    "source_case_id": 48,
+    "idempotency_key": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  },
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
+}

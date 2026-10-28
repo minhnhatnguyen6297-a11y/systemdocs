@@ -21,7 +21,7 @@ component dùng chung cho Notary, Upload Lab và các mặt shell.
 
 ## 3. Token chính
 
-Nguồn máy đọc: [`tokens.json`](./tokens.json).
+Nguồn máy đọc: [`tokens.json`](tokens.json).
 
 | Nhóm | Giá trị đã chốt |
 |---|---|
@@ -42,14 +42,15 @@ Nguồn máy đọc: [`tokens.json`](./tokens.json).
 - Toast chỉ cho kết quả ngắn; trạng thái dài nằm trong vùng nội dung.
 - `waiting_user` dùng tông cảnh báo, không dùng đỏ như lỗi.
 - Drag có keyboard fallback hoặc menu gán vị trí.
-- Dữ liệu chưa lưu phải có dấu rõ; Hủy khôi phục snapshot committed.
+- Dữ liệu chưa lưu phải có dấu rõ; thao tác Hủy nếu có khôi phục baseline đã lưu. Soạn hồ sơ không có nút Hủy/Cập nhật Stage; chỉ Lưu hồ sơ ghi snapshot đang sửa.
 
 ### Navigation và giữ trạng thái
 
 - Đổi module/tab không được mất form, lựa chọn, vị trí cuộn hoặc job đang chạy.
-- Dữ liệu dirty (đã sửa nhưng chưa lưu) hiển thị tại đúng nút commit.
+- Dữ liệu dirty (đã sửa nhưng chưa lưu) hiển thị tại đúng nút ghi dữ liệu; với Soạn hồ sơ là **Lưu hồ sơ**, gồm Stage, metadata và Diagram.
 - Rời module hoặc đóng cửa sổ khi dirty phải hỏi xác nhận; không auto-save và
   không âm thầm bỏ dữ liệu.
+- Soạn hồ sơ: cảnh báo phải nói rõ chưa bấm Lưu hồ sơ thì thay đổi chưa xuống DB và sẽ mất khi đóng app hoặc bỏ hồ sơ để mở hồ sơ khác. Giữ buffer khi chỉ đổi module trong phiên không phải tự lưu hoặc bảo đảm khôi phục sau khi đóng app.
 
 ### Bốn mặt trạng thái
 
@@ -97,8 +98,8 @@ Lỗi chỉ ở một card thì card đó đổi mặt; không che toàn màn h�
 
 ## 7. Tài sản tham chiếu
 
-- [`prototypes/`](./prototypes/README.md): prototype HTML có dữ liệu giả.
-- [`references/`](./references/README.md): ảnh owner đã duyệt.
+- [`prototypes/`](prototypes/README.md): prototype HTML có dữ liệu giả.
+- [`references/`](references/README.md): ảnh owner đã duyệt.
 - `tokens.json`: giá trị chuẩn; CSS runtime phải ánh xạ từ đây.
 
 ## 8. Lịch sử và câu hỏi

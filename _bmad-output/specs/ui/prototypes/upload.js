@@ -364,7 +364,7 @@ function buildScan(el) {
       box.append(hd);
       box.append(h('div', 'modal-body',
         'Dừng sau đơn vị đang xử lý; các tab người đang kiểm tra không tự đóng. ' +
-        'Hủy không hoàn tác một lần Lưu đã xảy ra.'));
+        'Hủy không hoàn tác thao tác người dùng đã tự làm trên website.'));
       const f = h('div', 'modal-foot');
       f.append(btn('Tiếp tục chạy', '', close));
       f.append(btn('Dừng', 'danger-ghost', () => {
@@ -380,23 +380,16 @@ function buildScan(el) {
   c1.append(b1);
   el.append(c1);
 
-  /* banner chờ người / cần đối chiếu */
+  /* banner chờ người — kết thúc bước review không phải trạng thái Lưu */
   if (flags().has('waiting')) {
     const w = h('div', 'banner warn');
     w.append(h('span', 'grow',
-      'Đang chờ kiểm tra — đợt biểu mẫu đã điền sẵn trong Chromium. Kiểm tra và bấm Lưu từng tab, rồi xác nhận tại đây.'));
+      'Đang chờ kiểm tra — đợt biểu mẫu đã điền sẵn trong Chromium. Kiểm tra và tự quyết định có Lưu trên web hay không, rồi kết thúc bước chờ tại đây.'));
     w.append(btn('Mở lại trình duyệt', 'sm', () => P.toast('Đưa cửa sổ Chromium lên trước (demo).')));
     w.append(btn('Xác nhận xong kiểm tra', 'secondary sm', () => {
       flags().delete('waiting'); P.rerenderModule();
-      P.toast('Đã ghi nhận xong kiểm tra (demo — không phải bằng chứng Lưu).');
+      P.toast('Đã kết thúc bước chờ kiểm tra (demo).');
     }));
-    el.append(w);
-  }
-  if (flags().has('reconcile')) {
-    const w = h('div', 'banner warn');
-    w.append(h('span', 'grow',
-      '3 hồ sơ có thể đã Lưu nhưng chưa xác minh được — cần đối chiếu sổ mới hoặc xác nhận tay trước khi gửi lại.'));
-    w.append(btn('Đối chiếu ngay', 'secondary sm', () => P.toast('Chạy đối chiếu sổ mới (demo).')));
     el.append(w);
   }
 
@@ -405,7 +398,10 @@ function buildScan(el) {
   const b2 = h('div', 'card-body');
   const act = h('div', 'ul-row');
   const selCount = () => U.queue.filter(r => r.sel).length;
-  act.append(btn('Chọn tất cả', 'sm', () => { U.queue.forEach(r => r.sel = true); resortQueue(); }));
+  act.append(btn('Chọn tất cả hồ sơ chưa chuẩn bị', 'sm', () => {
+    U.queue.forEach(r => { r.sel = r.state !== 'filled' && r.state !== 'review'; });
+    resortQueue();
+  }));
   act.append(btn('Bỏ chọn tất cả', 'sm', () => { U.queue.forEach(r => r.sel = false); resortQueue(); }));
   const filt = btn(U.filterErr ? 'Hoàn tác lọc' : 'Lọc số lỗi', 'sm', () => {
     U.filterErr = !U.filterErr; P.rerenderModule();
@@ -424,8 +420,10 @@ function buildScan(el) {
   });
   up.disabled = !selCount() || U.scanning;
   act.append(up);
-  const next = btn(`Tiếp tục ${U.tabsPerBatch} số tiếp theo`, 'secondary sm', () => {
-    P.toast(`Mở đợt ${U.tabsPerBatch} tab kế tiếp — chỉ khi người bấm (demo).`);
+  const next = btn(`Tiếp tục ${U.tabsPerBatch} hồ sơ đã chọn còn chưa chuẩn bị`, 'secondary sm', () => {
+    const remaining = U.queue.filter(r => r.sel && r.state !== 'filled' && r.state !== 'review').length;
+    const count = Math.min(U.tabsPerBatch, remaining);
+    P.toast(count ? `Đợt thủ công tiếp theo gồm ${count} hồ sơ đã chọn còn chưa chuẩn bị (demo).` : 'Không có hồ sơ đã chọn còn chưa chuẩn bị (demo).');
   });
   next.disabled = !flags().has('waiting');
   act.append(next);
@@ -474,8 +472,6 @@ function resortQueue() {
 const STATE_PILL = {
   filled: ['accent', 'Đã điền sẵn'],
   review: ['warn', 'Đang chờ kiểm tra'],
-  saved: ['ok', 'Đã lưu trên web'],
-  reconcile: ['warn', 'Cần đối chiếu'],
   err: ['err', 'Lỗi'],
 };
 
@@ -483,7 +479,7 @@ function queueTable() {
   const t = h('table', 'ul-grid');
   const th = h('thead'); const tr = h('tr');
   const cbAll = h('input'); cbAll.type = 'checkbox'; cbAll.className = 'cb';
-  const rows = U.queue.filter(r => !U.filterErr || r.state === 'err' || r.state === 'reconcile');
+  const rows = U.queue.filter(r => !U.filterErr || r.state === 'err');
   cbAll.checked = rows.length > 0 && rows.every(r => r.sel);
   cbAll.setAttribute('aria-label', 'Chọn tất cả hồ sơ');
   cbAll.addEventListener('change', () => {

@@ -3,7 +3,7 @@
 Khong viet lai nghiep vu: moi thao tac deu qua models/services/router
 handlers cua repo con. Write path (customer/property/case/participant) goi
 dung inline-create/participant handlers → giu nguyen validation, upsert va
-business rule (locked case, dedup, unique serial).
+business rule (locked case, dedup).
 
 DB: notary.db cua engine root (database.py neo theo __file__). Sidecar la
 owner ghi duy nhat — renderer khong bao gio cham DB (g1-module-data §5).
@@ -65,9 +65,10 @@ def _ensure_db():
         _db_ready = False
     if _db_ready:
         return
-    database.migrate_customers_nullable()
+    database.migrate_customers_document_number()
     database.migrate_inheritance_cases_schema()
     database.migrate_properties_schema()
+    database.migrate_properties_serial()
     database.migrate_property_land_rows()
     database.migrate_inheritance_case_properties_schema()
     database.migrate_zalo_schema()
@@ -154,6 +155,9 @@ def _property_row(p):
     }
 
 
+_STATUS_LABELS = {"draft": "Nháp", "done": "Đã lưu"}
+
+
 def _case_row(c):
     return {
         "id": c.id,
@@ -161,8 +165,9 @@ def _case_row(c):
         "tai_san": _property_row(c.tai_san) if c.tai_san else None,
         "ngay_lap_ho_so": _d(c.ngay_lap_ho_so),
         "loai_van_ban": c.loai_van_ban, "trang_thai": c.trang_thai,
+        "status_label": _STATUS_LABELS.get(c.trang_thai, c.trang_thai),
         "noi_niem_yet": c.noi_niem_yet, "ghi_chu": c.ghi_chu,
-        "is_locked": c.is_locked, "tong_ty_le": c.tong_ty_le,
+        "tong_ty_le": c.tong_ty_le,
     }
 
 
@@ -300,7 +305,7 @@ def property_create(job, payload):
     sess = _db_session()
     try:
         resp = props.inline_create(
-            so_serial=_require(p.get("so_serial"), "so_serial"),
+            so_serial=p.get("so_serial"),
             so_vao_so=p.get("so_vao_so"), so_thua_dat=p.get("so_thua_dat"),
             so_to_ban_do=p.get("so_to_ban_do"),
             dia_chi=_require(p.get("dia_chi"), "dia_chi"),
@@ -343,14 +348,40 @@ def case_create(job, payload):
         if not sess.get(models.Property, tai_san_id):
             raise CommandError("file_not_found",
                                f"khong co tai san #{tai_san_id}")
-        case = models.InheritanceCase(
-            nguoi_chet_id=nguoi_id, tai_san_id=tai_san_id,
-            ngay_lap_ho_so=ngay_lap, loai_van_ban=loai,
-            noi_niem_yet=p.get("noi_niem_yet") or None,
-            ghi_chu=p.get("ghi_chu") or None,
-            trang_thai="draft")
-        sess.add(case)
+        # Storage B (issue 13): Word/Stage đọc dòng Người/Tài sản của chính
+        # hồ sơ, không đọc master. Tạo qua CaseWorkspaceService như web
+        # /cases/create (hydrate dòng từ master được chọn) để hồ sơ tạo bằng
+        # lệnh legacy vẫn xuất Word được.
+        from uuid import uuid4
+        cases_router = _router("cases")
+        ws = _svc("case_workspace")
+        owner = cases_router._people_from_customer(
+            sess.get(models.Customer, nguoi_id))
+        stage = {"people": [owner],
+                 "assets": [cases_router._asset_row_from_property(
+                     sess.get(models.Property, tai_san_id))],
+                 "owner_row_id": owner["row_id"]}
+        meta = {"case_type": "inheritance", "document_type": loai,
+                "ngay_lap_ho_so": ngay_lap.isoformat(),
+                "noi_niem_yet": p.get("noi_niem_yet") or None,
+                "ghi_chu": p.get("ghi_chu") or None}
+        try:
+            data = ws.CaseWorkspaceService(sess).create(
+                str(uuid4()), meta, stage, None)
+        except ws.WorkspaceError as exc:
+            raise CommandError("validation_error", exc.message,
+                               details=exc.details) from exc
+        case_id = data["case"]["id"]
+        # Cột legacy giữ cho case_get/participant (không phải nguồn Word).
+        # Giữ nguyên mốc lưu của create (một lần lưu = một mốc): ghi
+        # updated_at tường minh để onupdate không đóng mốc thứ hai.
+        tbl = models.InheritanceCase.__table__
+        sess.execute(
+            tbl.update().where(tbl.c.id == case_id).values(
+                nguoi_chet_id=nguoi_id, tai_san_id=tai_san_id,
+                updated_at=tbl.c.updated_at))
         sess.commit()
+        case = sess.get(models.InheritanceCase, case_id)
         sess.refresh(case)
         return _result("case_created", {"case": _case_row(case)})
     finally:
@@ -480,7 +511,10 @@ def export_word(job, payload):
             raise CommandError("engine_unavailable",
                                f"khong mo duoc template: {exc}") from exc
         try:
-            mapping = we.build_template_mapping(case)
+            # Gate nhóm theo token mẫu thực dùng (owner 15/10/2026): mẫu đã
+            # mở ở trên — dùng đúng needs của nó, không gate blanket.
+            mapping = we.build_template_mapping(
+                case, needed=we.template_group_needs(doc))
         except we.WordExportValidationError as exc:
             raise CommandError("validation_error", str(exc)) from exc
         we.replace_in_doc(doc, mapping)
@@ -628,7 +662,7 @@ def zalo_status(job, payload):
 # (login_required|pick_files|retry|contact_admin|null):
 #   workspace_conflict      → retryable, client doc lai workspace roi retry
 #   stage_validation_error  → khong retryable (payload sai retry mu se lai sai)
-_WORKSPACE_RETRYABLE_CODES = {"workspace_conflict"}
+_WORKSPACE_RETRYABLE_CODES = {"workspace_conflict", "engine_unavailable"}
 
 
 def _workspace_command_error(err):
@@ -674,6 +708,62 @@ def workspace_get(job, payload):
         sess.close()
 
 
+def workspace_source_latest(job, payload):
+    """notary.workspace_source_latest — doc Stage cua case Done moi nhat.
+
+    Read-only: payload bat buoc object rong; service chon theo moc luu
+    (`updated_at` microsecond, null-last, tie id DESC) va tra row_id moi.
+    Khong co Done la ket qua rong thanh cong, khong phai loi."""
+    if not isinstance(payload, dict) or payload:
+        raise CommandError(
+            "validation_error",
+            "payload phai la object rong — khong nhan null/case_id/filter")
+    sess = _db_session()
+    try:
+        module = _workspace_module()
+        try:
+            data = module.CaseWorkspaceService(sess).source_latest()
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("workspace_source_latest", data)
+    finally:
+        sess.close()
+
+
+def workspace_duplicate(job, payload):
+    """notary.workspace_duplicate — nhan ban toan bo ho so (§13.21).
+
+    Payload chi `source_case_id` + `idempotency_key`; session sach; service
+    so huu validate/atomic/idempotency. `complete_atomic` de cancel sau DB
+    commit khong bao sai trang thai ghi."""
+    if not isinstance(payload, dict):
+        raise CommandError("validation_error", "payload phai la object")
+    extra = set(payload) - {"source_case_id", "idempotency_key"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload co key ngoai schema: {sorted(extra)}")
+    source = payload.get("source_case_id")
+    if isinstance(source, bool) or not isinstance(source, int) or source < 1:
+        raise CommandError("validation_error",
+                           "source_case_id phai la so nguyen >= 1")
+    sess = _db_session()
+    try:
+        def apply():
+            module = _workspace_module()
+            try:
+                data = module.CaseWorkspaceService(
+                    sess, _docx_store).duplicate(
+                        source_case_id=source,
+                        idempotency_key=payload.get("idempotency_key"))
+            except module.WorkspaceError as err:
+                raise _workspace_command_error(err)
+            return _result("workspace_duplicate", data)
+        return job.complete_atomic(apply)
+    finally:
+        sess.close()
+
+
 def workspace_create(job, payload):
     """notary.workspace_create — tao ho so tu nhap trong mot transaction
     (contract v2 §13.6): case + person + asset + link + diagram + revision=1.
@@ -710,6 +800,67 @@ def workspace_create(job, payload):
         sess.close()
 
 
+def workspace_save_case(job, payload):
+    """notary.workspace_save_case — Lưu hồ sơ nguyên tử (contract §13.19).
+
+    `case_id` absent = tạo mới: bắt buộc `idempotency_key`, cấm
+    `base_revision`; `case_id` present = case cũ: bắt buộc
+    `base_revision`, cấm key. Một transaction gồm Stage/meta/Diagram/
+    status done/revision. Sidecar chỉ kiểm shape biên; service sở hữu
+    validate/atomic/idempotency."""
+    if not isinstance(payload, dict):
+        payload = {}
+    extra = set(payload) - {
+        "case_id", "base_revision", "idempotency_key", "case", "stage",
+        "diagram", "docx_import",
+    }
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload co key ngoai schema: {sorted(extra)}")
+    if "case_id" in payload and payload.get("case_id") is None:
+        raise CommandError("validation_error",
+                           "case_id null — bo key khi tao moi")
+    case_id = payload.get("case_id")
+    if case_id is not None:
+        if isinstance(case_id, bool):
+            raise CommandError("validation_error",
+                               "case_id phai la so nguyen >= 1")
+        case_id = _int_id(case_id, "case_id")
+    base_revision = payload.get("base_revision")
+    if base_revision is not None:
+        if isinstance(base_revision, bool):
+            raise CommandError("validation_error",
+                               "base_revision phai la so nguyen >= 1")
+        base_revision = _int_id(base_revision, "base_revision")
+    stage = payload.get("stage")
+    if not isinstance(stage, dict):
+        raise CommandError("validation_error", "stage phai la object")
+    if not isinstance(payload.get("case"), dict):
+        raise CommandError("validation_error",
+                           "payload.case phai la object")
+    dg = payload.get("diagram")
+    if not isinstance(dg, dict) or "state" not in dg:
+        raise CommandError("validation_error",
+                           "payload.diagram.state bat buoc")
+    sess = _db_session()
+    try:
+        module = _workspace_module()
+        try:
+            data = module.CaseWorkspaceService(
+                sess, _docx_store).save_case(
+                    case_id=case_id, base_revision=base_revision,
+                    idempotency_key=payload.get("idempotency_key"),
+                    case_meta=payload.get("case"), stage=stage,
+                    state=dg.get("state"),
+                    docx_import=payload.get("docx_import"))
+        except module.WorkspaceError as err:
+            raise _workspace_command_error(err)
+        job.check_cancel()
+        return _result("workspace_save_case", data)
+    finally:
+        sess.close()
+
+
 def workspace_commit_stage(job, payload):
     """notary.workspace_commit_stage — commit Stage nguyen tu + revision."""
     if not isinstance(payload, dict):
@@ -739,10 +890,38 @@ def workspace_commit_stage(job, payload):
         sess.close()
 
 
+def workspace_convert_type(job, payload):
+    """Dedicated atomic saved-case domain conversion."""
+    if not isinstance(payload, dict):
+        raise CommandError("validation_error", "payload phải là object")
+    extra = set(payload) - {
+        "case_id", "base_revision", "case_type", "document_type",
+        "confirm_diagram_reset", "owner_row_id",
+    }
+    if extra:
+        raise CommandError("validation_error", "payload có key ngoài schema")
+    cid = _int_id(_require(payload.get("case_id"), "case_id"), "case_id")
+    base = _int_id(_require(payload.get("base_revision"), "base_revision"), "base_revision")
+    conversion = {k: v for k, v in payload.items()
+                  if k not in ("case_id", "base_revision")}
+    sess = _db_session()
+    try:
+        def apply():
+            module = _workspace_module()
+            try:
+                data = module.CaseWorkspaceService(sess).convert_type(cid, base, conversion)
+            except module.WorkspaceError as err:
+                raise _workspace_command_error(err)
+            return _result("workspace_convert_type", data)
+        return job.complete_atomic(apply)
+    finally:
+        sess.close()
+
+
 def workspace_update(job, payload):
     """notary.workspace_update — cap nhat meta case da luu
     (ngay_lap_ho_so/noi_niem_yet/ghi_chu; §6.2). case_type/document_type
-    la dinh danh nghiep vu — khong doi sau create. base_revision bat
+    khong doi qua update (dung workspace_convert_type). base_revision bat
     buoc, conflict → workspace_conflict."""
     if not isinstance(payload, dict):
         payload = {}
@@ -813,9 +992,6 @@ def intake_analyze(job, payload):
                     "case_type_unsupported",
                     f"loai viec chua ho tro: {case_type}",
                     details={"case_type": case_type})
-            if case.is_locked:
-                raise CommandError("workspace_locked",
-                                   f"ho so #{cid} da khoa")
         finally:
             sess.close()
 
@@ -951,7 +1127,7 @@ def _word_case_id(payload):
     return raw
 
 
-def _word_case(sess, models, cid, *, writable):
+def _word_case(sess, models, cid):
     """Load case cho word export. Session PHAI mo trong suot batch —
     build_word_context lazy-load participants/property_links/nguoi_chet."""
     case = sess.get(models.InheritanceCase, cid)
@@ -961,8 +1137,6 @@ def _word_case(sess, models, cid, *, writable):
     # NAIA-8: bo chan case_type_unsupported rieng luong Word —
     # engine da co context/mapping two_party; readiness chi tiet qua
     # word_export_options.block_reason (word.no_people/no_diagram/...).
-    if writable and case.is_locked:
-        raise CommandError("workspace_locked", f"ho so #{cid} da khoa")
     return case
 
 
@@ -998,18 +1172,25 @@ def word_export_options(job, payload):
     Read-only: duoc phep tren locked/unsupported (§5.3 chi workspace_get
     quyet dinh capability) — mock oracle khong _check_writable.
     NAIA-8: `template_dir` (FileRef thu muc) → documents = file .docx
-    quet duoc thay vi catalog co dinh."""
+    quet duoc thay vi catalog co dinh.
+    Phan W (owner 23/10/2026): ho so CHUA LUU (`case_id` absent/null) van
+    quet duoc nguon mau — readiness chi con muc mau; luot xuat tu tao +
+    luu truoc khi render. Nguon Word goc thi phai co ho so da luu."""
     p = payload if isinstance(payload, dict) else {}
     extra = set(p) - {"case_id", "template_dir", "original_source_id"}
     if extra:
         raise CommandError("validation_error",
                            f"payload key la: {sorted(extra)}")
-    cid = _word_case_id(payload)
+    has_case = p.get("case_id") is not None
+    if not has_case and p.get("original_source_id"):
+        raise CommandError("validation_error",
+                           "Hồ sơ chưa lưu — chưa có nguồn Word gốc")
+    cid = _word_case_id(payload) if has_case else None
     wbe = _svc("word_batch_export")
     models = _models()
     sess = _db_session()
     try:
-        case = _word_case(sess, models, cid, writable=False)
+        case = _word_case(sess, models, cid) if has_case else None
         if p.get("original_source_id"):
             if p.get("template_dir"):
                 raise CommandError("validation_error", "Chỉ chọn một nguồn mẫu Word")
@@ -1018,11 +1199,13 @@ def word_export_options(job, payload):
                 proposals = original.binding_proposals(case, p["original_source_id"], _docx_store())
             except (ValueError, OSError, KeyError, TypeError) as exc:
                 raise CommandError("word.original_mapping_invalid", str(exc)) from exc
-            reason = None
-            try:
-                original.reviewed_template(case, p["original_source_id"], _docx_store())
-            except (ValueError, OSError, KeyError, TypeError):
-                reason = "word.original_mapping_invalid"
+            we = _svc("word_engine")
+            reason = we.word_block_reason(we.build_word_context(case), static=True)
+            if reason is None:
+                try:
+                    original.reviewed_template(case, p["original_source_id"], _docx_store())
+                except (ValueError, OSError, KeyError, TypeError):
+                    reason = "word.original_mapping_invalid"
             return _result("word_export_options", {"schema_version": wbe.SCHEMA_VERSION,
                 "binding_proposals": proposals,
                 "documents": [{"document_key": "original.docx", "display_name": "Hợp đồng Word gốc",
@@ -1070,7 +1253,7 @@ def word_export_batch(job, payload):
     models = _models()
     sess = _db_session()
     try:
-        case = _word_case(sess, models, cid, writable=True)
+        case = _word_case(sess, models, cid)
         if p.get("original_source_id"):
             if p.get("template_dir") or p.get("document_keys") != ["original.docx"]:
                 raise CommandError("validation_error", "Chọn đúng hợp đồng Word gốc")

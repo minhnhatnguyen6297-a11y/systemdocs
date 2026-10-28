@@ -66,7 +66,7 @@ def inline_create(
 ):
     import json as _json
     form = {
-        "so_serial": (so_serial or "").strip(),
+        "so_serial": so_serial or "",
         "so_vao_so": (so_vao_so or "").strip(),
         "so_thua_dat": (so_thua_dat or "").strip(),
         "so_to_ban_do": (so_to_ban_do or "").strip(),
@@ -79,15 +79,10 @@ def inline_create(
         "land_rows": (land_rows or "").strip(),
     }
     errors = {}
-    if not form["so_serial"]:
-        errors["so_serial"] = "Bat buoc"
     if not form["dia_chi"]:
         errors["dia_chi"] = "Bat buoc"
     if form["ngay_cap"] and parse_date(form["ngay_cap"]) is None:
         errors["ngay_cap"] = "Ngay khong hop le"
-    if form["so_serial"] and db.query(Property).filter(Property.so_serial == form["so_serial"]).first():
-        errors["so_serial"] = "So serial da ton tai"
-
     # Cụm đất: parse + validate theo cùng luật Stage (dual key cũ/mới,
     # chuỗi|số đúng kiểu, tối đa MAX_LAND_ROWS) — canonical hóa ngay để
     # bảng con property_land_rows và mirror land_rows_json ghi cùng một
@@ -232,7 +227,7 @@ def create(
     # `thoi_han` lẻ không còn là input (MIN-141): client cũ gửi kèm bị bỏ
     # qua — giá trị mới chỉ lưu theo cụm property_land_rows.
     form = {
-        "so_serial": (so_serial or "").strip(),
+        "so_serial": so_serial or "",
         "so_vao_so": (so_vao_so or "").strip(),
         "so_thua_dat": (so_thua_dat or "").strip(),
         "so_to_ban_do": (so_to_ban_do or "").strip(),
@@ -247,16 +242,10 @@ def create(
     }
     errors = []
     field_errors = {}
-    if not form["so_serial"]:
-        field_errors["so_serial"] = "Bat buoc"
     if not form["dia_chi"]:
         field_errors["dia_chi"] = "Bat buoc"
     if form["ngay_cap"] and parse_date(form["ngay_cap"]) is None:
         field_errors["ngay_cap"] = "Ngay khong hop le"
-
-    if form["so_serial"] and db.query(Property).filter(Property.so_serial == form["so_serial"]).first():
-        field_errors["so_serial"] = "So serial da ton tai"
-        errors.append(f"Số serial '{form['so_serial']}' đã tồn tại!")
 
     if field_errors:
         return templates.TemplateResponse("properties/form.html", {
@@ -330,7 +319,7 @@ def edit(
     # `thoi_han` lẻ không còn là input (MIN-141): form không gửi, client cũ
     # gửi kèm bị bỏ qua — p.thoi_han giữ nguyên giá trị lịch sử.
     form = {
-        "so_serial": (so_serial or "").strip(),
+        "so_serial": so_serial or "",
         "so_vao_so": (so_vao_so or "").strip(),
         "so_thua_dat": (so_thua_dat or "").strip(),
         "so_to_ban_do": (so_to_ban_do or "").strip(),
@@ -345,18 +334,10 @@ def edit(
     }
     errors = []
     field_errors = {}
-    if not form["so_serial"]:
-        field_errors["so_serial"] = "Bat buoc"
     if not form["dia_chi"]:
         field_errors["dia_chi"] = "Bat buoc"
     if form["ngay_cap"] and parse_date(form["ngay_cap"]) is None:
         field_errors["ngay_cap"] = "Ngay khong hop le"
-
-    if form["so_serial"]:
-        dup = db.query(Property).filter(Property.so_serial == form["so_serial"], Property.id != pid).first()
-        if dup:
-            field_errors["so_serial"] = "So serial da ton tai"
-            errors.append(f"Số serial '{form['so_serial']}' đã tồn tại!")
 
     if field_errors:
         return templates.TemplateResponse("properties/form.html", {

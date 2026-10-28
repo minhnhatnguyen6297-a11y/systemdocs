@@ -70,14 +70,24 @@ _LISTING_HTML = """<!doctype html><html><head><title>Ho so cong chung</title></h
 _CREATE_HTML = """<!doctype html><html><head><title>Tao ho so</title></head>
 <body>
 <h1>Tao moi ho so</h1>
+<!-- id/selector khop uploader_selectors.FORM_SELECTORS de engine THAT
+     (NamDinhUploaderSession) chay duoc tren fixture nay; #so-cong-chung
+     giu cho luong gia lap cu. -->
+<input id="hopdong.sohopdong" aria-label="Số công chứng"/>
+<select id="hopdong.tenhopdong" aria-label="Tên hợp đồng">
+  <option value="">-- Chọn --</option>
+  <option>Hợp đồng chuyển nhượng</option>
+</select>
 <input id="so-cong-chung"/>
 <button id="save-btn">Lưu</button>
 <script>
 document.getElementById('save-btn').addEventListener('click', async () => {
+  const soHd = document.getElementById('hopdong.sohopdong');
+  const value = (soHd && soHd.value) ||
+    document.getElementById('so-cong-chung').value;
   const res = await fetch('/api/hoso', {method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({so_cong_chung:
-      document.getElementById('so-cong-chung').value})});
+    body: JSON.stringify({so_cong_chung: value})});
   if (res.ok) location.href = '/ho-so-cong-chung';
 });
 </script>
@@ -264,8 +274,9 @@ class FakePortal:
                 saved = list(self.saved_contract_nos)
             if fail:
                 return _json_response({"ok": False, "error": "interrupted"}, 500)
-            # So da Lưu tren portal hien trong export moi nhat — giong so
-            # that, de audit/reconcile doi chieu duoc sau Save.
+            # So da Luu tren portal xuat hien trong export moi nhat — day
+            # la du lieu CHINH THUC cua website (SOT), khong phai suy tu
+            # tin hieu browser.
             existing = {r[0] for r in self.export_rows}
             rows = list(self.export_rows) + [
                 (cn, datetime.now().strftime("%d/%m/%Y"))
@@ -420,7 +431,6 @@ class PortalBrowserSession:
         self.prepare_gate: threading.Event | None = None
         self.last_prepare_kwargs: dict | None = None
         self.last_download_dates: tuple[str, str] | None = None
-        self.last_poll_strict: bool | None = None
         self.prepare_calls = 0
 
     # -- helpers ---------------------------------------------------------------
@@ -519,24 +529,18 @@ class PortalBrowserSession:
         *,
         selected_record_ids=None,
         exclude_contract_nos=None,
-        requester_sheet_url: str = "",
         progress_callback=None,
         cong_chung_vien=None,
         thu_ky=None,
         chunk_size=None,
-        prime_save_validation: bool = True,
     ) -> dict:
         self._mark("prepare_manifest")
         self.last_prepare_kwargs = {
             "selected_record_ids": set(selected_record_ids) if selected_record_ids is not None else None,
             "exclude_contract_nos": set(exclude_contract_nos or []),
-            "requester_sheet_url": requester_sheet_url,
             "cong_chung_vien": cong_chung_vien,
             "thu_ky": thu_ky,
             "chunk_size": chunk_size,
-            # v1 adapter truyen False: dry-run khong click nut Luu (F1).
-            # Fixture ghi lai de test assert kwarg di toi engine seam.
-            "prime_save_validation": prime_save_validation,
         }
         self.prepare_calls += 1
 
@@ -566,17 +570,8 @@ class PortalBrowserSession:
             selected_record_ids=selected_record_ids,
             cong_chung_vien=cong_chung_vien,
             thu_ky=thu_ky,
-            statuses=uploader.QUEUE_STATUSES,
+            statuses=uploader.PREPARE_QUEUE_STATUSES,
         )
-        records = [
-            record
-            for record in records
-            if record.status in uploader.PREPARE_QUEUE_STATUSES
-            or (
-                record.status in uploader.PREPARED_QUEUE_STATUSES
-                and record.record_id not in self._prepared_record_ids
-            )
-        ]
         excluded_duplicates: list = []
         if exclude_contract_nos:
             records, excluded_duplicates = uploader.split_records_by_existing_contract_nos(
@@ -727,16 +722,8 @@ class PortalBrowserSession:
         emit({"event": "finished", **summary})
         return summary
 
-    def poll_prepared_pages(self, strict_save_evidence: bool = False) -> dict:
+    def poll_prepared_pages(self) -> dict:
         self._mark("poll_prepared_pages")
-        # v1 (_poll_browser truyen website_id != None): chi POST 2xx tinh
-        # la Luu — fake da strict san (chi save_evidence=POST 2xx moi
-        # finalize; 'navigated away' khong co trong model cua fixture).
-        self.last_poll_strict = strict_save_evidence
-        from engine_roots import import_engine_module
-
-        batch_scan = import_engine_module("upload_lab", "batch_scan")
-        saved_ids: list[int] = []
         closed_ids: list[int] = []
         with self._state:
             items = list(self.tabs.items())
@@ -746,20 +733,11 @@ class PortalBrowserSession:
                     self.tabs.pop(record_id, None)
                     self._prepared_record_ids.discard(record_id)
                 closed_ids.append(record_id)
-            elif tab["save_evidence"]:
-                conn = batch_scan.connect_registry(self.working_dir / "registry.sqlite3")
-                batch_scan.mark_records_uploaded_success(
-                    conn, [record_id], reason="Luu tren fake portal (da xac minh POST)"
-                )
-                conn.close()
-                with self._state:
-                    self.tabs.pop(record_id, None)
-                    self._prepared_record_ids.discard(record_id)
-                saved_ids.append(record_id)
         with self._state:
             open_ids = sorted(self._prepared_record_ids)
+        # Tab con `save_evidence` (da bam Luu tren portal gia lap) VAN duoc
+        # bao la dang mo: ung dung khong ket luan ket qua Luu tu day.
         return {
-            "saved_record_ids": saved_ids,
             "closed_record_ids": closed_ids,
             "open_record_ids": open_ids,
         }
@@ -851,7 +829,6 @@ def make_fake_provider(portal: FakePortal, *, website_id: str = "fake_portal"):
                         "scan",
                         "prepare",
                         "staff_options",
-                        "reconcile",
                     ),
                 )
                 self.portal = fake_portal
@@ -1016,7 +993,9 @@ def _fake_run_scan(
                             "so_cong_chung": contract_no,
                             "nhom_hop_dong": "Chuyen nhuong quyen su dung dat",
                             "loai_tai_san": "Quyen su dung dat",
-                            "tai_san": f"Thua dat so {index}",
+                            # A09-A: tài sản chỉ render từ dạng có cấu trúc
+                            # (thửa + tờ), chuỗi tự do -> missing: tai_san.
+                            "tai_san": f"Thửa đất số {index}, tờ bản đồ số 2",
                         },
                         "raw": {"file_goc": str(docx)},
                     },

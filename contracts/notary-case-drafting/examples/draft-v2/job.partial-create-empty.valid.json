@@ -1,0 +1,62 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.6: create nháp rỗng → case draft rev1; owner_row_id=null, diagram không seed node owner giả (nodes=[]), render null."
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_partial_create_empty_001",
+  "command_id": "a1b2c3d4-2021-4021-8021-000000000021",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_create",
+    "data": {
+      "schema_version": "notary.case-drafting.v2",
+      "backend_mode": "real",
+      "created": true,
+      "case": {
+        "id": 92,
+        "case_type": "inheritance",
+        "document_type": "khai_nhan",
+        "status": "draft",
+        "revision": 1,
+        "ngay_lap_ho_so": null,
+        "noi_niem_yet": null,
+        "ghi_chu": null,
+        "nguoi_nhan_uy_quyen": null,
+        "nguoi_nhan_uy_quyen_id": null,
+        "noi_dung_viec": null
+      },
+      "stage": {
+        "owner_row_id": null,
+        "people": [],
+        "assets": []
+      },
+      "diagram": {
+        "domain": "inheritance",
+        "state": {
+          "version": 3,
+          "domain": "inheritance",
+          "nodes": []
+        },
+        "render_model": null,
+        "warnings": []
+      },
+      "capabilities": {
+        "intake": [
+          "image",
+          "pdf",
+          "docx",
+          "xlsx",
+          "text"
+        ],
+        "diagram": true,
+        "word_export": true
+      }
+    },
+    "warnings": []
+  },
+  "error": null,
+  "updated_at": "2026-10-22T08:00:02.200000+00:00"
+}

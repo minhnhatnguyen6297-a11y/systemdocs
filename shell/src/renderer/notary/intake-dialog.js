@@ -22,18 +22,17 @@ const INTAKE_EXT_KIND = {
 const INTAKE_KIND_LABEL = {
   image: 'ảnh', pdf: 'PDF', docx: 'Word', xlsx: 'Excel', text: 'văn bản',
 };
-const OBS_STATE_LABEL = {
-  observed: 'đọc được', normalized: 'đã chuẩn hóa', inferred: 'suy luận',
-};
 const INTAKE_FILTERS = [
   { name: 'Tài liệu/Giấy tờ',
     extensions: ['jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx'] },
 ];
 const INTAKE_FIELD_LABEL = {
   ho_ten: 'Họ tên', so_giay_to: 'Số giấy tờ', ngay_sinh: 'Ngày sinh', ngay_chet: 'Ngày chết',
-  ngay_cap: 'Ngày cấp', noi_cap: 'Nơi cấp', dia_chi: 'Địa chỉ', so_serial: 'Serial giấy chứng nhận',
+  ngay_cap: 'Ngày cấp', noi_cap: 'Nơi cấp', dia_chi: 'Địa chỉ', so_serial: 'Số giấy tờ (GCN)',
   so_vao_so: 'Số vào sổ', so_thua_dat: 'Số thửa đất', so_to_ban_do: 'Số tờ bản đồ',
   dien_tich: 'Diện tích', co_quan_cap: 'Cơ quan cấp', land_rows: 'Cụm đất',
+  gioi_tinh: 'Giới tính', loai_dat: 'Loại đất', thoi_han: 'Thời hạn', nguon_goc: 'Nguồn gốc',
+  hinh_thuc_su_dung: 'Hình thức sử dụng', loai_so: 'Loại sổ', place_of_origin: 'Quê quán',
 };
 
 // Same numeric rule as Intake normalization: 1.234,5 → 1234.5.
@@ -56,6 +55,10 @@ function createIntakeDialog(ctx) {
   // registerDroppedFile co the thieu tren shell cu — fallback picker.
   const registerDroppedFile = ctx.registerDroppedFile || null;
   const cancelJob = ctx.cancelJob || (async () => ({ ok: false }));
+  const actionStatus = ctx.actionStatus ||
+    { run: (sel, root, task) => task() };
+  const errText = ctx.errText ||
+    ((e) => (e && (e.message || e.code)) || 'Lỗi');
 
   function open(presetKind) {
     // item: {source_id, kind, label, token?, text?, status, error}
@@ -135,9 +138,7 @@ function createIntakeDialog(ctx) {
       for (const [k, f] of Object.entries(sug.fields || {})) {
         const v = f && (f.normalized_value != null
           ? f.normalized_value : f.raw_value);
-        const st = f && f.observation_state;
-        bits.push(`${INTAKE_FIELD_LABEL[k] || k}: ${k === 'land_rows' ? 'xem từng dòng bên dưới' : v == null ? '—' : v}` +
-          (st ? ` (${OBS_STATE_LABEL[st] || st})` : ''));
+        bits.push(`${INTAKE_FIELD_LABEL[k] || k}: ${k === 'land_rows' ? 'xem từng dòng bên dưới' : v == null ? '—' : v}`);
       }
       head.append(h('span', 'cd-suggest-text', bits.join(' · ')));
       card.append(head);
@@ -160,7 +161,6 @@ function createIntakeDialog(ctx) {
           };
           function renderRows() {
             rowsBox.innerHTML = '';
-            rowsBox.append(h('div', 'muted', 'Cụm đất: mỗi dòng giữ riêng loại đất, diện tích và thời hạn.'));
             for (const row of rows) {
               const rowEl = h('div', 'cd-check-row');
               for (const [name, label] of [['loai_dat', 'Loại đất'], ['dien_tich', 'Diện tích'], ['thoi_han', 'Thời hạn']]) {
@@ -204,8 +204,6 @@ function createIntakeDialog(ctx) {
         input.type = 'text';
         input.value = field.review_input != null ? String(field.review_input) : field.normalized_value == null ? '' : String(field.normalized_value);
         input.setAttribute('aria-label', `Kiểm tra ${INTAKE_FIELD_LABEL[key] || key}`);
-        input.placeholder = 'Thiếu hoặc chưa chắc — nhập giá trị đã kiểm tra';
-        if (key.startsWith('ngay_')) input.placeholder = 'Năm hoặc ngày dạng 2026-10-04';
         const reviewError = h('span', 'error', field.review_error || '');
         const review = () => {
           const valid = model.reviewSuggestion(sug.suggestion_id, key, input.value);
@@ -234,10 +232,10 @@ function createIntakeDialog(ctx) {
         card.append(h('div', 'muted warn-text', w.message || w.code));
       }
       const actions = h('div', 'toolbar');
-      const put = btn('Đưa vào Stage', 'primary sm', () => {
+      const put = btn('Đưa vào hồ sơ', 'primary sm', () => {
         const row = model.acceptSuggestion(sug.suggestion_id);
         if (row) card.remove();
-        else notify(model.state.notice || 'Gợi ý chưa được đưa vào Stage', true);
+        else notify(model.state.notice || 'Gợi ý chưa được đưa vào hồ sơ', true);
       });
       put.disabled = !model.canWrite();
       const drop = btn('Bỏ qua', 'ghost sm', () => {
@@ -281,8 +279,6 @@ function createIntakeDialog(ctx) {
       head.append(mx);
       box.append(head);
       const body = h('div', 'modal-body');
-      body.append(h('div', 'muted',
-        'Mọi kết quả là gợi ý chờ kiểm tra — không tự ghi vào hồ sơ.'));
 
       // Drop-zone: file tha vao di qua registerDroppedFile (main cap token)
       // — khong bao gio doc path trong renderer.
@@ -296,9 +292,8 @@ function createIntakeDialog(ctx) {
         drop.classList.remove('drop-hint');
         if (!registerDroppedFile) {
           dropErr.innerHTML = '';
-          dropErr.append(face(L.faceError({
-            code: 'unsupported', message:
-              'Kéo thả chưa hỗ trợ trên bản này — dùng “Chọn file…”.' })));
+          dropErr.append(face({ kind: 'error', title:
+            'Kéo thả chưa hỗ trợ trên bản này — dùng “Chọn file…”.' }));
           return;
         }
         for (const f of (e.dataTransfer && e.dataTransfer.files) || []) {
@@ -358,7 +353,7 @@ function createIntakeDialog(ctx) {
       });
       cancelBtn.hidden = true;
 
-      const go = btn('Phân tích', 'primary', async () => {
+      const go = btn('Phân tích', 'primary js-intake-run', async () => {
         const sources = [];
         for (const it of items) {
           if (!it.kind || it.status === 'lỗi') continue;  // bo nguon loi
@@ -391,16 +386,17 @@ function createIntakeDialog(ctx) {
         cancelBtn.hidden = false;
         renderList();
         prog.textContent = 'Đang gửi…';
-        const r = await model.intakeAnalyze(sources, {
-          onJob: (job) => {
-            if (job && job.job_id) jobId = job.job_id;
-            const p = job && job.progress;
-            prog.textContent = p
-              ? `Đang phân tích ${p.done ?? 0}/${p.total ?? '?'} — ` +
-                (p.current_label || '')
-              : 'Đang phân tích…';
-          },
-        });
+        const r = await actionStatus.run('.js-intake-run', box,
+          () => model.intakeAnalyze(sources, {
+            onJob: (job) => {
+              if (job && job.job_id) jobId = job.job_id;
+              const p = job && job.progress;
+              prog.textContent = p
+                ? `Đang phân tích ${p.done ?? 0}/${p.total ?? '?'} — ` +
+                  (p.current_label || '')
+                : 'Đang phân tích…';
+            },
+          }), { ok: (x) => !!(x && x.ok) });
         if (r.stale) return;
         busy = false;
         jobId = null;
@@ -415,8 +411,7 @@ function createIntakeDialog(ctx) {
           renderList();
           const news = lastResult.suggestions || [];
           for (const e of lastResult.errors || []) {
-            review.append(h('div', 'error',
-              `${e.code}: ${e.message || ''}`));
+            review.append(h('div', 'error', errText(e)));
           }
           if (news.length) {
             review.append(btn('Tải JSON về máy', 'secondary sm', () => {
@@ -427,10 +422,8 @@ function createIntakeDialog(ctx) {
               anchor.click();
               URL.revokeObjectURL(url);
             }));
-            review.append(h('div', 'muted', 'JSON giữ kết quả phân tích ban đầu; các sửa đổi được lưu vào Stage.'));
             review.append(h('div', 'cd-suggest-title',
-              `${news.length} gợi ý mới — xử lý tại đây hoặc đóng ` +
-              'và xử lý trong khay gợi ý dưới Stage.'));
+              `${news.length} gợi ý mới`));
             const pendingIds = new Set(reviewCards.keys());
             for (const s2 of model.state.suggestions || []) {
               if (!pendingIds.has(s2.suggestion_id)) review.append(reviewCardEl(s2));
@@ -453,7 +446,7 @@ function createIntakeDialog(ctx) {
             }
           }
           renderList();
-          review.append(face(L.faceError(r.error || { code: 'unknown' })));
+          review.append(face({ kind: 'error', title: errText(r.error) }));
         }
       });
       go.disabled = !model.canWrite();

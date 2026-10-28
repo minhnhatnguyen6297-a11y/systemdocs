@@ -7,6 +7,7 @@ theo persisted workspace shape). Chạy từ repo root notary_v2.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import os
 import re
@@ -95,24 +96,121 @@ def _case_state(*people, nodes=None):
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _person_row(stage_row, vitri):
+    raw_id = stage_row.get("entity_id")
+    if raw_id is None:
+        legacy = str(stage_row.get("id") or "")
+        raw_id = int(legacy) if legacy.isdigit() else None
+    return SimpleNamespace(
+        row_id=stage_row.get("row_id") or f"row-{raw_id}-{vitri}",
+        customer_id=raw_id, vitri=vitri,
+        ho_ten=stage_row.get("ho_ten"),
+        gioi_tinh=stage_row.get("gioi_tinh"),
+        ngay_sinh=stage_row.get("ngay_sinh"),
+        ngay_chet=stage_row.get("ngay_chet"),
+        so_giay_to=stage_row.get("so_giay_to"),
+        ngay_cap=stage_row.get("ngay_cap"),
+        noi_cap=stage_row.get("noi_cap"),
+        dia_chi=stage_row.get("dia_chi"),
+        place_of_origin=stage_row.get("place_of_origin"),
+        loai_giay_to=stage_row.get("loai_giay_to"),
+        loai_dia_chi=stage_row.get("loai_dia_chi"),
+    )
+
+
+def _asset_row(prop, vitri):
+    raw = prop.land_rows_json
+    rows = json.loads(raw) if raw else []
+    return SimpleNamespace(
+        row_id=f"asset-{vitri}", property_id=getattr(prop, "id", None),
+        vitri=vitri, so_serial=prop.so_serial, so_vao_so=prop.so_vao_so,
+        so_thua_dat=prop.so_thua_dat, so_to_ban_do=prop.so_to_ban_do,
+        dia_chi=prop.dia_chi, loai_so=prop.loai_so,
+        hinh_thuc_su_dung=prop.hinh_thuc_su_dung, thoi_han=prop.thoi_han,
+        nguon_goc=prop.nguon_goc, ngay_cap=prop.ngay_cap,
+        co_quan_cap=prop.co_quan_cap, land_rows_present=bool(raw),
+        land_rows=[SimpleNamespace(
+            vitri=index + 1, loaidat=row.get("loai_dat"),
+            dientich=row.get("dien_tich"), thoihan=row.get("thoi_han"))
+            for index, row in enumerate(rows) if isinstance(row, dict)],
+    )
+
+
 def _make_case(owner, *, participants=None, properties=None,
                case_state=None, cid=99):
-    """properties=None → không tài sản (empty); [] cũng vậy."""
+    """Case Storage B: rows case-owned + JSON v4 (Diagram/meta)."""
+    participants = participants or []
     props = properties or []
+    payload = json.loads(case_state) if case_state else {}
+    stage_items = payload.get("stage") if isinstance(payload.get("stage"), list) else None
+    if stage_items is None:
+        stage_items = []
+        if owner is not None:
+            stage_items.append({
+                "id": str(owner.id), "ho_ten": owner.ho_ten,
+                "gioi_tinh": owner.gioi_tinh,
+                "ngay_sinh": owner.ngay_sinh.isoformat() if owner.ngay_sinh else None,
+                "ngay_chet": owner.ngay_chet.isoformat() if owner.ngay_chet else None,
+                "so_giay_to": owner.so_giay_to,
+                "ngay_cap": owner.ngay_cap.isoformat() if owner.ngay_cap else None,
+                "noi_cap": owner.noi_cap, "dia_chi": owner.dia_chi,
+                "loai_dia_chi": owner.loai_dia_chi})
+        for participant in participants:
+            person = participant.customer
+            stage_items.append({
+                "id": str(person.id), "ho_ten": person.ho_ten,
+                "gioi_tinh": person.gioi_tinh,
+                "ngay_sinh": person.ngay_sinh.isoformat() if person.ngay_sinh else None,
+                "ngay_chet": person.ngay_chet.isoformat() if person.ngay_chet else None,
+                "so_giay_to": person.so_giay_to,
+                "ngay_cap": person.ngay_cap.isoformat() if person.ngay_cap else None,
+                "noi_cap": person.noi_cap, "dia_chi": person.dia_chi,
+                "loai_dia_chi": person.loai_dia_chi})
+    person_rows = [_person_row(item, index + 1)
+                   for index, item in enumerate(stage_items)]
+    entity_to_row = {str(row.customer_id): row.row_id
+                     for row in person_rows if row.customer_id is not None}
+
+    diagram = payload.get("diagram") or {}
+    nodes = None
+    engine = diagram.get("engineInput")
+    if isinstance(engine, dict):
+        nodes = engine.get("nodes") or []
+    elif isinstance(diagram.get("state"), dict):
+        nodes = diagram["state"].get("nodes") or []
+    remapped = []
+    for node in nodes or []:
+        if isinstance(node, dict):
+            mapped = entity_to_row.get(str(node.get("personId")))
+            remapped.append({**node,
+                             "personId": mapped or node.get("personId")})
+    state = json.dumps({
+        "schemaVersion": 4,
+        "owner_row_id": entity_to_row.get(str(getattr(owner, "id", None))),
+        "diagram": {"state": {"version": 3, "domain": "inheritance",
+                              "nodes": remapped}},
+    }, ensure_ascii=False)
+    for participant in participants:
+        participant.case_person_row_id = entity_to_row.get(
+            str(participant.customer_id))
     return SimpleNamespace(
         id=cid,
         nguoi_chet=owner,
         tai_san=props[0] if props else None,
-        property_links=[
-            SimpleNamespace(property=p, is_primary=(i == 0), id=i + 1)
-            for i, p in enumerate(props)
-        ],
         ngay_lap_ho_so=date(2026, 7, 3),
         loai_van_ban="khai_nhan",
+        trang_thai="draft",
+        workspace_revision=1,
         noi_niem_yet="UBND xã Minh Tân",
+        nguoi_nhan_uy_quyen=None,
+        nguoi_nhan_uy_quyen_id=None,
+        noi_dung_viec=None,
         ghi_chu="",
-        participants=participants or [],
-        case_state_json=case_state,
+        participants=participants,
+        person_rows=person_rows,
+        asset_rows=[_asset_row(prop, index + 1)
+                    for index, prop in enumerate(props)],
+        case_state_json=state,
     )
 
 
@@ -165,15 +263,22 @@ class TestExportOptions:
         assert docs["niem_yet"]["ready"] is False
         assert docs["niem_yet"]["block_reason"] == "word.template_missing"
 
-    def test_empty_case_blocks_with_word_reason(self):
+    def test_empty_case_ready_and_exports_with_missing_note(self, tmp_path):
+        # W6: thiếu dữ kiện không chặn — readiness chỉ còn mức kỹ thuật.
         owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
         case = _make_case(owner, properties=[], case_state=None)
         data = wbe.export_options(case, resolve_template=_resolve_builtin)
         docs = _docs_by_key(data)
-        assert docs["khai_nhan_di_san"]["ready"] is False
-        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_assets"
+        assert docs["khai_nhan_di_san"]["ready"] is True
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
         # niem_yet: template check trước data validation (mock parity)
         assert docs["niem_yet"]["block_reason"] == "word.template_missing"
+        # Xuất thật: file ra + ghi thiếu tài sản/chủ đất/người nhận.
+        batch = _batch(case, ["khai_nhan_di_san"], tmp_path)
+        entry = _docs_by_key(batch)["khai_nhan_di_san"]
+        assert entry["status"] == "saved"
+        assert (tmp_path / entry["actual_filename"]).is_file()
+        assert "tài sản" in entry["missing"]
 
     def test_missing_template_blocks_templated_docs(self):
         data = wbe.export_options(_ready_case(),
@@ -197,7 +302,73 @@ class TestExportOptions:
                 ]))
         docs = _docs_by_key(wbe.export_options(
             case, resolve_template=_resolve_builtin))
-        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_receiver"
+        # Mẫu builtin không dùng nhóm "Người nhận" → gate nhóm bỏ qua theo
+        # template (owner 15/10/2026: readiness theo dữ liệu MẪU cần).
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
+
+    def test_receiver_gate_only_when_template_needs_group(self, tmp_path):
+        owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
+        child = _person(2, "Nguyễn Văn Con")
+        case = _make_case(
+            owner, properties=[_prop()],
+            case_state=_case_state(
+                owner, child,
+                nodes=[
+                    _node(1, role="Owner", is_land_owner=True),
+                    _node(2, role="Con", will_receive=False),
+                ]))
+        # Template TỰ tạo có token nhóm "Người nhận" → gate vẫn báo thiếu;
+        # alias KHÔNG DẤU cùng key cũng phải nhận đúng như consumer
+        # (`_lookup_placeholder` chuẩn hoá token trước khi khớp).
+        needs_receiver = tmp_path / "needs_receiver.docx"
+        doc = Document()
+        doc.add_paragraph("[Người nhận 1 - Họ tên]")
+        doc.save(str(needs_receiver))
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=lambda _k: needs_receiver))
+        # W6: nhóm mẫu cần mà thiếu → file vẫn xuất, ghi thiếu người nhận.
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
+        dest = tmp_path / "recv_out"
+        dest.mkdir()
+        batch = _batch(case, ["khai_nhan_di_san"], dest,
+                       resolve_template=lambda _k: needs_receiver)
+        entry = _docs_by_key(batch)["khai_nhan_di_san"]
+        assert entry["status"] == "saved"
+        assert "người nhận" in entry["missing"]
+
+        needs_receiver_unaccented = tmp_path / "needs_receiver_ascii.docx"
+        doc = Document()
+        doc.add_paragraph("[Nguoi nhan 3 - Ho ten]")
+        doc.save(str(needs_receiver_unaccented))
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=lambda _k: needs_receiver_unaccented))
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
+
+    def test_stage_only_template_two_party_without_saved_diagram(self, tmp_path):
+        a = _person(1, "Lê Văn A")
+        b = _person(2, "Phạm Thị B")
+        case = _make_case(
+            a, properties=[_prop()],
+            participants=[_participant(b, 'Ben B')],
+            case_state=None)
+        case.loai_van_ban = "chuyen_nhuong"
+        stage_only = tmp_path / "stage_only.docx"
+        doc = Document()
+        doc.add_paragraph("[Người 1 - Họ tên] và [Người 2 - Họ tên]")
+        doc.save(str(stage_only))
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=lambda _k: stage_only))
+        # Mẫu chỉ cần Stage → không bắt buộc sơ đồ hai bên đã lưu.
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
+        # Và xuất THẬT được: render cùng needs của mẫu, không rơi lại gate cũ.
+        dest = tmp_path / "tp_out"
+        dest.mkdir()
+        data = _batch(case, ["khai_nhan_di_san"], dest,
+                      resolve_template=lambda _k: stage_only)
+        assert data["breakdown"]["succeeded"] == ["khai_nhan_di_san"]
+        text = Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+        assert "Lê Văn A" in text and "Phạm Thị B" in text
 
     def test_no_deceased_landowner(self):
         owner = _person(1, "Nguyễn Văn Chủ")          # còn sống
@@ -212,8 +383,8 @@ class TestExportOptions:
                 ]))
         docs = _docs_by_key(wbe.export_options(
             case, resolve_template=_resolve_builtin))
-        assert docs["khai_nhan_di_san"]["block_reason"] == (
-            "word.no_deceased_landowner")
+        # W6: chủ đất còn sống → file vẫn xuất, ghi thiếu chủ đất đã mất.
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
 
     def test_no_landowner_when_owner_hidden_in_diagram(self):
         owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
@@ -229,7 +400,8 @@ class TestExportOptions:
                 ]))
         docs = _docs_by_key(wbe.export_options(
             case, resolve_template=_resolve_builtin))
-        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_landowner"
+        # W6: chủ đất ẩn → file vẫn xuất, ghi thiếu chủ đất.
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
 
     def test_too_many_assets(self):
         owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
@@ -340,10 +512,22 @@ class TestExportBatch:
                 / "Van_ban_khai_nhan_di_san_HS-99.docx").is_file()
 
     def test_all_failed_raises_batch_failed_with_result(self, tmp_path):
+        # W6: thiếu dữ kiện không còn làm file lỗi — dùng trần kỹ thuật
+        # (6 tài sản) + văn bản chưa có template để có lượt all-failed.
         owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
-        empty = _make_case(owner, properties=[], case_state=None)
+        heir = _person(2, "Nguyễn Văn Con")
+        props = [_prop(dia_chi=f"Đất {i}", so_serial=f"S{i}")
+                 for i in range(1, 7)]
+        over = _make_case(
+            owner, properties=props,
+            case_state=_case_state(
+                owner, heir,
+                nodes=[
+                    _node(1, role="Owner", is_land_owner=True),
+                    _node(2, role="Con", will_receive=True),
+                ]))
         with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(empty, ["khai_nhan_di_san", "niem_yet"], tmp_path)
+            _batch(over, ["khai_nhan_di_san", "niem_yet"], tmp_path)
         err = exc.value
         assert err.code == "word_batch_failed"
         rd = err.result_data
@@ -352,7 +536,7 @@ class TestExportBatch:
             "failed": ["khai_nhan_di_san", "niem_yet"],
             "skipped": []}
         codes = {d["error"]["code"] for d in rd["documents"]}
-        assert codes == {"word.no_assets", "word.template_missing"}
+        assert codes == {"word.too_many_assets", "word.template_missing"}
         # không file nào được tạo
         assert list(tmp_path.iterdir()) == []
 
@@ -367,34 +551,35 @@ class TestExportBatch:
         assert doc["error"]["code"] == "word.template_missing"
         assert list(tmp_path.iterdir()) == []
 
-    def test_unresolved_placeholders_fail_document(self, tmp_path):
+    def test_unresolved_placeholders_export_with_note(self, tmp_path):
+        # W8: token lạ không chặn file — xuất bản còn token + ghi kết quả.
         bad_template = tmp_path / "bad_template.docx"
         doc = Document()
         doc.add_paragraph("Văn bản thử — [Trường Chưa Hỗ Trợ]")
         doc.save(str(bad_template))
-        with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
-                   resolve_template=lambda _k: bad_template)
-        assert exc.value.code == "word_batch_failed"
-        result = exc.value.result_data["documents"][0]
-        assert result["status"] == "failed"
-        assert result["error"]["code"] == "word.unresolved_placeholders"
-        # không output nào được tạo
-        assert not list(tmp_path.glob("*_HS-*.docx"))
+        data = _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: bad_template)
+        result = data["documents"][0]
+        assert result["status"] == "saved"
+        assert result["error"] is None
+        assert any("[Trường Chưa Hỗ Trợ]" in note
+                   for note in result["missing"])
+        out = Document(str(tmp_path / result["actual_filename"]))
+        assert "[Trường Chưa Hỗ Trợ]" in out.paragraphs[0].text
 
-    def test_unresolved_placeholder_in_header_fails_document(self, tmp_path):
-        """Placeholder ngoài body (header) cũng phải chặn file, không xuất thầm."""
+    def test_unresolved_placeholder_in_header_export_with_note(self, tmp_path):
+        """Placeholder ngoài body (header) cũng chỉ ghi thiếu, không giấu."""
         bad_template = tmp_path / "bad_header_template.docx"
         doc = Document()
         doc.add_paragraph("Thân văn bản")
         doc.sections[0].header.paragraphs[0].add_run("[Trường Chưa Hỗ Trợ]")
         doc.save(str(bad_template))
-        with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
-                   resolve_template=lambda _k: bad_template)
-        result = exc.value.result_data["documents"][0]
-        assert result["error"]["code"] == "word.unresolved_placeholders"
-        assert not list(tmp_path.glob("*_HS-*.docx"))
+        data = _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: bad_template)
+        result = data["documents"][0]
+        assert result["status"] == "saved"
+        assert any("[Trường Chưa Hỗ Trợ]" in note
+                   for note in result["missing"])
 
     def test_verified_fixed_form_codes_do_not_block_export(self, tmp_path):
         """Mã in cứng đã xác minh của ĐÚNG mẫu DK18 không bị coi là thiếu."""
@@ -416,24 +601,25 @@ class TestExportBatch:
         assert docs["khai_nhan_di_san"]["status"] == "saved"
         assert list(tmp_path.glob("*_HS-*.docx"))
 
-    def test_numeric_tokens_on_unverified_template_block_export(self, tmp_path):
-        """Mẫu bất kỳ chứa "[01]"/"[54.99]" KHÔNG được miễn — phải báo sót."""
+    def test_numeric_tokens_on_unverified_template_export_with_note(
+            self, tmp_path):
+        """Mẫu bất kỳ chứa "[01]"/"[54.99]" KHÔNG được miễn — ghi vào kết quả."""
         template = tmp_path / "codes_template.docx"
         doc = Document()
         doc.add_paragraph("[01] Mục chưa xác minh")
         doc.add_paragraph("[54.99] Ngoài bộ DK18")
         doc.save(str(template))
-        with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
-                   resolve_template=lambda _k: template)
-        result = exc.value.result_data["documents"][0]
-        assert result["error"]["code"] == "word.unresolved_placeholders"
-        assert "[01]" in result["error"]["message"]
-        assert "[54.99]" in result["error"]["message"]
-        assert not list(tmp_path.glob("*_HS-*.docx"))
+        data = _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: template)
+        result = data["documents"][0]
+        assert result["status"] == "saved"
+        note = next(n for n in result["missing"] if "chưa hỗ trợ" in n)
+        assert "[01]" in note
+        assert "[54.99]" in note
 
-    def test_fixed_code_outside_verified_list_still_blocks_export(self, tmp_path):
-        """Mẫu DK18 đã xác minh nhưng chứa mã NGOÀI danh sách vẫn bị chặn."""
+    def test_fixed_code_outside_verified_list_reported_but_exported(
+            self, tmp_path):
+        """Mẫu DK18 đã xác minh nhưng chứa mã NGOÀI danh sách → ghi đúng mã."""
         case = _ready_case()
         mapping = word_engine.build_template_mapping(case)
         real_token = next(
@@ -446,13 +632,13 @@ class TestExportBatch:
         doc.add_paragraph("[54.99] Mã lạ")
         doc.add_paragraph(real_token)
         doc.save(str(template))
-        with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(case, ["khai_nhan_di_san"], tmp_path,
-                   resolve_template=lambda _k: template)
-        result = exc.value.result_data["documents"][0]
-        assert result["error"]["code"] == "word.unresolved_placeholders"
-        assert "[54.99]" in result["error"]["message"]
-        assert "[01]" not in result["error"]["message"]
+        data = _batch(case, ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: template)
+        result = data["documents"][0]
+        assert result["status"] == "saved"
+        note = next(n for n in result["missing"] if "chưa hỗ trợ" in n)
+        assert "[54.99]" in note
+        assert "[01]" not in note
 
     def _uq_template(self, path, slot=1):
         doc = Document()
@@ -480,48 +666,42 @@ class TestExportBatch:
                     _node(2, role="Con", will_receive=True),
                 ]))
 
-    def test_template_requiring_authorized_person_fails_loudly(self, tmp_path):
-        """Mẫu UQ dùng token nhóm 'người được ủy quyền' mà hồ sơ chưa gán vai
-        trò đó -> per-doc failed, KHÔNG xuất file trống thầm lặng (NAIA-12)."""
-        template = self._uq_template(tmp_path / "3. UQ.docx")
-        with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
-                   resolve_template=lambda _k: template)
-        result = exc.value.result_data["documents"][0]
-        assert result["status"] == "failed"
-        assert result["error"]["code"] == "word.missing_authorized_person"
-        assert not list(tmp_path.glob("*_HS-*.docx"))
-
-    def test_template_requiring_authorized_slot_2_fails_with_one_person(
+    def test_template_requiring_authorized_person_exports_with_note(
             self, tmp_path):
-        """Mẫu đòi người được ủy quyền THỨ HAI nhưng hồ sơ chỉ gán một -> fail."""
+        """W8: mẫu đòi người được ủy quyền mà hồ sơ chưa gán → file vẫn ra,
+        phần đó trống, kết quả ghi thiếu slot."""
+        template = self._uq_template(tmp_path / "3. UQ.docx")
+        data = _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: template)
+        result = data["documents"][0]
+        assert result["status"] == "saved"
+        assert "người được ủy quyền 1" in result["missing"]
+
+    def test_template_authorized_slot_2_exports_with_note(self, tmp_path):
+        """Mẫu đòi slot 2 nhưng hồ sơ chỉ gán một → ghi thiếu slot 2."""
         template = self._uq_template(tmp_path / "3. UQ.docx", slot=2)
         case = self._case_with_authorized_via_saved_role()
-        with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(case, ["khai_nhan_di_san"], tmp_path,
-                   resolve_template=lambda _k: template)
-        result = exc.value.result_data["documents"][0]
-        assert result["error"]["code"] == "word.missing_authorized_person"
-        assert not list(tmp_path.glob("*_HS-*.docx"))
+        data = _batch(case, ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: template)
+        result = data["documents"][0]
+        assert result["status"] == "saved"
+        assert "người được ủy quyền 2" in result["missing"]
 
-    def test_template_authorized_inline_slot_2_fails_with_one_person(
+    def test_template_authorized_inline_slot_2_exports_with_note(
             self, tmp_path):
-        """Phản ví dụ review NAIA-12: mẫu dùng "[Người được ủy quyền inline 2]"
-        với chỉ 1 đại diện -> word.missing_authorized_person, KHÔNG tạo file
-        (trước đây inline 2 bị nhận nhầm slot 1 nên slot 2 trống vẫn saved)."""
+        """Mẫu dùng "[Người được ủy quyền inline 2]" với 1 đại diện → ghi
+        thiếu slot 2 (trước đây inline 2 bị nhận nhầm slot 1)."""
         template = tmp_path / "3. UQ.docx"
         doc = Document()
         doc.add_paragraph(
             "đại diện thứ hai: [Người được ủy quyền inline 2]")
         doc.save(str(template))
         case = self._case_with_authorized_via_saved_role()
-        with pytest.raises(wbe.WordBatchError) as exc:
-            _batch(case, ["khai_nhan_di_san"], tmp_path,
-                   resolve_template=lambda _k: template)
-        result = exc.value.result_data["documents"][0]
-        assert result["status"] == "failed"
-        assert result["error"]["code"] == "word.missing_authorized_person"
-        assert not list(tmp_path.glob("*_HS-*.docx"))
+        data = _batch(case, ["khai_nhan_di_san"], tmp_path,
+                      resolve_template=lambda _k: template)
+        result = data["documents"][0]
+        assert result["status"] == "saved"
+        assert "người được ủy quyền 2" in result["missing"]
 
     def test_template_authorized_person_saved_from_persisted_role(
             self, tmp_path):
@@ -957,7 +1137,7 @@ class TestFolderModeExport:
             resolve_template=resolve, doc_specs=specs)
         assert result["breakdown"]["succeeded"] == ["static.docx"]
         output = Document(result["documents"][0]["output_file"]["path"])
-        assert case.nguoi_chet.ho_ten in output.paragraphs[0].text
+        assert case.person_rows[0].ho_ten in output.paragraphs[0].text
         assert "[" not in output.paragraphs[0].text
 
     def test_options_lists_folder_files(self, tmp_path):
@@ -1149,3 +1329,282 @@ class TestTemplateLinkEscape:
         _dir_link(tdir / "linkdir.docx", outside_dir)
         specs = wbe.scan_template_dir(tdir)
         assert specs == []
+
+
+def _folder(tmp_path, files):
+    """Thư mục mẫu + (specs, resolver) như export_options/export_batch."""
+    tdir = tmp_path / "templates"
+    tdir.mkdir()
+    for name, paragraphs in files.items():
+        doc = Document()
+        for text in paragraphs:
+            doc.add_paragraph(text)
+        doc.save(tdir / name)
+    return tdir, wbe.scan_template_dir(tdir), wbe.template_path_resolver(tdir)
+
+
+def _no_receiver_case():
+    owner = _person(1, "Nguyễn Văn Chủ", dead=date(2024, 2, 3))
+    child = _person(2, "Nguyễn Văn Con")
+    return _make_case(
+        owner, properties=[_prop()],
+        case_state=_case_state(
+            owner, child,
+            nodes=[
+                _node(1, role="Owner", is_land_owner=True),
+                _node(2, role="Con", will_receive=False),
+            ]))
+
+
+def _two_party_case():
+    a = _person(1, "Lê Văn A")
+    b = _person(2, "Phạm Thị B")
+    case = _make_case(
+        a, properties=[_prop()], case_state=None,
+        participants=[_participant(b, 'Ben B')])
+    case.loai_van_ban = "chuyen_nhuong"
+    return case
+
+
+class TestTemplateGroupClassification:
+    """Gate nhóm theo token mẫu thực dùng (owner 15/10/2026) — kiểm ở
+    biên consumer (export_options/export_batch), không pin helper nội bộ."""
+
+    def test_metadata_token_shapes_do_not_demand_receiver(self, tmp_path):
+        """Token metadata chứa "người nhận" nhưng KHÔNG phải key nhóm
+        Người nhận thì không được kéo gate `word.no_receiver`;
+        `[nguoinhanuyquyen]` là key metadata thật (xuất được), còn
+        `[Người nhận ủy quyền]` chưa hỗ trợ → per-file unresolved."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "metadata.docx": ["[nguoinhanuyquyen] — [Người 1 - Họ tên]"],
+            "metadata_unsupported.docx": ["[Người nhận ủy quyền]"],
+        })
+        docs = _docs_by_key(wbe.export_options(
+            _no_receiver_case(), resolve_template=resolve, doc_specs=specs))
+        assert docs["metadata.docx"]["block_reason"] is None
+        assert docs["metadata_unsupported.docx"]["block_reason"] is None
+        assert all(d["block_reason"] != "word.no_receiver"
+                   for d in docs.values())
+
+        dest = tmp_path / "out"
+        dest.mkdir()
+        case = _no_receiver_case()
+        data = _batch(case, ["metadata.docx"], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        assert data["breakdown"]["succeeded"] == ["metadata.docx"]
+        assert "[" not in Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+
+    def test_two_party_slots_template_without_diagram_exports_blank(
+            self, tmp_path):
+        """W6: mẫu dùng ghế `[Bên A N …]` khi chưa có diagram state vẫn
+        xuất được — ghế trống, kết quả ghi thiếu sơ đồ hai bên."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "slots.docx": ["[Bên A 1 - Họ tên]"],
+            "names.docx": ["[Tên bên A] và [Tên bên B]"],
+        })
+        case = _two_party_case()
+        docs = _docs_by_key(wbe.export_options(
+            case, resolve_template=resolve, doc_specs=specs))
+        assert docs["slots.docx"]["block_reason"] is None
+        assert docs["names.docx"]["block_reason"] is None
+
+        dest = tmp_path / "out"
+        dest.mkdir()
+        data = _batch(case, ["slots.docx"], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        entry = data["documents"][0]
+        assert entry["status"] == "saved"
+        assert "sơ đồ hai bên đã lưu" in entry["missing"]
+        out = Document(str(dest / entry["actual_filename"]))
+        assert out.paragraphs[0].text.strip() == ""
+
+    def test_folder_stage_only_two_party_exports_without_diagram(self, tmp_path):
+        """AC1 folder mode: mẫu chỉ cần Stage xuất được khi chưa có
+        diagram state — render dùng đúng needs của mẫu."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "stage_only.docx": ["[Người 1 - Họ tên] và [Người 2 - Họ tên]"],
+        })
+        case = _two_party_case()
+        options = wbe.export_options(
+            case, resolve_template=resolve, doc_specs=specs)
+        assert options["documents"][0]["ready"] is True
+        dest = tmp_path / "out"
+        dest.mkdir()
+        data = _batch(case, ["stage_only.docx"], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        assert data["breakdown"]["succeeded"] == ["stage_only.docx"]
+        text = Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+        assert "Lê Văn A" in text and "Phạm Thị B" in text
+
+    def test_folder_group_missing_stays_empty_not_fail(self, tmp_path):
+        """Folder mode giữ semantics §3.3: token nhóm thiếu dữ liệu render
+        rỗng (không thêm gate/fail mới)."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "needs_receiver.docx": ["[Người nhận 1 - Họ tên] | [Người 1 - Họ tên]"],
+        })
+        case = _no_receiver_case()
+        options = wbe.export_options(
+            case, resolve_template=resolve, doc_specs=specs)
+        assert options["documents"][0]["ready"] is True
+        dest = tmp_path / "out"
+        dest.mkdir()
+        data = _batch(case, ["needs_receiver.docx"], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        assert data["breakdown"]["succeeded"] == ["needs_receiver.docx"]
+        text = Document(
+            data["documents"][0]["output_file"]["path"]).paragraphs[0].text
+        assert "[" not in text
+        assert "Nguyễn Văn Chủ" in text
+
+
+class TestFolderTemplateErrors:
+    def test_malformed_template_reports_per_file_code(self, tmp_path):
+        """Mẫu hỏng: readiness trả đúng data-code per-file mà batch trả —
+        không nuốt lỗi thành gate dữ liệu cũ; nguồn không đổi."""
+        tdir = tmp_path / "templates"
+        tdir.mkdir()
+        bad = tdir / "hong.docx"
+        bad.write_bytes(b"khong-phai-zip-docx")
+        before = bad.read_bytes()
+        specs = wbe.scan_template_dir(tdir)
+        resolve = wbe.template_path_resolver(tdir)
+        options = wbe.export_options(
+            _ready_case(), resolve_template=resolve, doc_specs=specs)
+        assert options["documents"][0]["ready"] is False
+        assert options["documents"][0]["block_reason"] == "word.render_failed"
+
+        dest = tmp_path / "out"
+        dest.mkdir()
+        with pytest.raises(wbe.WordBatchError) as exc:
+            _batch(_ready_case(), ["hong.docx"], dest,
+                   resolve_template=resolve, doc_specs=specs)
+        assert exc.value.code == "word_batch_failed"
+        entry = exc.value.result_data["documents"][0]
+        assert entry["status"] == "failed"
+        assert entry["error"]["code"] == "word.render_failed"
+        assert bad.read_bytes() == before
+        assert list(dest.iterdir()) == []
+
+    def test_mixed_batch_reports_per_file_states(self, tmp_path):
+        """Batch trộn: MỌI file lưu; token lạ/thiếu ủy quyền/slot ngoài
+        dải thành ghi chú `missing` riêng từng file; nguồn không đổi."""
+        tdir, specs, resolve = _folder(tmp_path, {
+            "good.docx": ["[Người 1 - Họ tên]"],
+            "unknown.docx": ["Ký hiệu: [Ký hiệu lạ XYZ]"],
+            "auth_short.docx": ["[Người được ủy quyền 2 - Họ tên]"],
+            "beyond.docx": ["[Người 25 - Họ tên]"],
+        })
+        hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in tdir.iterdir()}
+        dest = tmp_path / "out"
+        dest.mkdir()
+        case = _ready_case()
+        data = _batch(case, [s.document_key for s in specs], dest,
+                      resolve_template=resolve, doc_specs=specs)
+        by_key = {d["document_key"]: d for d in data["documents"]}
+        # W6/W8: cả 4 file đều xuất; thiếu dữ kiện/token lạ thành ghi chú.
+        assert {d["status"] for d in data["documents"]} == {"saved"}
+        assert by_key["good.docx"]["missing"] == []
+        assert any("[Ký hiệu lạ XYZ]" in n
+                   for n in by_key["unknown.docx"]["missing"])
+        assert "người được ủy quyền 2" in by_key["auth_short.docx"]["missing"]
+        assert any("[Người 25 - Họ tên]" in n
+                   for n in by_key["beyond.docx"]["missing"])
+        assert sorted(data["breakdown"]["succeeded"]) == [
+            "auth_short.docx", "beyond.docx", "good.docx", "unknown.docx"]
+        assert data["breakdown"]["failed"] == []
+        assert {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in tdir.iterdir()} == hashes
+        assert sorted(p.name for p in dest.iterdir()) == [
+            "auth_short_HS-99.docx", "beyond_HS-99.docx",
+            "good_HS-99.docx", "unknown_HS-99.docx"]
+
+
+@pytest.fixture()
+def synthetic_limit_templates(tmp_path):
+    folder = tmp_path / "templates"
+    folder.mkdir()
+    for key in ("khai_nhan_di_san", "thoa_thuan_phan_chia"):
+        doc = Document()
+        doc.add_paragraph("[Người 1 - Họ tên] | [Người 20 - Họ tên]")
+        doc.save(folder / f"{key}.docx")
+    return folder
+
+
+@pytest.fixture()
+def inheritance_people_case():
+    def make(count):
+        people = [_person(i, f"Người thử {i:02}") for i in range(1, count + 1)]
+        return _make_case(
+            people[0],
+            properties=[_prop(so_serial="", so_thua_dat="901",
+                              so_to_ban_do="09")],
+            case_state=_case_state(*people, nodes=[]))
+    return make
+
+
+@pytest.mark.parametrize("count", [20, 21, 25])
+@pytest.mark.parametrize("folder_mode", [False, True], ids=["catalog", "folder"])
+def test_inheritance_people_export_limit_per_document(
+        tmp_path, synthetic_limit_templates, inheritance_people_case,
+        count, folder_mode):
+    case = inheritance_people_case(count)
+    folder = synthetic_limit_templates
+    specs = wbe.scan_template_dir(folder) if folder_mode else None
+    keys = ([spec.document_key for spec in specs] if folder_mode else
+            ["khai_nhan_di_san", "thoa_thuan_phan_chia"])
+    resolve = (wbe.template_path_resolver(folder) if folder_mode else
+               lambda key: folder / f"{key}.docx")
+    options = _docs_by_key(wbe.export_options(
+        case, resolve_template=resolve, doc_specs=specs))
+    for key in keys:
+        assert options[key]["ready"] is (count == 20)
+        assert options[key]["block_reason"] == (
+            None if count == 20 else "word.too_many_people")
+
+    destination = tmp_path / "output"
+    destination.mkdir()
+    if count == 20:
+        result = _batch(case, keys, destination,
+                        resolve_template=resolve, doc_specs=specs)
+        assert result["breakdown"]["succeeded"] == keys
+        for entry in result["documents"]:
+            text = Document(entry["output_file"]["path"]).paragraphs[0].text
+            assert text == "Người thử 01 | Người thử 20"
+        return
+
+    with pytest.raises(wbe.WordBatchError) as failure:
+        _batch(case, keys, destination,
+               resolve_template=resolve, doc_specs=specs)
+    assert failure.value.code == "word_batch_failed"
+    result = failure.value.result_data
+    assert result["breakdown"] == {"succeeded": [], "failed": keys, "skipped": []}
+    assert len(result["documents"]) == 2
+    for entry in result["documents"]:
+        assert entry["status"] == "failed"
+        assert entry["output_file"] is None
+        assert entry["error"] == {
+            "code": "word.too_many_people", "message": "Quá 20 người trong Stage"}
+    assert list(destination.iterdir()) == []
+
+
+def test_export_limit_exception_uses_catalog_message(inheritance_people_case):
+    context = word_engine.build_word_context(inheritance_people_case(25))
+    code, message = wbe._doc_error_from(
+        word_engine.WordExportValidationError("Danh sách Stage vượt quá 20 người"),
+        context, static=True)
+    assert (code, message) == ("word.too_many_people", "Quá 20 người trong Stage")
+
+
+def test_export_error_message_has_no_python_exception_prefix(tmp_path):
+    def resolve(_key):
+        raise ValueError("Không thể đọc mẫu")
+
+    with pytest.raises(wbe.WordBatchError) as failure:
+        _batch(_ready_case(), ["khai_nhan_di_san"], tmp_path,
+               resolve_template=resolve)
+    entry, = failure.value.result_data["documents"]
+    assert entry["error"] == {
+        "code": "word.render_failed", "message": "Không thể đọc mẫu"}

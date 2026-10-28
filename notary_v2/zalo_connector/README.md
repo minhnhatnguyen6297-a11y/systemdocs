@@ -10,7 +10,7 @@ The `zalo/` snapshot exists; this directory documents the old connector still
 present in Notary. Engine documentation lives under `zalo/docs/`.
 The notary app retains Sync, raw storage, parsing, grouping, human review and
 draft input. Do not maintain two editable engine specs.
-The current product requirements are in [the main Zalo spec](../../_bmad-output/specs/notary_v2/input/zalo/README.md):
+The current product requirements are in [the main Zalo spec](../../_bmad-output/archive/specs-before-consolidation-20261015/notary_v2/input/zalo/README.md):
 The independent module receives media and calls Qwen OCR where image bytes live.
 It retains images for seven days and hands off raw text, OCR status and source
 provenance without images. Document Intake in the notary system parses fields,

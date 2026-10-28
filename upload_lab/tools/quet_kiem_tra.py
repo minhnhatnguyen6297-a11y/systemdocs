@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import extract_contract
+import extraction_adapter
+from extraction_adapter import case_from_payload
 from kiem_tra_trich_xuat import MUC_BO_QUA, MUC_LOI, kiem_tra_payload
 
 
@@ -50,7 +51,7 @@ def tim_file(folder: str, *, loc: str = "", ca_doc: bool = False) -> list[str]:
 
 def quet_file(path: str) -> dict:
     try:
-        payload = extract_contract.extract(path)
+        payload = extraction_adapter.extract(path)
     except Exception as exc:  # noqa: BLE001 - loi doc file ghi nhan, khong dung dot
         return {
             "file": path,
@@ -63,7 +64,7 @@ def quet_file(path: str) -> dict:
     return {
         "file": path,
         "ten_file": os.path.basename(path),
-        "kind": raw.get("document_kind", ""),
+        "kind": case_from_payload(payload).get("loaivanbannhandien") or "",
         "so_nguoi": len(raw.get("ben_a", {}).get("nguoi", [])) + len(raw.get("ben_b", {}).get("nguoi", [])),
         "so_chet": len(raw.get("nguoi_chet", [])),
         "so_thua": len(raw.get("danh_sach_thua_dat", [])),

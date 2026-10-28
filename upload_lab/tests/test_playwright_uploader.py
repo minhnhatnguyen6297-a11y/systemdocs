@@ -17,13 +17,11 @@ from playwright_uploader import (
     NamDinhUploaderSession,
     build_upload_form_data,
     field_value_matches,
-    finalize_uploaded_records,
     get_uploader_setup_status,
     get_field_value_candidates,
     load_upload_queue,
     load_uploader_settings,
     normalize_contract_no_for_compare,
-    parse_requester_sheet_csv,
     read_exported_contract_numbers,
     save_uploader_env,
     split_records_by_existing_contract_nos,
@@ -346,7 +344,7 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
         row = self.conn.execute("SELECT id FROM file_registry WHERE file_key = ?", (file_key,)).fetchone()
         return int(row[0])
 
-    def test_load_upload_queue_uses_manifest_run_id_and_excludes_uploaded_success(self):
+    def test_load_upload_queue_uses_manifest_run_id_and_keeps_legacy_status_history(self):
         run_id = "run123"
         other_run = "run999"
         file_goc = str(self.root / "goc1.docx")
@@ -357,6 +355,8 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
 
         self._seed_record(file_key="k1", run_id=run_id, contract_no="111/2026/CCGD", status="extracted", output_json_path=output1)
         self._seed_record(file_key="k2", run_id=run_id, contract_no="222/2026/CCGD", status="prepared_dry_run", output_json_path=output2)
+        # Trang thai cu (truoc cutover) chi la lich su du lieu: khong con
+        # duoc doc nhu bang chung Luu, va cung khong tu quay lai queue.
         self._seed_record(file_key="k3", run_id=run_id, contract_no="333/2026/CCGD", status="uploaded_success", output_json_path=output3)
         self._seed_record(file_key="k4", run_id=other_run, contract_no="444/2026/CCGD", status="extracted", output_json_path=output1)
 
@@ -440,26 +440,6 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
         self.assertEqual(total_pending, 2)
         self.assertEqual([record.contract_no for record in records], ["111/2026/CCGD", "222/2026/CCGD"])
 
-    def test_finalize_uploaded_records_marks_selected_rows(self):
-        run_id = "run123"
-        file_goc = str(self.root / "goc2.docx")
-        Path(file_goc).write_text("dummy", encoding="utf-8")
-        output_path = make_output_json(self.workdir / "output" / "x.json", contract_no="555/2026/CCGD", file_goc=file_goc)
-        record_id = self._seed_record(
-            file_key="finalize-key",
-            run_id=run_id,
-            contract_no="555/2026/CCGD",
-            status="prepared_partial",
-            output_json_path=output_path,
-        )
-
-        count = finalize_uploaded_records([record_id], working_dir=self.workdir)
-        row = get_row_by_id(self.conn, record_id)
-
-        self.assertEqual(count, 1)
-        self.assertEqual(row["status"], "uploaded_success")
-        self.assertTrue(row["uploaded_success_at"])
-
     def test_contract_group_aliases_match_for_dropdown_values(self):
         candidates = get_field_value_candidates("nhom_hop_dong", "Cam kết - Thỏa thuận")
 
@@ -470,65 +450,35 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
             field_value_matches("nhom_hop_dong", "Cam kết - Thỏa thuận", "Thoả thuận - Cam kết")
         )
 
-    def test_parse_requester_sheet_csv_builds_lookup_keys(self):
-        csv_text = (
-            '"STT","Số CC","Ngày CC","Tên khách hàng"\n'
-            '"","11","7/1/2026","Phùng Đình Việt"\n'
-            '"","405","09/04/2026","Nguyễn Thị Hoa"\n'
-        )
 
-        lookup = parse_requester_sheet_csv(csv_text)
-
-        self.assertEqual(lookup["11"], "Phùng Đình Việt")
-        self.assertEqual(lookup["11/2026"], "Phùng Đình Việt")
-        self.assertEqual(lookup["405/2026"], "Nguyễn Thị Hoa")
-
-    def test_build_upload_form_data_overrides_requester_from_lookup(self):
-        payload = {
-            "web_form": {
-                "ten_hop_dong": "Hợp đồng chuyển nhượng",
-                "ngay_cong_chung": "09/04/2026",
-                "so_cong_chung": "405/2026/CCGD",
-                "nhom_hop_dong": "Chuyển nhượng - Mua bán",
-                "loai_tai_san": "Đất đai không có tài sản",
-                "nguoi_yeu_cau": "Ông A",
-                "duong_su": "BÊN A ...",
-                "tai_san": "Thửa đất ...",
-            },
-            "raw": {
-                "file_goc": str(self.root / "goc_lookup.docx"),
-                "ben_b": {
-                    "nguoi": [
-                        {
-                            "gioi_tinh": "Ông",
-                            "ho_ten": "Nguyễn Văn B",
-                            "ngay_sinh": "01/01/1980",
-                            "cccd": "012345678901",
-                            "noi_cap": "CA Nam Định",
-                            "ngay_cap_cccd": "01/01/2024",
-                            "dia_chi": "xã A, huyện B",
-                        },
-                        {
-                            "gioi_tinh": "Bà",
-                            "ho_ten": "Nguyễn Thị Hoa",
-                            "ngay_sinh": "02/02/1985",
-                            "cccd": "123456789012",
-                            "noi_cap": "CA Nam Định",
-                            "ngay_cap_cccd": "02/02/2024",
-                            "dia_chi": "xã C, huyện D",
-                        },
-                    ]
-                },
-            },
-        }
-
-        form_data = build_upload_form_data(
-            payload,
-            requester_lookup={"405/2026": "Nguyễn Thị Hoa"},
-        )
-
-        self.assertIn("Nguyễn Thị Hoa", form_data["nguoi_yeu_cau"])
-        self.assertIn("Can cuoc so:", form_data["nguoi_yeu_cau"])
+    def test_load_upload_queue_preserves_persisted_requester_and_source_history(self):
+        run_id = "requester-projection"
+        output = make_output_json(
+            self.workdir / "output" / "requester.json",
+            contract_no="405/2026/CCGD", file_goc=str(self.root / "requester.docx"))
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        requester = "  Ông A\nBà B\nNGÂN HÀNG MẪU\nChi nhánh C; đại diện Ông D\n  "
+        payload["web_form"]["nguoi_yeu_cau"] = requester
+        payload["raw"]["ben_b"] = {"nguoi": [{"ho_ten": "Tên cũ trong raw"}]}
+        payload["raw"]["source_refs"] = [{"start": 7, "end": 99}]
+        output.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        original = output.read_bytes()
+        self._seed_record(file_key="requester", run_id=run_id,
+                          contract_no="405/2026/CCGD", status="extracted",
+                          output_json_path=output)
+        manifest = self.workdir / "runs" / "requester.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(json.dumps({"run_id": run_id}), encoding="utf-8")
+        (self.workdir / "requester_lookup_cache.csv").write_text(
+            '"Số CC","Ngày CC","Tên khách hàng"\n"405","09/04/2026","Tên lookup cũ"\n',
+            encoding="utf-8")
+        for _ in range(2):
+            _, records, total = load_upload_queue(manifest, working_dir=self.workdir)
+            self.assertEqual(total, 1)
+            self.assertEqual(records[0].upload_form["nguoi_yeu_cau"], requester)
+            self.assertEqual(records[0].payload["web_form"], payload["web_form"])
+            self.assertEqual(records[0].payload["raw"], payload["raw"])
+            self.assertEqual(output.read_bytes(), original)
 
     def test_build_upload_form_data_overrides_notary_and_secretary(self):
         payload = {
@@ -687,7 +637,7 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
         self.assertEqual(result["status"], "authenticated")
         self.assertEqual(saved_paths, [str(session.settings.storage_state_path)])
 
-    def test_saved_prepared_page_is_finalized_and_closed(self):
+    def test_prepared_page_with_save_evidence_stays_open_tab_resource(self):
         run_id = "run-save-detect"
         output_path = make_output_json(
             self.workdir / "output" / "save-detect.json",
@@ -708,16 +658,48 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
         )
         page = _FakeTrackedPage(url=session.settings.create_url)
         record = SimpleNamespace(record_id=record_id, contract_no="601/2026/CCGD")
-        artifact_dir = self.workdir / "upload_runs" / "save-detect"
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        session._register_prepared_page(record, page, artifact_dir)
-        session.prepared_pages[record_id].save_response_ok = True
+        session._register_prepared_page(record, page)
 
         result = session.poll_prepared_pages()
 
-        self.assertEqual(result["saved_record_ids"], [record_id])
-        self.assertTrue(page.closed)
-        self.assertEqual(get_row_by_id(self.conn, record_id)["status"], "uploaded_success")
+        # Poll chi bao tai nguyen: tab con mo, KHONG dong tab thay nguoi
+        # dung va KHONG ghi ket qua Luu vao registry.
+        self.assertEqual(result["open_record_ids"], [record_id])
+        self.assertEqual(result["closed_record_ids"], [])
+        self.assertFalse(page.closed)
+        self.assertEqual(get_row_by_id(self.conn, record_id)["status"],
+                         "prepared_dry_run")
+
+    def test_poll_prepared_pages_reports_closed_tab_without_registry_write(self):
+        run_id = "run-tab-closed"
+        output_path = make_output_json(
+            self.workdir / "output" / "closed-tab.json",
+            contract_no="602/2026/CCGD",
+            file_goc=str(self.root / "closed-tab.docx"),
+        )
+        record_id = self._seed_record(
+            file_key="closed-tab",
+            run_id=run_id,
+            contract_no="602/2026/CCGD",
+            status="prepared_dry_run",
+            output_json_path=output_path,
+        )
+        session = NamDinhUploaderSession(
+            load_uploader_settings(self.workdir),
+            working_dir=self.workdir,
+            log_callback=lambda _msg: None,
+        )
+        page = _FakeTrackedPage(url=session.settings.create_url)
+        page.closed = True
+        record = SimpleNamespace(record_id=record_id, contract_no="602/2026/CCGD")
+        session._register_prepared_page(record, page)
+
+        result = session.poll_prepared_pages()
+
+        self.assertEqual(result["closed_record_ids"], [record_id])
+        self.assertEqual(result["open_record_ids"], [])
+        self.assertEqual(get_row_by_id(self.conn, record_id)["status"],
+                         "prepared_dry_run")
 
     def test_get_uploader_setup_status_tracks_storage_state(self):
         save_uploader_env(
@@ -1215,10 +1197,10 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
             self.assertTrue(session._fill_dropdown(page, "ten_hop_dong", expected))
 
         self.assertEqual(locator.type_values, [expected, expected])
-        self.assertIn("Enter", locator.press_keys)
+        self.assertNotIn("Enter", locator.press_keys)
         self.assertTrue(any("dispatchEvent" in script and "change" in script for script in locator.evaluate_scripts))
 
-    def test_fill_dropdown_clears_with_keyboard_and_selects_first_autocomplete_option(self):
+    def test_free_text_autocomplete_commits_without_option_or_submit(self):
         session = NamDinhUploaderSession(
             load_uploader_settings(self.workdir),
             working_dir=self.workdir,
@@ -1242,8 +1224,9 @@ class PlaywrightUploaderQueueTests(unittest.TestCase):
 
         self.assertIn("Control+A", locator.press_keys)
         self.assertIn("Backspace", locator.press_keys)
-        self.assertIn("ArrowDown", locator.press_keys)
-        self.assertIn("Enter", locator.press_keys)
+        self.assertNotIn("ArrowDown", locator.press_keys)
+        self.assertNotIn("Enter", locator.press_keys)
+        self.assertIn("Tab", locator.press_keys)
 
 
 if __name__ == "__main__":

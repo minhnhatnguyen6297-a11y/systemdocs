@@ -340,14 +340,25 @@ class SidecarContractTest(unittest.TestCase):
         self.assertEqual(len(bd["succeeded"]), 1)
         self.assertEqual(bd["failed"], [sources[1]["source_id"]])
 
-    def test_notary_locked_write_rejected(self):
+    def test_notary_done_case_write_allowed(self):
+        """Case 44 done van ghi duoc: khong con workspace_locked; chi
+        revision guard + stage hop le moi chan. Gui lai dung stage hien
+        co de khang dinh commit_stage thanh cong that."""
+        job = self.http.post("/v1/commands", json=_new_cmd(
+            "notary.workspace_get", {"case_id": 44})).json()
+        got = self._wait_job(job["job_id"])
+        self.assertEqual(got["status"], "succeeded")
+        data = got["result"]["data"]
+        self.assertEqual(data["case"]["status"], "done")
+        self.assertNotIn("locked", data["case"])
         job = self.http.post("/v1/commands", json=_new_cmd(
             "notary.workspace_commit_stage",
-            {"case_id": 44, "base_revision": 3,
-             "stage": {"people": [], "assets": []}})).json()
+            {"case_id": 44, "base_revision": data["case"]["revision"],
+             "stage": data["stage"]})).json()
         final = self._wait_job(job["job_id"])
-        self.assertEqual(final["status"], "failed")
-        self.assertEqual(final["error"]["code"], "workspace_locked")
+        self.assertEqual(final["status"], "succeeded")
+        self.assertEqual(final["result"]["data"]["revision"],
+                         data["case"]["revision"] + 1)
 
     def test_notary_word_export_idempotent_no_duplicate(self):
         import docx

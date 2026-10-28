@@ -95,7 +95,7 @@ def test_accepted_engine_cases_match_their_published_fraction_oracles():
 
         slot_types_by_reason = {
             "active_estate": ["father", "mother", "spouse", "child"],
-            "representation_branch": ["spouse", "child"],
+            "representation_branch": ["child"],
         }
         for requirement in result["requiredSlots"]:
             assert requirement["reason"] in slot_types_by_reason, case["id"]

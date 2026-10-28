@@ -7,7 +7,7 @@ const { createModel } = require('../src/renderer/notary/case-drafting-model.js')
 
 const pause = () => new Promise(resolve => setTimeout(resolve, 20));
 
-function setup() {
+async function setup() {
   const calls = [];
   const pending = [];
   const client = { run(command, payload) {
@@ -15,7 +15,13 @@ function setup() {
     return new Promise(resolve => pending.push(resolve));
   }};
   const model = createModel({ client, uuid: () => crypto.randomUUID() });
-  model.newDraft('inheritance');
+  // Issue 13: newDraft đọc nguồn Done mới nhất trước khi 'ready'. Trả nguồn
+  // rỗng rồi xóa lịch sử gọi để test chỉ thấy lệnh address_lookup.
+  const opened = model.newDraft('inheritance');
+  assert.deepEqual(calls.map(c => c[0]), ['notary.workspace_source_latest']);
+  pending.shift()({ ok: true, data: { stage: { people: [], assets: [] } } });
+  await opened;
+  calls.length = 0;
   const person = model.addPerson({ ho_ten: 'Synthetic', dia_chi: 'Xa A, Tinh P' });
   const asset = model.addAsset({ dia_chi: 'Xa A, Tinh P' });
   return { model, person, asset, calls, pending };
@@ -41,7 +47,7 @@ const fullFound = { ok: true, data: {
   dataset_version: 'v2', revision: 1 } };
 
 test('P5: changing source removes ready results without sending another lookup', async () => {
-  const { model, person, calls, pending } = setup();
+  const { model, person, calls, pending } = await setup();
   await tra(model, pending, 'person', person.row_id);
   model.updatePersonField(person.row_id, 'dia_chi', 'Query B');
   assert.equal(model.state.addressSlots['person:' + person.row_id].result, null);
@@ -54,7 +60,7 @@ test('P9: malformed v2 responses become communication errors', async () => {
     { results: [{ ...rowB, province: null }, rowC] }, { total: 3 },
     { status: 'unknown' }, { revision: -1 },
   ]) {
-    const { model, person, pending } = setup();
+    const { model, person, pending } = await setup();
     await tra(model, pending, 'person', person.row_id,
       { ok: true, data: { ...draftingFound.data, ...change } });
     assert.equal(model.state.addressSlots['person:' + person.row_id].phase, 'error');
@@ -64,7 +70,7 @@ test('P9: malformed v2 responses become communication errors', async () => {
 
 test('P9: both full entry points reject wrong presentation and malformed rows', async () => {
   for (const change of [{ presentation: 'drafting' }, { results: [null, rowC] }]) {
-    const { model, person, pending } = setup();
+    const { model, person, pending } = await setup();
     await tra(model, pending, 'person', person.row_id, draftingTooMany);
     model.openFullFromSlot('person', person.row_id);
     pending.shift()({ ok: true, data: { ...fullFound.data, ...change } });
@@ -88,7 +94,7 @@ async function tra(model, pending, kind, rowId, answer = draftingFound) {
 }
 
 test('Tra sends drafting payload with live input text; re-Tra same text sends again', async () => {
-  const { model, person, calls, pending } = setup();
+  const { model, person, calls, pending } = await setup();
   await tra(model, pending, 'person', person.row_id);
   await tra(model, pending, 'person', person.row_id);
   assert.equal(calls.length, 2);
@@ -102,7 +108,7 @@ test('Tra sends drafting payload with live input text; re-Tra same text sends ag
 });
 
 test('no auto lookup on edits; lookup never mutates rows or meta', async () => {
-  const { model, person, asset, calls, pending } = setup();
+  const { model, person, asset, calls, pending } = await setup();
   model.updatePersonField(person.row_id, 'dia_chi', 'Xa B, Tinh P');
   model.updateCaseMeta('noi_niem_yet', 'Manual value');
   await pause();
@@ -115,7 +121,7 @@ test('no auto lookup on edits; lookup never mutates rows or meta', async () => {
 });
 
 test('posting query uses the posting box itself, not an asset address', async () => {
-  const { model, asset, calls, pending } = setup();
+  const { model, asset, calls, pending } = await setup();
   model.updateCaseMeta('noi_niem_yet', 'Xa Posting, Tinh P');
   model.updateAssetField(asset.row_id, 'dia_chi', 'Xa Asset Khac, Tinh P');
   await tra(model, pending, 'posting', 'posting');
@@ -124,7 +130,7 @@ test('posting query uses the posting box itself, not an asset address', async ()
 });
 
 test('issuer query uses the deceased address, not the noi_cap box', async () => {
-  const { model, person, calls, pending } = setup();
+  const { model, person, calls, pending } = await setup();
   model.updatePersonField(person.row_id, 'ngay_chet', '2020-01-01');
   model.updatePersonField(person.row_id, 'noi_cap', 'UBND Xa Cu, Tinh P');
   model.updatePersonField(person.row_id, 'dia_chi', 'Xa Moi, Tinh P');
@@ -134,7 +140,7 @@ test('issuer query uses the deceased address, not the noi_cap box', async () => 
 });
 
 test('stale response dropped on new Tra, on source edit, and on A-B-A', async () => {
-  const { model, person, pending } = setup();
+  const { model, person, pending } = await setup();
   const key = 'person:' + person.row_id;
   const first = model.requestLookup('person', person.row_id);
   await pause();
@@ -167,7 +173,7 @@ test('stale response dropped on new Tra, on source edit, and on A-B-A', async ()
 });
 
 test('switching case drops in-flight lookup', async () => {
-  const { model, person, pending } = setup();
+  const { model, person, pending } = await setup();
   const p = model.requestLookup('person', person.row_id);
   await pause();
   const resolve = pending.shift();
@@ -180,7 +186,7 @@ test('switching case drops in-flight lookup', async () => {
 });
 
 test('too_many confirm flow: full uses captured query; overlay edit only sends on Tra', async () => {
-  const { model, person, calls, pending } = setup();
+  const { model, person, calls, pending } = await setup();
   await tra(model, pending, 'person', person.row_id, draftingTooMany);
   assert.equal(calls.length, 1);
   const opened = model.openFullFromSlot('person', person.row_id);
@@ -219,7 +225,7 @@ test('too_many confirm flow: full uses captured query; overlay edit only sends o
 });
 
 test('closing overlay drops late full responses', async () => {
-  const { model, person, pending } = setup();
+  const { model, person, pending } = await setup();
   await tra(model, pending, 'person', person.row_id, draftingTooMany);
   assert.equal(model.openFullFromSlot('person', person.row_id).ok, true);
   await pause();
@@ -232,7 +238,7 @@ test('closing overlay drops late full responses', async () => {
 });
 
 test('malformed and transport failures store messages, never results', async () => {
-  const { model, person, pending } = setup();
+  const { model, person, pending } = await setup();
   const key = 'person:' + person.row_id;
   let p = model.requestLookup('person', person.row_id);
   await pause();
@@ -250,7 +256,7 @@ test('malformed and transport failures store messages, never results', async () 
 });
 
 test('empty query sends nothing', async () => {
-  const { model, person, calls } = setup();
+  const { model, person, calls } = await setup();
   model.updatePersonField(person.row_id, 'dia_chi', '   ');
   await model.requestLookup('person', person.row_id);
   assert.equal(calls.length, 0);
@@ -258,7 +264,7 @@ test('empty query sends nothing', async () => {
 });
 
 test('R6: A-B-A before confirm keeps the old Tra invalid', async () => {
-  const { model, person, calls, pending } = setup();
+  const { model, person, calls, pending } = await setup();
   await tra(model, pending, 'person', person.row_id, draftingTooMany);
   model.updatePersonField(person.row_id, 'dia_chi', 'Xa B, Tinh P');
   model.updatePersonField(person.row_id, 'dia_chi', 'Xa A, Tinh P');
@@ -268,7 +274,7 @@ test('R6: A-B-A before confirm keeps the old Tra invalid', async () => {
 });
 
 test('R3: source change while pending ends stale with guidance, not loading', async () => {
-  const { model, person, pending } = setup();
+  const { model, person, pending } = await setup();
   const key = 'person:' + person.row_id;
   const p = model.requestLookup('person', person.row_id);
   await pause();
@@ -282,7 +288,7 @@ test('R3: source change while pending ends stale with guidance, not loading', as
 });
 
 test('R3: editing an unrelated field does not invalidate the lookup', async () => {
-  const { model, person, pending } = setup();
+  const { model, person, pending } = await setup();
   const key = 'person:' + person.row_id;
   const p = model.requestLookup('person', person.row_id);
   await pause();

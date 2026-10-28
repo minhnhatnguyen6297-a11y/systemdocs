@@ -1,226 +1,447 @@
-# Notary System — Tổng quan dành cho developer
+# Sổ tay sản phẩm theo màn hình
 
-**Bản giới thiệu · cập nhật 02/10/2026.** Tổng hợp từ tài liệu sản phẩm trong `_bmad-output/specs/`; không thay thế spec chi tiết hoặc quyết định còn chờ duyệt. Mức độ hoàn thiện dưới đây theo tài liệu, không phải kết quả chạy thử toàn bộ ứng dụng.
+**Cập nhật:** 21/10/2026 · **Dùng để:** giúp owner và coordinator cùng nhìn
+vào sản phẩm, giao diện và việc còn dở khi bắt đầu phiên làm việc.
 
-## Ý tưởng trong một phút
+Đọc [nền sản phẩm và khái niệm chung](README.md) trước để hiểu người dùng,
+ba kết quả và nghĩa các từ dùng chung. Trang này là bản đồ ngắn để tìm đúng
+màn hình, tài liệu và điểm vào mã, đồng thời ghi việc đang mở. Spec trong
+`_bmad-output/specs/` quyết định hành vi; code cho biết hiện trạng. Có mã nguồn
+không đồng nghĩa đã nghiệm thu trên ứng dụng. Hãy kiểm tra lại nguồn mới nhất
+trước khi bắt tay vào việc.
 
-Notary System là hệ thống hỗ trợ văn phòng công chứng, tập trung vào giải quyết 3 bài toán - 3 module chính trong repo:
-- Soạn thảo tự động: Mọi input: image, pdf, excel, raw text,... -> Xuất thành các trường dữ lieu chuẩn. VD: "name","date_of_birth",... -> xuất thành file word. Chuyển work flow từ soạn thủ công thành flow kéo thả.
-- Upload tự động: Hệ thống công chứng phải upload mọi hồ sơ trong quá trình hoạt động lên website của nhà nước. Flow: Scan file word trong máy, trích xuất thành các trường thông tin -> upload tự động lên web bằng api request hoặc playwright (nếu web không có api)
-- Quản lý văn phòng: Mỗi máy nhân viên được cài 1 listener soi diff file word và excel. Nhân viên soạn thảo hồ sơ nào -> xuất thành 1 record lưu trữ. Lifecycle của 1 hồ sơ đất đai có thể rất dài, qua nhiều bước nhưng hệ thống công chứng hiện không có phần mềm quản lý, nếu có cũng yêu cầu nhập lieu chi tiết -> Flow mới: tự trích xuất việc nhân viên làm, xuất thành 1 record trong 1 chuỗi tiến độ -> Quản lý hồ sơ thời gian dài.
+## Đường đọc sau khi gom spec
 
-Đích dài hạn là một ứng dụng desktop, giao diện chung và cơ sở dữ liệu nghiệp vụ chung. Hiện tại các module còn giữ dữ liệu và phần xử lý riêng. Sản phẩm phát triển theo hướng dùng dữ liệu tại văn phòng, kết hợp một số kết nối bên ngoài được cho phép.
+Soạn thảo có một spec luồng và hai phần chuyên sâu Sơ đồ/Word. Upload và NotaryOffice mỗi module một spec chính. Quy tắc dữ liệu, bóc tách, OCR và địa chỉ nằm trong shared; chỉ mở đúng phần cần làm. Spec viết đủ hành vi; decision giữ lý do và phương án bỏ. Issue/task bền vững ở backlog; bản ghi tạm ở tmp. Bản cũ trong archive không nạp mặc định.
 
-## 1. notary_v2 — Soạn hồ sơ mới
+## Mục tiêu và việc đang mở
 
-### Các chức năng chính
+Sản phẩm hỗ trợ văn phòng công chứng giảm nhập liệu lặp lại qua ba hướng:
 
-- Nhận ảnh, PDF, Word, Excel và văn bản dán vào.
-- Đọc chữ trong ảnh bằng OCR — công nghệ biến ảnh giấy tờ thành chữ — rồi bóc thông tin người và tài sản.
-- Cho chuyên viên kiểm tra, sửa và xác nhận dữ liệu trong bảng.
-- Sắp xếp người vào sơ đồ quan hệ hoặc hai bên của hợp đồng.
-- Với thừa kế: tính kết quả từ quan hệ và dữ kiện đã nhập, kèm giải thích và cảnh báo thiếu thông tin.
-- Tạo một hoặc nhiều văn bản Word từ mẫu và dữ liệu đã lưu.
+1. **Soạn hồ sơ mới:** đọc giấy tờ, cho chuyên viên kiểm tra dữ liệu, lập quan
+   hệ và xuất Word.
+2. **Số hóa hồ sơ cũ:** đọc Word, so với dữ liệu chính thức của website và
+   chuẩn bị biểu mẫu để chuyên viên tự kiểm tra, tự quyết định Lưu. Dữ liệu đã
+   được website ghi nhận chính thức là SOT; app không suy kết quả Lưu từ browser.
+3. **Theo dõi vận hành:** dự kiến cho biết hồ sơ đang ở đâu và chờ việc gì;
+   hiện mới có thiết kế, chưa có chương trình chạy.
 
-### Luồng soạn hồ sơ
+**Định hướng hồ sơ thử — owner 19/10/2026:** folder `D:\testcase`, đọc
+[README chung](file:///D:/testcase/README.md) và
+[context từng loại](notary_v2/README.md#context-ho-so-thu).
+Mọi luồng dùng dữ liệu chuẩn Người–Tài sản–Hồ sơ; hiện **chỉ ghi tài liệu**,
+chưa tạo Word/corpus hoặc chạy E2E. Vị trí người nhận trong cấu trúc Di chúc
+cần nhận diện từ mẫu, không phải quyết định ghế Diagram; thế chấp ngân hàng
+cung cấp nội dung, văn phòng chỉ soạn lời chứng và input
+luôn thiếu thông tin tài sản; mua bán xe chỉ ghi
+[#29 DEFERRED](../backlog/spike-vehicle-sale-case-scope.md), hiện không làm.
+[Decision](../decisions/decision-owner-case-context-standard-data-20261019.md).
+**Gate mới — owner 19/10/2026:** mọi future sample batch/khảo sát mẫu thực,
+corpus và E2E theo mẫu chờ
+[#41 chuẩn hóa toàn bộ trường Upload](../backlog/story-upload-business-field-standardization.md)
+được nghiệm thu chuẩn DB/contract, cutover và proof consumer thật, không chỉ
+bảng mapping. Proof riêng #41 khi được giao dùng input tổng hợp/kiểm soát
+cô lập, không cần quét corpus owner để đóng gate. Không tắt Scan/Upload
+production. Chủ đất thuộc **Hồ sơ**, không Tài sản cố định/node `owner` Thừa kế;
+thông tin công chứng thuộc Hồ sơ, khác ngày tạo. Key/kiểu/cardinality chưa
+chọn; inventory gồm số/ngày công chứng, công chứng viên, thư ký và mọi trường.
+Không bóc/chuẩn hóa thông tin giá/cọc/thuê/vay/lãi/thanh toán hoặc thời hạn
+nghiệp vụ; vẫn giữ thời hạn đất và timeout kỹ thuật. Portal cần trường đã loại
+thì ghi xung đột để refine, không bịa/default hay tự chọn bước nhập tay.
+[#42 Người nhiều giấy tờ và địa chỉ](../backlog/story-person-multiple-identities-addresses.md)
+là issue riêng, model tương lai chưa chọn, không tự là prerequisite #41.
+**Policy owner 21/10/2026, áp dụng cả task tương lai:** máy xử lý dữ liệu,
+không quyết định thay người dùng. Không thêm business/UX gate hoặc đổi hành
+vi chưa báo và được owner duyệt. Ưu tiên tối thiểu: 80% kết quả hơn 90% cộng
+10 thao tác, không phải quyền làm sai dữ liệu/xóa nguồn. UX chưa rõ ghi issue.
+Blocker hiện có chưa kiểm kê/xác minh; không tự gỡ safeguard hay claim đã audit.
+**Snapshot — owner chốt 21/10/2026:** một record nghiệp vụ là một Hồ sơ,
+chỉ giữ một snapshot hiện hành. Lưu lại cập nhật snapshot đó; lịch sử là
+các Hồ sơ liên quan, không snapshot mỗi lần lưu hoặc lịch sử sửa từng ô.
+Hồ sơ đã lưu giữ dữ liệu riêng, chỉ user sửa thủ công; dữ liệu mới ở nơi khác
+không tự cập nhật ngược. Các bộ thông tin khác nhau của cùng ID vẫn giữ qua
+những Hồ sơ đó; raw/nguồn/history kỹ thuật đã có vẫn giữ.
+[Quyết định](../decisions/decision-owner-case-snapshot-as-history-20261021.md).
+**Hồ sơ nháp — owner 21/10; làm rõ luồng Soạn hồ sơ 23/10/2026:**
+Nháp đã tồn tại trong database qua lệnh tạo/nhân bản vẫn mở lại làm tiếp được;
+giữ nhãn **Nháp** rõ khi hiển thị/thống kê/báo cáo có chứa Nháp. Trong Soạn
+hồ sơ, bản mới chỉ ở bộ nhớ phiên đến khi bấm **Lưu hồ sơ**; không có nút
+**Cập nhật** hoặc **Lưu nháp**, không tự ghi khi rời/đóng. Stage, Pool và
+Diagram dùng chung bản đang sửa. **Lưu hồ sơ** ghi Diagram và toàn bộ
+Stage/thông tin hồ sơ, kể cả ô đang sửa, trong cùng một lượt; đây là mốc Nháp→Done.
+Cấu trúc lưu phương án B đã triển khai vòng 1: dòng case-owned; trạng thái
+`draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi `workspace_save_case` nguyên tử,
+kể cả nhánh tạo mới với `draftId`/`idempotency_key` giữ nguyên khi thử lại.
+**Bằng chứng vòng 2 ngày 22/10/2026 (lịch sử, `test_issue13_partial_draft.py`):**
+`workspace_create` hỗ trợ nháp ít dữ liệu (0 Người/Tài sản, tên/owner null);
+command này vẫn dành cho consumer khác, không phải đường ghi của Soạn hồ sơ.
+Từ **23/10/2026**, Lưu hồ sơ cũng đi theo triết lý điền dần: không bắt
+≥1 Người/≥1 Tài sản, không bắt Chủ đất; Người chỉ cần họ tên, Tài sản chỉ cần
+số thửa + số tờ, chuỗi rỗng ghi null. Thiếu dữ kiện để engine tính vẫn lưu
+được ở trạng thái incomplete. Trần 5 tài sản; cụm đất không còn trần 20 và
+giá trị không hợp lệ được chuẩn hóa thay vì chặn. `commit_stage`/chuyển loại
+vẫn strict cho consumer khác. Nhãn dùng `draft`=Nháp, `done`=Đã lưu,
+độc lập chấm dirty. Resolver nguồn Done lưu gần nhất
+(`test_issue13_source_latest.py`) và Nhân bản
+(`test_issue13_workspace_duplicate.py`) đã triển khai;
+bản sao lần đầu `draft`/rev1 là chốt kỹ thuật chờ owner xác nhận.
+Cách tính trong từng báo cáo chưa chốt; B6 modal đất vẫn pending.
+Xem [quy tắc Hồ sơ nháp](notary_v2/README.md#2-danh-sách-hồ-sơ) và
+[quyết định](../decisions/decision-owner-persistent-case-drafts-20261021.md).
+**Điểm neo — owner chốt 21/10 mới nhất; vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:** tự dùng cùng ID
+Người khi **tên + số giấy tờ đồng thời giống nhau**; ngày cấp/địa chỉ khác vẫn
+cùng ID. Đổi tên/số chấp nhận ID khác. Tài sản gom theo **serial** nguyên văn.
+Khi lấy lại dữ liệu vào Hồ sơ mới mặc định bộ mới nhất, không chọn phiên bản.
+Tra cứu Người nhằm xem các Hồ sơ đã làm. Người sống/chết cùng bảng; địa chỉ
+cũ–mới tạm giữ cách hiện tại, mô hình mới chưa chốt. Thiếu điểm neo không gom
+rỗng, không chặn lưu Nháp.
+**Owner 22/10:** mới nhất theo Hồ sơ lưu gần nhất, chỉ nguồn done, không draft;
+tên so không phân biệt dấu/hoa-thường, giữ tên gốc. ID trùng cũ giữ nguyên,
+không tự hợp nhất; cùng serial dù khác thửa vẫn cùng ID. Nhân bản toàn bộ.
+Đổi **Lưu sơ đồ** thành **Lưu hồ sơ** đã chốt: lưu Diagram và toàn bộ nội dung,
+gồm ô đang sửa, trong một lượt và chuyển draft→done. Trên Done, chỉ khi
+Lưu hồ sơ thành công mới thay snapshot hiện hành; Word và nguồn cho Hồ sơ
+mới dùng bản đã lưu hiện tại, không giữ bản Done cũ riêng. Phương án B đã chốt,
+phần dừng chờ A/B/C đã gỡ; vòng 1 đã cutover dòng case-owned + identity neo,
+vòng 2 ĐÃ TRIỂN KHAI 22/10/2026 resolver nguồn Done (updated_at microsecond/tie
+id; proof: `test_issue13_source_latest.py`), Nhân bản toàn bộ
+(`test_issue13_workspace_duplicate.py`) và nháp ít dữ liệu
+(`test_issue13_partial_draft.py`). Copy/paste Excel vẫn
+chưa triển khai. Policy cũ ở
+[#44](../backlog/story-person-cccd-suggestion-link.md) đã bị thay thế;
+không dùng tiêu chí cũ để triển khai hoặc khôi phục CCCD UNIQUE/chặn luồng.
+Không tự ghép dữ kiện giữa văn bản/đổi snapshot nơi khác.
+#41 OPEN/gate mẫu ĐÓNG, #42 độc lập; không mở gate mẫu hoặc đóng #13 bằng
+thay đổi docs này.
+[Quyết định](../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+[Làm rõ và lượt rà soát 22/10](../decisions/decision-owner-data-entry-save-rules-20261022.md).
 
-```text
-Ảnh / PDF / DOCX / XLSX / text
-    → Đọc chữ và bóc trường
-    → Gợi ý để chuyên viên xem, sửa
-    → Stage: bảng Người và Tài sản
-    → Bấm Cập nhật để lưu dữ liệu đã kiểm tra
-    → Pool: danh sách người chưa được xếp vào sơ đồ
-    → Diagram: sơ đồ quan hệ và vai trò
-    → Xem cách tính, bổ sung thông tin, lưu sơ đồ
-    → Chọn mẫu và thư mục → xuất Word
-```
+**Rà soát cách ghi DB — owner chốt 22/10/2026:** đã chọn **phương án B**:
+mỗi Người/Tài sản một dòng thuộc Hồ sơ, ghi đúng dòng đổi; không giữ bản
+“đã chốt” riêng. Sửa Done là thay luôn nội dung hiện hành sau ghi thành công.
+**Lưu hồ sơ lưu tất cả**, gồm Diagram, Stage/thông tin hồ sơ và ô đang sửa,
+trong một lượt ghi trọn vẹn. Phần tạm dừng chờ A/B/C đã gỡ. Vòng 1 đã cutover
+Storage B case-owned; vòng 2 ĐÃ TRIỂN KHAI 22/10/2026
+source_latest/duplicate/partial-create (proof: `test_issue13_source_latest.py`,
+`test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`).
+Nút Lưu hồ sơ gọi `workspace_save_case` cho Stage+meta+Diagram
+và chuyển draft→done. Giữ `canLeave` và cảnh báo đóng cửa sổ khi chưa lưu,
+`base_revision`/hộp thoại conflict; rời/đóng không tự lưu nháp. Ngoại lệ Word:
+Nơi niêm yết vẫn lưu riêng qua `saveCaseMeta` → `workspace_update`.
+[Quyết định chọn B](../decisions/decision-owner-case-storage-b-20261022.md).
 
-### Luồng phụ: soát Word với bản scan
+**Pháp nhân (owner 20/10/2026):** không đưa vào Người; policy nhập tay chung
+có ngoại lệ ngân hàng thế chấp **app tự lấy** bên dưới. Bảng riêng tương lai
+chưa duyệt schema/build; không bịa/default. **Cụm trường phụ website** theo hướng owner cho phép có điều kiện cho một ô
+cụ thể (phức tạp, không lặp lại); chưa chọn ô/cấu trúc nào và không tự biến editor
+thành block. Quan hệ nhiều người/nhiều tài sản chưa chọn model/cardinality;
+D06+D07 chuyển [#43 riêng](../backlog/spike-case-people-assets-relationships.md),
+làm ngay sau làm rõ các ô Nam Định §7, không chờ toàn #41 xong/#42.
+[Quyết định](../decisions/decision-owner-upload-field-standardization-20261019.md).
+**Đáp án #43 — owner 20/10/2026:** requester Nam Định/Upload gồm cá nhân sống
+A/B/đại diện theo ủy quyền; không người chết/CCV/nhân viên trong output đó,
+không xóa Person chết/Stage/Hồ sơ thừa kế/raw/history. Cá nhân vẫn dữ kiện
+chuẩn, alias manual, D04/D08 không prose/lookup/firstperson. Ngân hàng thế
+chấp hiện cả cụm, không Person; **BANKMODE đã chốt “app tự lấy”**: toàn cụm có
+nguồn ngân hàng/chi nhánh/định danh/địa chỉ/đại diện/ủy quyền, chỉ thế chấp.
+Requester giữ mọi cá nhân sống thực sự tham gia theo thứ tự nguồn, đặt cụm
+ngân hàng đúng vị trí, không lặp đại diện đã nằm trong cụm. Cá nhân khác chuẩn.
+`web_form.nguoi_yeu_cau` → payload JSON → queue → editor là persistence
+projection hiện có hợp lệ, không thêm canonical field/schema. A/B đã chốt:
+ủy quyền A=ủy quyền/B=được ủy quyền, một bên không gán, conflict nhóm không
+winner/thu hẹp requester. #43 giữ đủ 16 ca, Q1/Q2/BANKMODE đủ đáp án và bàn
+giao #41; không còn bank owner gate, không tuyên bố #41 cutover xong. Requester không
+cần tag A/B đã gán: cá nhân sống một bên/đại diện ủy quyền vẫn vào khi nhóm
+không gán/conflict. W05
+đã chốt: giữ ID1 đất có tài sản/nhà; hồ sơ có thửa nhà + thửa trống chọn ID1
+khi có bằng chứng gắn liền đất, chỉ phạm vi đất-nhà/đất-trống, không ưu tiên
+phổ quát trên loại khác. D05 chọn nhóm A/B chung, chữ “nhận” gần như 100% không luật
+tuyệt đối. A09 đã chốt A: không residual field/block, chỉ render canonical/
+placeholder; raw/history retained không auto-fill. [SOT §7.5.1](upload_lab/nam-dinh-website-sot.md)
+lưu trường thật/ví dụ tổng hợp GCN/thửa/cụm đất. A10 nhận diện/pending structured,
+#29 deferred; không loại đất có nhà. **Owner 20/10/2026 chốt chỉ dùng
+placeholder và trường tĩnh**; không mở trường tầng 2 động/tính toán, text
+canonical persisted từ suy ra, engine công thức hoặc framework điều kiện.
+Quyền có điều kiện cho cụm **text tĩnh** đã duyệt khác vẫn giữ; **A09 đã chốt A**
+không residual field, chỉ render canonical/placeholder. Dữ kiện nguồn tĩnh khác
+lớp định dạng output/placeholder.
+Bounded local proof đã có, fresh bank-auto review CLEAN/Ticket PASS; #43 phân
+tích done/bàn giao. Không toàn normalized cutover #41, #41 mở/gate mẫu ĐÓNG.
+**BUILT — slice metadata Case, 19/10/2026; verification đạt, Quick code độc lập
+sạch sau fix được chấp nhận, tài liệu hoàn tất:** tám
+trường canonical đã đi qua extraction, lưu/đọc lại, builder và preSave consumer.
+Chủ đất là **“người được gán chủ đất trong diagram”**: lựa chọn Chủ
+`ownPositions` đã lưu, tên snapshot Stage theo ID, không mặc định slot
+owner/người chết. Upload không có Diagram là null. Catalog ở entities §9.4.
+Proof tổng hợp DOCX/SQLite/fresh reopen/local Chromium đã đạt; Quick code sạch
+sau sửa ghi nhân sự chỉ cho record thực sự prepare (queue read không ghi).
+Không claim portal thật có đăng nhập, packaging hoặc corpus accuracy.
+Person/Asset/parties chưa cutover; **toàn #41 chưa hoàn thành, gate mẫu ĐÓNG**.
+Sau gate và khi được giao, quy trình là **LLM đọc hàng loạt mẫu → nhận diện cấu trúc
+→ so code → điều chỉnh code → test lại, sai thì lặp**, nhằm xuất đủ, đúng thông
+tin hợp đồng. Issue riêng theo cấu trúc chưa chốt #30–#38;
+[#39 tổng hợp văn bản lạ](../backlog/spike-unfamiliar-document-review-queue.md)
+để owner xem sau, không chặn các file đã rõ. Không phải lệnh bắt đầu chạy lô.
+Đọc/cập nhật [báo cáo khảo sát ổn định](file:///D:/testcase/BAO_CAO_KHAO_SAT.md)
+trước/sau mỗi lô; audit trường chuẩn và mapping từng biến thể trước claim đủ
+đúng. Catalog nền chưa đủ trường Hồ sơ/Upload và không chứng minh đã khảo sát
+nội dung mẫu.
 
-Một công cụ chạy bằng dòng lệnh nhận thư mục hồ sơ, đọc bản scan và Word, so các trường như tên, số giấy tờ, ngày, thửa đất và diện tích, rồi xuất báo cáo. Công cụ này độc lập với luồng soạn hồ sơ và không ghi cơ sở dữ liệu. Nó kiểm tra chữ và chuỗi dữ liệu, không đưa ra kết luận pháp lý.
+**Owner 21/10/2026 — sáu quy tắc Người chết đã CHỐT, đã giao runtime hẹp:**
+Nơi chết/cư trú cuối chung một `dia_chi`; `Giấy chứng tử (bản sao)` quy về
+`Giấy chứng tử`, chỉ ba loại cùng `Trích lục khai tử` và `Trích lục khai tử (bản sao)`.
+Giữ cơ quan xã/phường/thị trấn theo ngày cấp giấy, không ép xã/suy lịch sử
+chưa xác nhận. Không đề xuất bổ sung hoặc tự ghép giữa văn bản; không gợi ý
+từ Đơn xin xác nhận. Thiếu ngày chết là không có thông tin, có trường hợp
+lệ nào điền trường đó, không chặn Người/tự coi còn sống/tạo field mới.
+Luật nội dung giấy tờ này không cấm gom ID theo điểm neo ở trên, cũng không
+cho phép mượn trường thiếu giữa văn bản hoặc tự cập nhật Hồ sơ đã lưu.
+Logic câu Word/trường tĩnh giữ nguyên. Owner tiếp tục **“trien khai”**:
+workstream Người chết **đã BUILT bounded** (parser/intake, số thật lưu an toàn,
+migration/consumer/Word, UI legacy giới hạn); actual proof implementer-run
+164 checks gồm fresh+migrated DB/Word. **Chưa nghiệm thu toàn #41**.
+Chỉ proof DOCX/SQLite riêng/Word tổng hợp, không mẫu thật/prodDB/corpus/
+Electron packaged; không mở #42/A04/quan hệ hoặc gate chung.
 
-**Đọc tiếp:** [Module](./notary_v2/README.md), [Nhập liệu](./notary_v2/input/README.md), [Stage](./notary_v2/stage.md), [Pool](./notary_v2/pool.md), [Diagram](./notary_v2/diagram/README.md), [Word](./notary_v2/word-output.md), [Soát văn bản](./notary_v2/fast-text-audit.md).
+Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.md)
+(16/10/2026; #17 built after independent Quick t2 clean; Upload failures and proof limits remain in the catalog/runtime record).
+[Ticket tổng cũ](../backlog/bug-notary-flow-ui-regex-word.md) giữ làm lịch sử và bị chặn tracking-only để không chạy trùng các leaf. Các điểm chính:
 
-## 2. upload_lab — Số hóa và chuẩn bị upload hồ sơ cũ
+- Đổi loại hồ sơ đã lưu **built 16/10/2026** (giữ Stage, reset Diagram, chọn văn bản mới + xác nhận — [decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md)). [#25](../backlog/story-saved-case-type-conversion.md): command + dialog nguyên tử, smoke Electron/source IPC hai chiều và xuất DOCX thật; **independent Quick clean** — built.
+- Sơ đồ/Stage: nhãn `Nơi chết`/`Nơi cấp giấy khai tử` theo bằng chứng (người đã mất thiếu bằng chứng vẫn `Nơi cấp giấy tờ`), Pool nội dung 224 (khung 240), ô Hai bên 202×52, thông báo tạm trong khoảng trống thanh trên (bám trên cùng khi vùng nội dung cuộn) không đẩy Sơ đồ; nút `Hủy thay đổi` của Stage đã gỡ, bảo vệ nháp giữ. Vùng Sơ đồ + Pool +50% chiều cao (802, đã chốt: sàn 726px từ baseline 484px, không đổi chiều rộng).
+- Regex gợi ý intake (#7) và cutover **#22 built 16/10/2026**: Notary/Upload/tool dùng **một đường luật chung** `tools/regex_workbench/engine/contract_extract.py` (identity `contract_word`), adapter giữ IO/mapping và `source_refs` span nguồn. Serial nguyên văn, địa chỉ có nhãn, nhóm/cụm đất nhiều dòng được giữ; ô phẳng mâu thuẫn vẫn báo mơ hồ. Retained Quick t1 findings → các vòng vá Q1–Q7/MB1–MB9 → **retained Quick final multiline recheck clean 16Oct**, parent chấp nhận. Bằng chứng cuối: workbench **53 passed, 6 subtests**; intake + Word-first **130 passed, 2 subtests** + guard chuyển nhóm **1 passed**; Upload bounded **11 passed, 9 subtests**. So API **828 trường khớp / 0 lệch**, **44 null + 256 shape chưa kiểm**, F10/F11 unreviewed — không phải all-accuracy. Sidecar thật trên bundle đã stage chứng minh exact DOCX multiline + provenance, Upload scan 1/1/1; **native GUI DOCX chưa thực thi** (seam raw path/file_token). Full Notary 1139 passed/2 skipped là trước round 5–7, không claim full suite hiện tại. Dev Workbench UI giữ, gọi lõi thật; bỏ editor JSON profile lỗi thời. [#22](../backlog/story-shared-regex-consumer-cutover.md) · [bằng chứng](../tmp/issue-22-regex-consumer-cutover/evidence/EXECUTION-SUMMARY.md).
+- Rule regex văn bản và rule upload theo website do developer quản lý, có phân biệt phiên bản để nhận biết; owner chốt 16/10/2026 người dùng sản phẩm không có tính năng thử/công bố/chọn phiên bản/rollback — [#23](../backlog/story-in-flow-regex-publication-review.md) superseded, [#8](../backlog/spike-regex-rule-lifecycle.md) đã có đáp án nghiệp vụ ([decision](../decisions/decision-owner-regex-rule-developer-only-20261016.md)).
+- Giúp tìm mẫu Word và biết chỗ điền dữ liệu nào được hỗ trợ.
+- Word #9 (đường xuất thật): evidence đã trả lời 16/10/2026 (direct batch + paired restore, bằng chứng sau khi dừng app là ca 3; retained Quick t2 clean); native picker/kiểm trang Word/cài sạch còn là giới hạn capability. [#9](../backlog/spike-word-real-route-acceptance.md).
+- Word #24 (readiness điền dần): built 16/10/2026 (Quick t1 clean sau vá nhãn readiness) — gate nhóm (Chủ/Nhận, sơ đồ hai bên) chỉ áp theo token mẫu thực dùng, nhận diện theo registry key engine sinh; folder mode giữ nhóm thiếu để trống; bằng chứng before/after engine 523608a + UI packaged (seam picker non-native) trong `_bmad-output/tmp/issue-24-word-readiness/evidence/`; independent Quick chạy sau. [#24](../backlog/story-gradual-fill-word-readiness.md).
+- Regex/placeholder — 21/10/2026: sửa token ngoài bị lẫn chữ textbox **BUILT bounded**; 72 Word tests đạt và proof DOCX intake → SQLite tạm/mở lại → mapping tĩnh → Word đọc lại đạt. Công việc engine độc lập kiến trúc lưu trữ, không đổi DB; chưa hoàn tất toàn engine/corpus, đọc mẫu thực mới và E2E theo mẫu vẫn chờ toàn #41. [Coverage](notary_v2/word-templates.md).
+- Upload: đã bỏ theo dõi kết quả Lưu, runtime cutover 15/10/2026. [#28](../backlog/story-upload-web-official-sot-cutover.md).
+- Desktop runtime (#17): manifest/lock dùng Electron `44.7.2`, builder `24.13.3`; production/test packages build, core tests, Notary IPC và Chromium loopback diagnostic đạt. Snapshot startup/sidecar smoke giữ nguyên 2,975 files; public picker token qua `file.inspect` khớp size/hash. Upload UI `file_ref.path`, production offline `file_token` và test `--case all` vẫn lỗi; chưa khẳng định full Upload E2E hay offline-flow immutability. Xem [runtime record](shell/electron-runtime-support.md).
 
-### Vì sao cần module này?
+- Sơ đồ: binding thông báo lỗi đã được sửa; có test hồi quy và probe trên
+  Electron thật (client stub; không xác minh command IPC/engine), review Quick
+  độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).
+- Hiệu chỉnh G2 vòng sửa lỗi E2E 23/10: khi Lưu hồ sơ bị
+  `diagram_invalid_state`, toast hiện lỗi sơ đồ đầu tiên, thiếu chi tiết thì
+  hiện lỗi tổng. `missing_land_owner` chỉ rõ thiếu chip Chủ trên vị trí tài
+  sản, không hướng dẫn gán lại người đã có trên sơ đồ.
+- **Luật sơ đồ v2 — owner 27/10/2026, WP0 spec; WP1 triển khai có giới hạn:** ô do engine tạo/xóa;
+  người dùng chỉ thao tác thẻ và Chủ/Nhận. Ô chủ đất mặc định Chủ, mọi ô
+  khác không tích (= từ chối), không tự điền Nhận. Gỡ không modal; chỉ cascade
+  mới toast + Hoàn tác khoảng 5 giây, công tắc mặc định bật. Engine phải
+  đối chiếu tới ổn định sau sửa Stage; hàng 2/3 gác sau
+  `ENABLE_LATER_LINES=False`, chỉ hàng 1 + thế vị + chuyển tiếp. Luật mới
+  thay G1 mặc định/đồng bộ Nhận và luật gỡ 17/10. **WP1 đã đưa code B vào:**
+  `spouseSlotIds`, người đặt cuối hợp pháp/thẻ trước nhạt, migration spouse
+  legacy trong RAM (chỉ ghi khi lưu), cap thế vị tới chắt. Engine mặc định
+  tắt hàng 2/3, thiếu người thừa kế hàng 1 trả `unsupported`/Chưa hỗ trợ
+  và không sinh ô hàng 2/3; vẫn giữ yêu cầu ô hàng 1 để điền tiếp. Đã bỏ
+  menu quan hệ, thêm ô cha/mẹ/con và chọn vợ/chồng
+  hợp pháp thủ công. **WP2 đã triển khai ở engine/mock:** chủ đất sống chỉ
+  ô vợ/chồng; chủ đất chết/chuyển tiếp có Cha, Mẹ, Vợ/chồng, Con; thế vị
+  chỉ Con, không sinh tiếp từ chắt. Vợ/chồng và Con có một ô dự phòng,
+  ID ô đích ổn định theo anchor/vai trò/thứ tự. Ngày mất không so được
+  không sinh ô, trả `missing_death_date` theo người (UI chưa nối nhãn).
+  **WP3–WP8 chưa triển khai:** client chưa dùng tập ID ô đích/đối chiếu tới
+  ổn định; mặc định từ chối, gỡ thẻ/Hoàn tác, bố cục và độ trễ mới vẫn chờ.
+  Kiểm chứng WP2: 202 pytest liên quan đạt; smoke engine/mock A–D và
+  create/evaluate SQLite riêng đạt; schema/example 121 file đúng kỳ vọng;
+  Quick review sạch sau sửa ba gap Q1/provenance và tombstone mock.
+  Toàn suite cuối: pytest 1331 đạt/19 lỗi/7 bỏ qua (WP1 1314/18/7),
+  JS 444 đạt/22 lỗi (WP1 442/24). Lượt pytest trước đạt 1327/18/7;
+  lượt cuối thêm 5 regression nhưng test hash fixture
+  `test_golden_fixture_materialization_is_byte_repeatable` đổi sang fail.
+  Không sửa các test/code ngoài WP2; toàn suite chưa xanh.
+  [Quyết định và Q1–Q4](../decisions/decision-owner-diagram-rules-v2-20261027.md).
+- Sơ đồ: lưu bản hợp lệ còn thiếu giữ warning Pool/`requiredSlots` qua mở lại;
+  state `invalid` bị từ chối và giữ nguyên bản cũ; cue chỉ-đọc (trạng thái +
+  phần thiếu) hiện khi panel cách tính đóng. Bằng chứng service/adapter và
+  Electron thật (service thật, SQLite tạm) đạt; independent Quick t3 CLEAN,
+  review xong. Smoke còn ghi nhận toast khởi động thoáng qua
+  `engine_unavailable` khi mở danh sách; danh sách tự retry. Đây là giới hạn
+  đã quan sát, không thuộc scope #5 và không được tuyên bố đã khắc phục.
+  [#5](../backlog/story-save-valid-incomplete-diagram.md).
+- **Lịch sử #21B bên dưới đã bị thay thế về hành vi** bởi §9.9 luật gỡ thẻ
+  ngày 27/10/2026; bằng chứng cũ không nghiệm thu luật mới.
+- Sơ đồ Thừa kế **#21B BUILT 17/10/2026** theo owner **“B - gỡ cả nhánh”**; retained Quick CODE t3 **No actionable findings**, parent accepted AC1–4. Node full 198 trước patch bỏ assertion chữ; affected file 25 sau patch, service 106 (24 warnings hiện có). Source Electron + real IPC/SQLite riêng đạt cảnh báo/dismiss/focus/atomic cut/Pool/Save invalid và fresh reopen exact. Không claim packaged/Word; startup toast `engine_unavailable` còn quan sát. #21 vẫn là spike nhận đáp án, không chứa implementation. [Proof](../tmp/issue-21b-branch-removal/evidence/ui-ipc-proof.json) · [Quy tắc](notary_v2/diagram-rules.md#branch-removal).
+- Ngày Người giữ độ đầy đủ qua lưu/đọc/sửa/xuất Word: `2010` (chỉ năm) không
+  bị đệm thành `01/01/2010`; snapshot hồ sơ là bằng chứng, master chỉ fallback
+  khi snapshot cũ thiếu key. Đã sửa, test hồi quy và export DOCX thật đạt;
+  review độc lập Quick sạch. [#6](../backlog/story-preserve-year-only-precision.md).
 
-Phần mềm quản lý cũ của văn phòng chưa có API, tức cổng để phần mềm khác lấy dữ liệu trực tiếp. Nguồn có thể khai thác là các file Word chuyên viên đã soạn. Upload Lab đọc nguồn đó để giảm việc nhập lại lên portal — website cơ sở dữ liệu công chứng của tỉnh.
+Đây là các hướng cần đánh giá theo ticket, không phải lệnh triển khai tự động.
+Danh sách [deferred-work](../implementation-artifacts/deferred-work.md) là
+lịch sử cần xác minh từng mục, không phải danh sách việc hiện đang mở.
 
-### Luồng A: quét kho Word
+## Menu chung
 
-```text
-Thư mục .doc / .docx
-    → Đọc nội dung theo thứ tự đoạn và bảng
-    → Nhận diện loại văn bản
-    → Bóc đương sự, tài sản, số/ngày công chứng, công chứng viên...
-    → Lưu dữ liệu có cấu trúc và kết quả từng lượt quét
-```
+Menu gốc được khai báo tại [`NAV_SPEC`](../../shell/src/renderer/lib.js), rồi
+hiển thị bởi [`renderSidebar`](../../shell/src/renderer/renderer.js). Menu có ba
+module nghiệp vụ và hai tiện ích:
 
-Các nhóm được tài liệu mô tả gồm chuyển nhượng, thế chấp, cam kết tài sản riêng, phân chia/từ chối di sản và nhóm văn bản chung. Quy tắc bóc trường nằm trong catalog regex — tập mẫu nhận diện chữ, ví dụ tìm số công chứng theo cấu trúc `xxx/yyyy`.
+| Mục trên menu | Việc làm được | Tài liệu | Điểm vào mã |
+|---|---|---|---|
+| `notary_v2` | Soạn hồ sơ mới | [Module](notary_v2/README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildNotaryView` |
+| `upload_lab` | Đọc hồ sơ cũ, audit sổ và chuẩn bị upload | [Module](upload_lab/README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildUploadView` |
+| `notaryoffice` | Theo dõi hồ sơ — **thiết kế nháp, chưa có màn chạy** | [Thiết kế](notaryoffice/README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildOffice` |
+| `Tra cứu` | Tìm kiếm chung — chưa có nguồn dữ liệu để tìm | [Tầm nhìn hệ thống](README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildSearch` |
+| `Trạng thái/Cài đặt` | Xem kết nối, phiên bản, module, job, môi trường và diagnostics; phần Cài đặt hiện chỉ có thông tin | [Spec hệ thống](README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildStatus` |
 
-### Luồng B: đối chiếu sổ Excel
+## notary_v2 — Soạn hồ sơ mới
 
-```text
-Excel tải từ portal hoặc do người dùng cung cấp
-    → Chuẩn hóa số công chứng
-    → Kiểm tra theo khoảng ngày
-    → Báo số thiếu, trùng, sai định dạng hoặc sai năm
-    → Đối chiếu với kho Word đã quét
-```
+Flow chính: **Tổng quan hồ sơ → Soạn hồ sơ → Nhập liệu/gợi ý → Stage → Pool →
+Diagram → Xuất Word.** Tab `Word` hiện chỉ có thông báo, chưa có chức năng
+riêng; nút xuất nằm trong `Soạn hồ sơ`. Nút Zalo disable đã gỡ khỏi giao diện
+(chức năng chưa ban hành). Mỗi dòng dưới đây
+trỏ tới phần nhỏ để bắt đầu tìm hiểu.
 
-### Luồng C: chuẩn bị upload
+**Tab Word tạo/lưu mẫu tương lai DEFERRED — owner 17/10/2026:** “chức năng này tôi sẽ tự làm sau, cần spec kỹ. Chuyển issue khác”. Cần spec chi tiết trước implementation tương lai; chưa giao viết spec hoặc code lúc này, các lựa chọn nguồn/bố cục/catalog/nghiệm thu chưa chốt. #19 đã nhận đáp án hoãn phạm vi, không built; chuyển #20, không hỏi tiếp #19. Nút Xuất Word và intake hiện có không bị hoãn. [Decision](../decisions/decision-owner-word-authoring-deferred-20261017.md).
 
-```text
-Chọn hồ sơ cần nhập
-    → Mở browser đã đăng nhập
-    → Điền sẵn form, mỗi tab gắn với một hồ sơ
-    → Người dùng kiểm tra và tự bấm Lưu
-    → Nhận phản hồi lưu thành công
-    → Cập nhật kết quả và hàng đợi
-```
+**Danh sách hồ sơ (Tổng quan hồ sơ) làm lại — owner 17/10/2026:** owner “note lại phương hướng (chưa chốt chắc chắn)” và **sẽ tự triển khai spec sau**; chức năng **DEFERRED**, không giao code hoặc spec lúc này. Owner yêu cầu mọi input/output tuân theo chuẩn database; whitelist trường, mapping cụ thể và phạm vi request chưa chốt. Phần tentative **chưa duyệt**: trường hiển thị/search/filter, thẻ chia 3 vùng Người/Tài sản/Hồ sơ. Danh sách/tạo/mở hiện có không bị dừng. [#20](../backlog/spike-case-list-query-labels.md) · [Decision](../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
 
-Mỗi đợt có thể chọn 1–30 tab. Hồ sơ đã xuất hiện trong Excel được bỏ chọn mặc định để tránh nhập trùng. App chỉ đánh dấu thành công khi nhận được bằng chứng portal đã lưu.
+| Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |
+|---|---|---|---|
+| Tổng quan: lọc hồ sơ | Thu hẹp danh sách | [Workspace](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `buildCaseListPanel` |
+| Tổng quan: làm mới | Tải lại danh sách | [Workspace](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `buildCaseListPanel` |
+| Tổng quan: tạo nháp | Chọn loại việc và mở hồ sơ mới | [Workspace](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `newDraftFlow` |
+| Tổng quan: mở hồ sơ | Vào workspace đã lưu | [Workspace](notary_v2/README.md#stage) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `openCase` |
+| Input: chọn file | Nhận ảnh, PDF, Word, Excel | [Input](notary_v2/README.md#input) | [intake-dialog.js](../../shell/src/renderer/notary/intake-dialog.js) · `createIntakeDialog` |
+| Input: dán văn bản | Nhận chữ do người dùng cung cấp | [Input](notary_v2/README.md#input) | [intake-dialog.js](../../shell/src/renderer/notary/intake-dialog.js) · `createIntakeDialog` |
+| Input: phân tích | Tạo gợi ý từ nguồn nhập | [Input](notary_v2/README.md#input) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `intakeAnalyze` |
+| Input: sửa gợi ý | Kiểm tra, sửa dòng trước khi nhận | [Nhập liệu](notary_v2/README.md#input) | [intake-dialog.js](../../shell/src/renderer/notary/intake-dialog.js) · `reviewCardEl`, `renderRows` |
+| Input: đưa vào Stage | Chấp nhận gợi ý đã kiểm tra | [Workspace](notary_v2/README.md#stage) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `acceptSuggestion` |
+| Input: bỏ qua gợi ý | Loại gợi ý chưa dùng | [Input](notary_v2/README.md#input) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `discardSuggestion` |
+| Stage: thêm Người | Thêm dòng Người mới | [Stage](notary_v2/README.md#stage) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `addPerson` |
+| Stage: sửa Người | Sửa dữ liệu trong bảng | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `peopleTableEl` |
+| Stage: xóa Người | Bỏ dòng Người khỏi Stage | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `model.removeStageRow` |
+| Stage: đổi thứ tự Người | Kéo hoặc dùng Ctrl + ↑/↓ để sắp xếp dòng | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `movePersonRow` |
+| Stage: thêm Tài sản | Thêm cột Tài sản | [Stage](notary_v2/README.md#stage) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `addAsset` |
+| Stage: sửa Tài sản | Sửa dữ liệu trong cột | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `assetTableEl` |
+| Stage: xóa Tài sản | Bỏ cột Tài sản khỏi Stage | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `removeAssetAt` |
+| Stage: đổi thứ tự Tài sản | Kéo cột hoặc dùng Ctrl + ←/→ để sắp xếp | [Stage](notary_v2/README.md#stage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `assetTableEl`, `model.moveAsset` |
+| Stage: sửa loại đất | Chọn, thêm hoặc sửa loại đất trong draft | [Quy tắc tài sản](shared/ocr-rules.md#property) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `openLandDialog` |
+| Stage: áp dụng loại đất | Đưa lựa chọn loại đất vào draft hiện tại | [Quy tắc tài sản](shared/ocr-rules.md#property) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `openLandDialog` |
+| Stage: tra địa chỉ | Tra xã/tỉnh, copy kết quả phù hợp rồi tự dán vào ô | [Tra cứu địa chỉ](shared/administrative-lookup.md#usage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `lookupTraButton`, `lookupCopyButton` |
+| Stage: đồng bộ khi sửa | Pool/Diagram đọc ngay Stage đang sửa; không có nút Cập nhật/Lưu nháp, chưa ghi DB | [Stage](notary_v2/README.md#stage) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `updatePersonField`, `updateAssetField`, `pool` |
+| Pool: gán người | Chọn người chưa gán và đưa vào sơ đồ | [Pool](notary_v2/README.md#pool) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `openAssignMenu` |
+| Pool: bỏ gán người | Trả người từ vị trí sơ đồ về Pool | [Pool](notary_v2/README.md#pool) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `inheritanceCardEl` |
+| Diagram: Hai bên | Xếp người theo hai bên hợp đồng | [Hai bên](notary_v2/diagram-rules.md#two-party) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `twoPartyInto` |
+| Diagram: Thừa kế | Xếp quan hệ và vai trò thừa kế | [Sơ đồ](notary_v2/diagram-rules.md#common) · [Thừa kế](notary_v2/diagram-rules.md#inheritance) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `inheritanceInto` |
+| Diagram: xem cách tính | Xem kết quả và giải thích từ engine | [Sơ đồ](notary_v2/diagram-rules.md#common) | [relationship-diagram.js](../../shell/src/renderer/notary/relationship-diagram.js) · `runEvaluate`, `calcPanelEl` |
+| Hồ sơ: Lưu hồ sơ | Điểm ghi duy nhất của Soạn hồ sơ: lưu Stage+meta+Diagram, cả ô đang sửa, và chuyển draft→done | [Sơ đồ](notary_v2/diagram-rules.md#common) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `runSaveCase`, `flushActiveEditors` · [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `saveCase` |
+| Word: chọn thư mục mẫu | Chọn thư mục chứa các mẫu Word | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `createWordDialog` |
+| Word: quét mẫu | Tải danh sách file và trạng thái sẵn sàng | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `renderDocs` |
+| Word: chọn thư mục đích | Chọn nơi lưu kết quả | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `pickDirToken` |
+| Word: xuất | Tạo văn bản từ hồ sơ | [Xuất Word](notary_v2/word-templates.md#export) | [case-drafting-model.js](../../shell/src/renderer/notary/case-drafting-model.js) · `exportWord` |
+| Word: mở file | Mở file kết quả | [Xuất Word](notary_v2/word-templates.md#export) | [word-export-dialog.js](../../shell/src/renderer/notary/word-export-dialog.js) · `resultRowEl` |
 
-Giao diện Electron có hai tab: **Audit Sổ Công Chứng** và **Quét & Upload Hồ Sơ**. “Audit” ở đây nghĩa là kiểm tra, đối chiếu dữ liệu. Trạng thái quét, bộ lọc và lựa chọn được giữ khi đổi tab.
+**Chuyển loại hồ sơ sau khi lưu** đã có quy tắc owner 16/10/2026 ([decision](../decisions/decision-owner-saved-case-type-conversion-20261016.md),
+contract §13.18): giữ Người/Tài sản của Stage, reset Diagram rỗng theo domain mới, buộc chọn
+`document_type` mới kèm xác nhận. Loại chọn ở **dropdown header vùng Sơ đồ** cho
+cả hồ sơ mới và đã lưu; hồ sơ đã lưu đi qua
+`notary.workspace_convert_type`. Buffer Stage/meta đang sửa không chặn đổi loại
+(ghi kèm trong cùng hành động); lỗi giữ nháp
+Diagram. [#25](../backlog/story-saved-case-type-conversion.md) **built 16/10/2026,
+independent Quick clean**; không coi lựa chọn loại lúc tạo nháp là bằng chứng đổi loại.
 
-**Đọc tiếp:** [Module](./upload_lab/README.md), [Quy tắc trích xuất](./upload_lab/regex-rules.md), [Phiên portal](./upload_lab/portal-session.md), [Giao diện](./upload_lab/ui.md).
+**Vai trò quan hệ trong DB — owner 23/10/2026:** mỗi lần Lưu, `vai_tro` và
+`hang_thua_ke` của người có node được ghi lại theo Diagram mới; vai trò gán tay
+(ngoài bộ vai trò suy-từ-sơ-đồ, vd "Người được ủy quyền") giữ nguyên — quy tắc
+ở [Sơ đồ §4](notary_v2/diagram-rules.md#4-cách-biểu-diễn-và-lưu) và contract
+§13.19. Phần **neo cặp vợ–chồng theo nhánh** của
+[#45](../backlog/bug-participant-role-projection-stale-spouse-anchor.md) **tạm
+dừng**, chờ owner chốt mô hình quan hệ (nhiều vợ theo thứ tự, con theo từng
+cặp, con chung/con riêng) với Muse; không thêm trường/storage mới.
+[Decision](../decisions/decision-participant-role-projection-scope-20261023.md).
 
-## 3. notaryoffice — Theo dõi vận hành văn phòng
+## upload_lab — Số hóa và chuẩn bị upload hồ sơ cũ
 
-**Đây là ý tưởng đã được viết thành thiết kế nháp, chưa có phần mềm chạy.**
+Hai tab đang có trong UI là `Audit Sổ Công Chứng` và `Quét & Upload Hồ Sơ`.
+App điền sẵn rồi dừng trước nút Lưu để người dùng tự kiểm tra; dữ liệu chính
+thức trên website là nguồn sự thật, không phải tín hiệu browser cục bộ.
 
-Mục tiêu là trả lời: “Hồ sơ nào đang xử lý? Ai đang giữ? Đang ở bước nào? Chờ bổ sung việc gì?”. Hệ thống dự kiến tận dụng dấu vết công việc được phép thu nhận, như thay đổi nội dung Word và sự kiện in, để giảm nhập nhật ký thủ công.
+**SOT cấu trúc website — 20/10/2026, sau đăng nhập thủ công:**
+[Nam Định](upload_lab/nam-dinh-website-sot.md) là website thứ nhất được catalog
+lâu dài: **17 trường ngữ nghĩa** trên empty form live, **7 label required**
+(không proof HTML attr/enforcement); 6 widget/list hiện render gồm status **3**,
+nhóm **13**, asset **12**, title **5**, CCV **3**, thư ký **5**. List phi cá nhân
+và ID/label/metadata vai trò nhóm được chép bền vững; nhân sự chỉ shape/count.
+Có default/state và proof props↔DOM/pagination **trong phiên**, không tổng DB
+hoặc mọi đơn vị. Zero authenticated coverage/403/unscoped=[] của audit static
+trước đó giữ làm lịch sử; scope server và form/submission conversion còn unknown.
+Không Lưu/prime/upload hoặc mở record trên portal thật. Policy owner đã chốt:
+bốn phí/ghi chú bỏ qua, status Đã công chứng. Slice preSave adapter đã sửa và
+kiểm chứng Chromium cô lập (không submit, có file selection), **review độc lập CLEAN**
+không suy backend từ widget. Person/Asset/parties chưa cutover, **toàn #41 chưa
+xong, gate mẫu ĐÓNG**; website thứ hai chưa khảo sát, không thêm canonical key.
+Reviewer chạy lại Upload **42 pass, không skip** và sidecar **60 pass**; smoke
+filename decoy bổ sung **5 pass, không skip**. Không nghiệm thu portal thật hoặc
+packaged; build/dist chưa tái sinh.
 
-### Luồng dự kiến
 
-```text
-Dấu vết Word / in / nguồn được phép
-    → Bản ghi có nguồn và thời gian
-    → Nhóm các hoạt động có thể liên quan
-    → Đề xuất hồ sơ nháp
-    → Chuyên viên xác nhận, sửa, gộp hoặc bỏ qua
-    → Hồ sơ vận hành đã xác nhận
-    → Tìm kiếm và xem lịch sử xử lý
-```
+| Màn / thao tác | Dùng để | Tài liệu | Điểm vào mã |
+|---|---|---|---|
+| Audit: chọn website | Chọn nguồn portal dùng chung cho hai tab | [UI](upload_lab/README.md#ui) | [audit.js](../../shell/src/renderer/upload/audit.js) · `buildAuditTab` |
+| Audit: kiểm tra môi trường | Xem khả năng kết nối portal | [UI](upload_lab/README.md#ui) | [index.js](../../shell/src/renderer/upload/index.js) · `upload.env_check` |
+| Audit: đăng nhập/xác nhận | Mở browser và xác nhận đã đăng nhập | [Phiên portal](upload_lab/README.md#portal) | [index.js](../../shell/src/renderer/upload/index.js) · `upload.session_start`, `upload.confirm_login` |
+| Audit: chọn khoảng ngày | Giới hạn đợt cần so sánh | [UI](upload_lab/README.md#ui) | [audit.js](../../shell/src/renderer/upload/audit.js) · `commitDate` |
+| Audit: tải Excel từ web | Tải sổ portal về | [UI](upload_lab/README.md#ui) | [index.js](../../shell/src/renderer/upload/index.js) · `upload.download_export` |
+| Audit: chọn/nạp Excel | Nạp sổ để đối chiếu | [Upload Lab](upload_lab/README.md) · [UI](upload_lab/README.md#ui) | [audit.js](../../shell/src/renderer/upload/audit.js) |
+| Audit: xem KPI và bảng kết quả | Xem tổng, hợp lệ, thiếu, lỗi và số trùng | [Upload Lab](upload_lab/README.md) §4 | [audit.js](../../shell/src/renderer/upload/audit.js) · `buildAuditTab` |
+| Quét & Upload: chọn website | Dùng cùng website với tab Audit | [UI](upload_lab/README.md#ui) | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) · `buildScanUploadTab` |
+| Quét & Upload: chọn thư mục/quét | Chạy quét kho Word | [Upload Lab](upload_lab/README.md) §3 | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) · `buildScanUploadTab` |
+| Quét & Upload: cập nhật Công chứng viên/Thư ký | Quản lý thông tin dùng khi chuẩn bị form | [UI](upload_lab/README.md#ui) | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) |
+| Quét & Upload: chọn số tab, xem tiến độ | Chia hồ sơ thành từng đợt | [UI](upload_lab/README.md#ui) | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) |
+| Quét & Upload: chọn tất cả/bỏ chọn | Chọn hàng trong danh sách | [UI](upload_lab/README.md#ui) | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) · `selectAll`, `clearSelection` |
+| Quét & Upload: lọc lỗi/hoàn tác | Thu hẹp danh sách và khôi phục lọc | [UI](upload_lab/README.md#ui) | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) · `toggleIssueFilter` |
+| Quét & Upload: chọn số thiếu trong Excel | Đưa hàng thiếu vào đợt chuẩn bị | [Upload Lab](upload_lab/README.md) §5 | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) |
+| Quét & Upload: điền form đã chọn | Điền sẵn, dừng để người dùng tự bấm Lưu | [Upload Lab](upload_lab/README.md) §5 | [scan-upload.js](../../shell/src/renderer/upload/scan-upload.js) · `actions.prepare` |
+| Quét & Upload: tiếp tục đợt/đối chiếu đầu vào | Chuyển qua hồ sơ đã chọn nhưng chưa chuẩn bị, hoặc nạp sổ để so lại dữ liệu chính thức | [Upload Lab](upload_lab/README.md) §2.3, §3.2 | [index.js](../../shell/src/renderer/upload/index.js) |
+| Quét & Upload: dừng/đóng browser | Dừng tiến trình hoặc đóng phiên portal | [Phiên portal](upload_lab/README.md#portal) | [index.js](../../shell/src/renderer/upload/index.js) · `upload.session_close` |
 
-Ví dụ: một file Word vừa thay đổi thông tin tài sản rồi được in. Hệ thống có thể đề xuất rằng hoạt động này liên quan đến hồ sơ X, kèm nguồn để chuyên viên kiểm tra. Sự kiện in chỉ là dấu hiệu tiến trình; số bản in không được coi là dữ kiện đáng tin cậy.
+## notaryoffice — Theo dõi hồ sơ
 
-### Chức năng và cấu trúc dự kiến
+Đây là module thứ ba trong tầm nhìn nhưng hiện mới là **bản thiết kế nháp**,
+chưa có màn chạy. **DEFERRED — owner 17/10/2026:** “notaryoffice để lại, tôi sẽ làm sau”.
+Giữ Draft và công việc để làm sau; không giao pilot, phép đo A1/A3/A4,
+code/schema/runtime Office lúc này. [Quyết định](../decisions/decision-owner-notaryoffice-deferred-20261017.md);
+[#14](../backlog/spike-office-pilot-scope.md) đã được trả lời về phạm vi, không phải Office built.
+Thiết kế dự kiến nhận dấu vết được phép, gom gợi ý hồ sơ, rồi để chuyên viên
+xác nhận. Đây chưa phải tích hợp hoàn chỉnh; nguồn Zalo riêng cũng chưa nối
+xong contract với ứng dụng chính.
 
-- Một chương trình nhỏ trên mỗi máy làm việc thu dấu vết được phép và giữ tạm khi mất mạng.
-- Một máy trung tâm trong mạng nội bộ nhận dữ liệu, đối chiếu và dựng gợi ý hồ sơ.
-- Chuyên viên kiểm tra gợi ý trước khi hồ sơ trở thành dữ liệu đã xác nhận.
-- Tìm theo tên, số giấy tờ, giấy chứng nhận, thửa/tờ và chuyên viên; xem lịch sử hồ sơ theo thời gian.
-- Phân biệt rõ kết quả dự đoán với kết quả đã xác nhận.
+| Hướng màn hình dự kiến | Mục đích | Tài liệu | Mã hiện tại |
+|---|---|---|---|
+| Dấu vết / bằng chứng | Giữ nguồn và thời gian của hoạt động được phép | [Thiết kế](notaryoffice/README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildOffice` chỉ hiện thông báo chưa triển khai |
+| Hồ sơ nháp đề xuất | Gom hoạt động thành ứng viên để người kiểm tra | [Nguồn ý tưởng](../archive/specs-before-consolidation-20261015/notaryoffice/intent-source.md) | Chưa có mã chạy |
+| Hồ sơ đã xác nhận / lịch sử | Tìm hồ sơ và xem tiến trình | [Thiết kế](notaryoffice/README.md) | Chưa có mã chạy |
 
-Thiết kế không thu màn hình hay phím bấm và không dùng để chấm công. Khả năng đọc Word khi đang mở, nhận sự kiện trên ổ mạng và xác định người dùng Windows còn cần khảo sát hoặc đo trên máy thật.
+Zalo là nguồn thu nhận, không phải module nghiệp vụ thứ tư. Trong màn Soạn hồ
+sơ không còn nút Zalo (chức năng chưa ban hành). Nguồn inbox có ở phần riêng;
+kết nối consumer còn
+đang ở dạng thiết kế nháp.
 
-**Đọc tiếp:** [Module](./notaryoffice/README.md), [Lập luận và thiết kế gốc — Draft](./notaryoffice/intent-source.md).
+## Tiện ích và công cụ khác
 
-## 4. Nguồn nhập liệu Zalo
+| Màn / công cụ | Dùng để | Tài liệu | Điểm vào |
+|---|---|---|---|
+| Tra cứu chung | Tìm trên dữ liệu nhiều module khi nguồn dữ liệu sẵn sàng | [Tầm nhìn hệ thống](README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildSearch`, hiện báo chưa có nguồn để tìm |
+| Trạng thái/Cài đặt: kết nối, phiên bản | Xem tình trạng kết nối và phiên bản | [Spec hệ thống](README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `buildStatus` |
+| Trạng thái/Cài đặt: module, job | Xem sức khỏe module và công việc đang chạy | [Spec hệ thống](README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `healthTableEl`, `renderJobs` |
+| Trạng thái/Cài đặt: engine, diagnostics | Kiểm tra môi trường và tải thông tin lỗi | [Spec hệ thống](README.md) | [renderer.js](../../shell/src/renderer/renderer.js) · `runEnvCheck`, `loadDiagnostics` |
+| Soát Word với bản scan (công cụ dòng lệnh) | Đối chiếu chữ và trường, không ghi hồ sơ | [Soát văn bản](shared/document-audit.md) | [run_fast_audit.py](../../notary_v2/tools/run_fast_audit.py) |
+| Regex Lab | So sánh quy tắc với đáp án kiểm tra độc lập | [Core và quy trình](shared/extraction-rules.md#core) | [regex_lab.py](../../upload_lab/tools/regex_lab.py) |
+| Tool kiểm tra regex cho nhân viên | Thử một file hoặc cả thư mục Word | [Catalog regex](shared/extraction-rules.md#types) | [regex_test_tool.py](../../regex-test-tool/tool/regex_test_tool.py) |
+| Tool xem kết quả một file | Xem Người/Thửa/JSON được trích | [Catalog regex](shared/extraction-rules.md#types) | [regex_test_tool.py](../../upload_lab/tools/regex_test_tool.py) |
+| Nguồn inbox Zalo riêng | Nhận nội dung theo phạm vi cho phép; nút tích hợp trong app đang tắt | [Đầu vào Zalo](../archive/specs-before-consolidation-20261015/notary_v2/input/zalo/README.md) | [zalo_inbox.py](../../notary_v2/routers/zalo_inbox.py); phần nối với app còn là thiết kế nháp |
+| Tra cứu địa chỉ trong Stage | Tra địa chỉ của Người hoặc Tài sản | [Tra cứu địa chỉ](shared/administrative-lookup.md#usage) | [case-drafting-view.js](../../shell/src/renderer/notary/case-drafting-view.js) · `lookupTraButton`, `lookupCopyButton`; backend `lookup_address` |
+| Lõi địa chỉ dùng chung | Tra tên xã/tỉnh từ kho cục bộ | [Lõi tra cứu](shared/administrative-lookup.md#lookup) | [administrative_address.py](../../notary_v2/services/administrative_address.py) · `lookup_address` |
 
-Nguồn Zalo có phần mềm thu nhận ở repo riêng; hợp đồng trao đổi dữ liệu với hệ thống chính vẫn là bản nháp, chưa đủ cơ sở giới thiệu như tích hợp hoàn chỉnh.
+## Cách dùng sổ tay
 
-```text
-Tài khoản Zalo chung của văn phòng
-    → Thu tin/ảnh thuộc phạm vi cho phép
-    → Giữ ảnh tạm và gọi OCR tại nơi có ảnh
-    → Gửi chữ OCR gốc, trạng thái và thông tin nguồn về máy chính
-    → Máy chính phân loại và bóc thông tin
-    → Chuyên viên đối chiếu trong Zalo, xác nhận
-    → Đưa vào bảng dữ liệu hồ sơ
-```
-
-Máy chính không nhận ảnh hoặc đường dẫn tải ảnh từ luồng này. Việc báo “đã nhận dữ liệu” chỉ có nghĩa đã lưu chữ gốc, chưa có nghĩa nội dung đã được chuyên viên duyệt. Tài khoản cá nhân và tin riêng của nhân viên nằm ngoài phạm vi.
-
-**Đọc tiếp:** [Nhập liệu từ Zalo](./notary_v2/input/zalo/README.md).
-
-## Công nghệ và cách các phần nối với nhau
-
-### Kiến trúc ứng dụng desktop
-
-```text
-Giao diện Electron: bảng, sơ đồ, thao tác người dùng
-    ↓
-Phần điều phối Electron: cửa sổ, chọn file, quyền hệ thống
-    ↓ Lệnh có định dạng và phiên bản thống nhất
-Python + FastAPI chạy cùng ứng dụng trên máy
-    ↓
-Bộ nối của từng module
-    ↓
-Xử lý nghiệp vụ, đọc tài liệu, tạo Word, điều khiển browser
-    ↓
-Cơ sở dữ liệu và file do từng module quản lý
-```
-
-Chương trình Python chạy kèm được gọi là **sidecar**: có thể hình dung Electron là quầy thao tác, còn Python là bộ phận xử lý phía sau. Giao diện gửi yêu cầu và hiển thị kết quả; quy tắc nghiệp vụ và việc lưu dữ liệu nằm ở Python.
-
-### Bộ công nghệ
-
-| Thành phần | Công nghệ | Dùng để làm gì? |
-|---|---|---|
-| Ứng dụng desktop | Electron, JavaScript, HTML/CSS | Cửa sổ và giao diện chung; shell hiện tại không khai báo React trong package của nó |
-| Xử lý phía sau | Python + FastAPI | Nhận yêu cầu từ app, điều phối và xử lý nghiệp vụ trên máy |
-| Lưu dữ liệu hiện tại | SQLite theo module | Dữ liệu hồ sơ và sổ theo dõi xử lý; loại DB chung cuối cùng chưa chốt |
-| Đọc chữ trong ảnh | Qwen-VL-OCR qua DashScope | Đọc giấy tờ ở các luồng được cho phép gửi ảnh ra ngoài |
-| Đọc/tạo Word mới | `python-docx` | Xử lý `.docx`, đoạn, bảng và mẫu văn bản |
-| Đọc Word cũ | Windows IFilter | Lấy chữ từ `.doc` |
-| Xử lý PDF | PyMuPDF | Đọc và chuẩn bị trang PDF cho nhập liệu |
-| Xử lý Excel | `openpyxl` | Đọc sổ Excel, đối chiếu dữ liệu |
-| Điều khiển portal | Playwright + Chromium có cửa sổ | Đăng nhập, tải Excel và điền sẵn form |
-
-Một số tài liệu cũ nhắc React hoặc giao diện Qt. Khi tìm hiểu ứng dụng tích hợp hiện tại, nên bắt đầu từ `shell/` và đọc tiếp phần chuyển đổi của từng module. MarkItDown hiện chỉ là thử nghiệm, chưa là công nghệ mặc định của sản phẩm.
-
-### Các nguyên tắc dữ liệu cần hiểu trước khi đóng góp
-
-1. **Giữ được đường về nguồn.** Giá trị trích xuất cần biết đến từ file, trang, đoạn hoặc ô nào; chữ gốc và chữ đã chuẩn hóa được giữ riêng.
-2. **Máy gợi ý, người xác nhận.** Nhận diện bằng OCR hoặc AI chưa phải dữ liệu đã duyệt.
-3. **Ưu tiên quy tắc rõ ràng.** AI hỗ trợ chỗ mơ hồ; không tự quyết kết luận pháp lý.
-4. **Mỗi module quản lý phần dữ liệu của mình.** Cùng nói về một hồ sơ không có nghĩa các module được tự gộp bản ghi hoặc ghi đè dữ liệu của nhau.
-5. **Lưu theo phiên bản.** Khi hai nơi sửa cùng hồ sơ, app phát hiện bản cũ để tránh ghi đè mất thay đổi.
-6. **Chạy chủ yếu tại văn phòng.** OCR cloud, Zalo và portal là các kết nối có phạm vi cụ thể, không phải quyền gửi mọi dữ liệu ra ngoài.
-
-Đường đi chung là: **nguồn gốc → chữ/sự kiện gốc → chuẩn hóa → gợi ý → xác nhận**.
-
-## Cấu trúc repository
-
-```text
-systemdocs/
-├── shell/                 # Ứng dụng Electron và Python chạy kèm
-├── notary_v2/             # Soạn hồ sơ, xử lý dữ liệu, thừa kế và Word
-├── upload_lab/            # Đọc Word cũ, kiểm Excel, chuẩn bị upload
-├── notaryoffice/          # Phần dành cho module theo dõi; chưa có runtime
-├── zalo/                  # Bản sao một chiều từ repo thu nhận riêng
-├── contracts/             # Định dạng trao đổi dữ liệu và schema đã duyệt
-├── _bmad-output/specs/
-│   ├── README.md          # Tầm nhìn, ranh giới và kiến trúc toàn hệ thống
-│   ├── notary_v2/         # Tài liệu theo bước trong luồng soạn hồ sơ
-│   ├── upload_lab/        # Tài liệu quét, đối chiếu và portal
-│   ├── notaryoffice/      # Thiết kế nháp của luồng theo dõi văn phòng
-│   └── ui/                # Giao diện chung, mẫu thử và ảnh tham chiếu
-└── .agent/tasks/           # Ghi chép thực hiện từng task
-```
-
-**Contract** là thỏa thuận về dữ liệu gửi/nhận giữa các phần, giống việc thống nhất các cột trong một biểu mẫu. Tài liệu sản phẩm giải thích ý nghĩa; schema trong `contracts/` giúp máy kiểm tra cấu trúc. Có cả contract nháp, nên luôn đọc trạng thái trước khi dùng.
-
-Đường đọc đề nghị: [README gốc](../../README.md) → [Spec toàn hệ thống](./README.md) → README module → tài liệu chức năng → contract → source/test liên quan. Task và điều kiện nghiệm thu được quản lý ở Backlog.md; tài liệu sản phẩm dài hạn nằm trong `_bmad-output/specs/`. Các ghi chép Linear cũ chỉ dùng như lịch sử. Trạng thái các đợt sửa regex/địa chỉ hiện tại nằm trong [bàn giao 05/10](../../_bmad-output/archive/removed-agents-files.md).
-
-## Các hướng phát triển để trao đổi với dev
-
-Đây là các phạm vi hợp lý để thảo luận, chưa phải danh sách task đã được giao:
-
-- Hoàn thiện luồng soạn hồ sơ trên Electron, giữ dữ liệu ổn định khi sửa, lưu và mở lại.
-- Nâng chất lượng bóc trường từ giấy tờ và Word, kiểm tra bằng mẫu thực tế có nguồn đối chiếu.
-- Hoàn thiện bộ vai trò và văn bản cho hợp đồng hai bên.
-- Kiểm chứng thao tác portal, khả năng khôi phục khi lỗi và chất lượng dữ liệu trước upload.
-- Duyệt hợp đồng Zalo và kiểm chứng việc gửi lại dữ liệu, xử lý lỗi OCR, mất kết nối.
-- Khảo sát máy văn phòng trước khi triển khai thử `notaryoffice`.
-- Chốt mô hình dữ liệu và cách chuyển sang DB chung khi các module đủ ổn định.
-
-## Khi chia sẻ theo phong cách dự án nguồn mở
-
-Bản này có thể dùng làm phần giới thiệu ý tưởng và cấu trúc dự án. Trước khi công bố repo theo hình thức nguồn mở, cần chốt giấy phép sử dụng mã nguồn, hướng dẫn cài/chạy và bộ dữ liệu mẫu đã bỏ thông tin cá nhân. Bản tổng quan không tự xác nhận dự án đã có giấy phép nguồn mở hoặc đã sẵn sàng dùng chính thức.
-
-Nguồn chính: [Spec hệ thống](./README.md), [Notary](./notary_v2/README.md), [Upload Lab](./upload_lab/README.md), [Notary Office](./notaryoffice/README.md), [UI chung](./ui/README.md). Công nghệ shell được đối chiếu thêm với [package hiện tại](../../shell/package.json).
+- Bắt đầu từ màn hình người dùng định làm việc; mở spec trước rồi lần tới code.
+- Khi sửa hành vi, cập nhật spec liên quan trước code. Ghi quyết định owner vào
+  `_bmad-output/decisions/`.
+- Đọc `graphify-out/` khi cần tìm quan hệ code, rồi kiểm tra source hiện hành.
+- Sau thay đổi UI, trạng thái module hoặc việc đang mở, cập nhật sổ tay này để
+  góc nhìn đầu phiên còn đúng. Đây là bản đồ, không thay spec hành vi.

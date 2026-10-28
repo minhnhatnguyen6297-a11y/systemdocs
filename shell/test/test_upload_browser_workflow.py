@@ -11,8 +11,8 @@ Covered:
   releases another job's wait
 - status queries read snapshots only (never enqueue ops / spawn browser)
 - idle browser loop keeps polling login + prepared pages while jobs wait
-- prepare: run binding, backend exclusions, chunk_size, dry-run, verified
-  Save only, needs-check for closed tabs, partial breakdown
+- prepare: run binding, backend exclusions, chunk_size, dry-run, chi tien
+  do prepared (khong ket luan Luu), tab resource facts, partial breakdown
 - download_export: completed file only, ISO->dd/mm/yyyy normalization
 - browser lost / session expiry / early+late confirm / cancel-stop
 - no focus stealing (engine keeps window minimized)
@@ -24,6 +24,7 @@ Run from the ``shell/`` directory:
 import gc
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -295,6 +296,12 @@ class BrowserWorkflowCase(unittest.TestCase):
 # Browser thread invariant + session lifecycle
 # =====================================================================
 
+def _batch_scan():
+    """Module batch_scan that (engine that) — dung identity file that khi
+    quet lai, khac fixture scan gia."""
+    return engine_roots.import_engine_module("upload_lab", "batch_scan")
+
+
 @unittest.skipUnless(_engines_available(),
                      "upload_lab engine/openpyxl missing")
 class SingleBrowserThreadTest(BrowserWorkflowCase):
@@ -320,10 +327,11 @@ class SingleBrowserThreadTest(BrowserWorkflowCase):
             sorted(self.session_status(bid)["tabs"]["open_record_ids"]),
             sorted(ids))
         self.session.user_save(ids[0])
+        self.session.user_close_tab(ids[1])
         self.wait_until(
-            lambda: ids[0] in self.session_status(bid)
-            ["tabs"]["saved_record_ids"],
-            what="poll phat hien save")
+            lambda: ids[1] in self.session_status(bid)
+            ["tabs"]["closed_record_ids"],
+            what="poll phat hien tab dong (tai nguyen)")
         fj = self.finish_review(bid, pjob.job_id)
         self.wait_terminal(fj)
         self.assertEqual(self.wait_terminal(pjob)["status"], "succeeded")
@@ -360,11 +368,13 @@ class SingleBrowserThreadTest(BrowserWorkflowCase):
         pjob = self.prepare(bid, run_id, ids[:2])
         self.wait_status(pjob, "waiting_user")
         self.session.user_save(ids[0])
-        # Idle poll must detect the verified save while the job is waiting.
+        self.session.user_close_tab(ids[1])
+        # Idle poll must report the closed tab as a resource fact while the
+        # job keeps waiting — khong suy ket qua Luu tu thao tac nguoi dung.
         self.wait_until(
-            lambda: ids[0] in self.session_status(bid)
-            ["tabs"]["saved_record_ids"],
-            what="saved_record_ids cap nhat qua idle poll")
+            lambda: ids[1] in self.session_status(bid)
+            ["tabs"]["closed_record_ids"],
+            what="closed_record_ids cap nhat qua idle poll")
         self.assertEqual(pjob.snapshot()["status"], "waiting_user")
 
     def test_login_latched_authenticated_across_idle_polls(self):
@@ -603,6 +613,83 @@ class PrepareTest(BrowserWorkflowCase):
         self.assertEqual(snap["error"]["code"], "scope_violation")
         self.assertEqual(self.session.tabs, {})
 
+    def test_same_file_rescan_moves_rows_and_stale_run_ids_rejected(self):
+        """Quet lai CUNG file (identity that cua batch_scan) chuyen row sang
+        run moi: 'Tiep tuc' tren run cu voi ids goc bi scope_violation
+        truoc khi engine mo tab nao."""
+        data_dir = upload_workspace.website_data_dir(WEBSITE)
+        folder = Path(self.tempdir.name) / "hs-real"
+        from docx import Document
+
+        for name, no in (("HD-701", "701/2026/CCGD"),
+                         ("HD-702", "702/2026/CCGD")):
+            folder.mkdir(parents=True, exist_ok=True)
+            doc = Document()
+            doc.add_paragraph(f"Số công chứng {no}")
+            doc.save(str(folder / f"{name}.docx"))
+
+        manifest_a = _batch_scan().run_batch_scan(
+            folder, working_dir=data_dir)
+        manifest_a_path = _batch_scan().finalize_manifest(
+            manifest_a, data_dir / "runs")
+        run_a = upload_workspace.register_run(
+            WEBSITE, manifest_a_path)["run_id"]
+        ids_a = self._run_record_ids(data_dir, run_a)
+        self.assertEqual(len(ids_a), 2, ids_a)
+
+        bid = self.login()
+        job = self.prepare(bid, run_a, ids_a)
+        self.wait_status(job, "waiting_user")
+        fj = self.finish_review(bid, job.job_id)
+        self.wait_terminal(fj)
+        self.wait_terminal(job)
+        tabs_before = sorted(self.session.tabs)
+        prepare_calls_before = self.session.prepare_calls
+
+        # Quet lai cung folder: file_key = path|mtime|size (identity that)
+        # nen upsert chuyen chinh cac row do sang run B.
+        time.sleep(1.1)  # ten manifest co do phan giai 1 giay
+        manifest_b = _batch_scan().run_batch_scan(
+            folder, working_dir=data_dir)
+        manifest_b_path = _batch_scan().finalize_manifest(
+            manifest_b, data_dir / "runs")
+        run_b = upload_workspace.register_run(
+            WEBSITE, manifest_b_path)["run_id"]
+        self.assertNotEqual(run_a, run_b)
+        self.assertEqual(self._run_record_ids(data_dir, run_a), [])
+        self.assertEqual(
+            sorted(self._run_contract_nos(data_dir, run_b)),
+            ["701/2026/CCGD", "702/2026/CCGD"])
+
+        stale = self.prepare(bid, run_a, ids_a, chunk_size=2)
+        snap = self.wait_terminal(stale)
+        self.assertEqual(snap["status"], "failed")
+        self.assertEqual(snap["error"]["code"], "scope_violation")
+        self.assertEqual(
+            self.session.prepare_calls, prepare_calls_before,
+            "scope_violation van goi engine mo tab")
+        self.assertEqual(sorted(self.session.tabs), tabs_before)
+
+    def _run_record_ids(self, data_dir, run_id):
+        conn = sqlite3.connect(str(data_dir / "registry.sqlite3"))
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = _batch_scan().fetch_registry_records_for_run(
+                conn, run_id)
+            return sorted(int(r["id"]) for r in rows)
+        finally:
+            conn.close()
+
+    def _run_contract_nos(self, data_dir, run_id):
+        conn = sqlite3.connect(str(data_dir / "registry.sqlite3"))
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = _batch_scan().fetch_registry_records_for_run(
+                conn, run_id)
+            return [str(r["contract_no"]) for r in rows]
+        finally:
+            conn.close()
+
     def test_queue_revision_stale(self):
         run_id, ids = self.run_scan()
         bid = self.login()
@@ -625,12 +712,18 @@ class PrepareTest(BrowserWorkflowCase):
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "succeeded")
         data = snap["result"]["data"]
-        self.assertEqual(data["saved_record_ids"], ids)
+        # Ket qua chi mo ta tien do chuan bi + tai nguyen: khong co ket qua
+        # Luu, tab nguoi dung da Luu van duoc bao la dang mo.
+        self.assertNotIn("saved_record_ids", data)
+        self.assertNotIn("needs_reconcile_record_ids", data)
         self.assertEqual(data["summary"]["prepared_count"], 1)
+        self.assertEqual(data["summary"]["open_record_ids"], ids)
         self.assertEqual(
             [b["record_id"] for b in data["breakdown"]["succeeded"]], ids)
-        # verified save written through to the website registry
-        self.assertEqual(self.registry_status(ids[0]), "uploaded_success")
+        self.assertEqual(
+            [b["stage"] for b in data["breakdown"]["succeeded"]], ["prepared"])
+        # Khong ghi ket qua Luu vao registry.
+        self.assertEqual(self.registry_status(ids[0]), "prepared_dry_run")
 
     def test_n_records_and_chunk_cap(self):
         """N ho so, chunk_size nho hon N -> toi da chunk tab mo mot dot."""
@@ -736,9 +829,9 @@ class PrepareTest(BrowserWorkflowCase):
                          data["breakdown"]["succeeded"]]
         self.assertEqual(sorted(succeeded_ids), [ids[0], ids[2]])
 
-    def test_tab_closed_before_save_is_needs_check(self):
-        """Tab dong tay thieu bang chung Save -> needs_reconcile, khong phai
-        'da luu' hay 'that bai thuong'."""
+    def test_tab_closed_without_save_is_resource_fact_only(self):
+        """Tab dong tay chi la su that tai nguyen: khong ket luan Luu, khong
+        ghi store, khong ha trang thai da chuan bi cua ho so."""
         run_id, ids = self.run_scan()
         bid = self.login()
         job = self.prepare(bid, run_id, ids[:2])
@@ -753,13 +846,18 @@ class PrepareTest(BrowserWorkflowCase):
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "succeeded")
         data = snap["result"]["data"]
-        self.assertIn(ids[1], data["needs_reconcile_record_ids"])
-        self.assertNotIn(ids[1], data["saved_record_ids"])
-        self.assertNotEqual(self.registry_status(ids[1]), "uploaded_success")
-        self.assertIn(ids[1], self.store.needs_reconcile_ids(WEBSITE))
+        self.assertNotIn("needs_reconcile_record_ids", data)
+        self.assertNotIn("saved_record_ids", data)
+        # Ho so van duoc coi la DA CHUAN BI trong luot (khong bi phat lai).
+        succeeded = [b["record_id"] for b in data["breakdown"]["succeeded"]]
+        self.assertEqual(sorted(succeeded), sorted(ids[:2]))
+        self.assertEqual(self.registry_status(ids[1]), "prepared_dry_run")
+        # Chi tab da dong mat quyen so huu; tab con mo van duoc theo doi.
+        self.assertEqual(self.store.open_tab_record_ids(WEBSITE), [ids[0]])
 
-    def test_finish_review_alone_is_not_save_evidence(self):
-        """'Xong kiem tra' khong danh dau uploaded_success."""
+    def test_finish_review_keeps_tabs_and_writes_nothing(self):
+        """'Xong kiem tra' chi ket thuc buoc cho review: tab van mo, khong
+        ghi ket qua Luu vao registry."""
         run_id, ids = self.run_scan()
         bid = self.login()
         job = self.prepare(bid, run_id, ids[:1])
@@ -768,26 +866,54 @@ class PrepareTest(BrowserWorkflowCase):
         self.wait_terminal(fj)
         snap = self.wait_terminal(job)
         data = snap["result"]["data"]
-        self.assertEqual(data["saved_record_ids"], [])
+        self.assertNotIn("saved_record_ids", data)
+        self.assertEqual(data["summary"]["open_record_ids"], ids[:1])
         self.assertEqual(self.registry_status(ids[0]), "prepared_dry_run")
+        self.assertEqual(self.store.open_tab_record_ids(WEBSITE), ids[:1])
 
-    def test_saved_rows_leave_the_queue(self):
-        run_id, ids = self.run_scan()
+    def test_continue_batch_never_reopens_prepared_records(self):
+        """AC2: 'Tiep tuc' chi mo ho so da chon CHUA chuan bi; 5 ho so da
+        chuan bi nhung chua Luu khong tu quay lai lo sau."""
+        run_id, ids = self.run_scan([
+            "101/2026/CCGD", "102/2026/CCGD", "103/2026/CCGD",
+            "104/2026/CCGD", "105/2026/CCGD", "106/2026/CCGD",
+            "107/2026/CCGD", "108/2026/CCGD"])
         bid = self.login()
-        job = self.prepare(bid, run_id, ids[:2])
+        job = self.prepare(bid, run_id, ids, chunk_size=4)
         self.wait_status(job, "waiting_user")
+        # Nguoi dung Luu 2 ho so, dong 1 tab chua Luu, de 1 tab mo.
         self.session.user_save(ids[0])
+        self.session.user_save(ids[1])
+        self.session.user_close_tab(ids[2])
         self.wait_until(
-            lambda: ids[0] in self.session_status(bid)
-            ["tabs"]["saved_record_ids"],
-            what="save duoc xac minh")
-        queue = self.queue_get(run_id)
-        queued_ids = [r["record_id"] for r in queue["folder_rows"]]
-        self.assertNotIn(ids[0], queued_ids)
-        self.assertIn(ids[1], queued_ids)
+            lambda: ids[2] in self.session_status(bid)
+            ["tabs"]["closed_record_ids"],
+            what="tab chua Luu da dong")
         fj = self.finish_review(bid, job.job_id)
         self.wait_terminal(fj)
         self.wait_terminal(job)
+
+        queue = self.queue_get(run_id)
+        queued_ids = [r["record_id"] for r in queue["folder_rows"]]
+        self.assertIn(ids[0], queued_ids)
+
+        open_before = set(
+            self.session_status(bid)["tabs"]["open_record_ids"])
+        job2 = self.prepare(bid, run_id, ids, chunk_size=4)
+        self.wait_status(job2, "waiting_user")
+        fj2 = self.finish_review(bid, job2.job_id)
+        self.wait_terminal(fj2)
+        snap2 = self.wait_terminal(job2)
+        data2 = snap2["result"]["data"]
+        # Lo sau chi mo ho so chua chuan bi: khong co tab moi nao cho cac
+        # ID da chuan bi (ke ca ho so da Luu va ho so tab da dong).
+        open_after = set(
+            self.session_status(bid)["tabs"]["open_record_ids"])
+        self.assertEqual(sorted(open_after - open_before), ids[4:])
+        self.assertEqual(data2["summary"]["prepared_count"], 4)
+        self.assertEqual(data2["summary"]["remaining"], 0)
+        for rid in ids:
+            self.assertEqual(self.registry_status(rid), "prepared_dry_run")
 
     def test_cancel_during_prepare_releases_browser(self):
         """Dung dat stop event; engine dung sau don vi dang xu ly va nha
@@ -809,20 +935,6 @@ class PrepareTest(BrowserWorkflowCase):
         snap = self.wait_terminal(dl)
         self.assertEqual(snap["status"], "succeeded", snap["error"])
 
-    def test_v1_prepare_disables_save_prime(self):
-        """F1: duong v1 truyen prime_save_validation=False xuong engine —
-        dry-run versioned khong bao gio click nut Luu cua portal (ke ca
-        click 'moi' ep validation ten_hop_dong tren form con thieu)."""
-        run_id, ids = self.run_scan(CONTRACT_NOS[:1])
-        bid = self.login()
-        job = self.prepare(bid, run_id, ids)
-        self.wait_status(job, "waiting_user")
-        self.assertIs(
-            self.session.last_prepare_kwargs["prime_save_validation"],
-            False)
-        fj = self.finish_review(bid, job.job_id)
-        self.wait_terminal(fj)
-        self.wait_terminal(job)
 
 
 # =====================================================================
@@ -832,33 +944,6 @@ class PrepareTest(BrowserWorkflowCase):
 @unittest.skipUnless(_engines_available(),
                      "upload_lab engine/openpyxl missing")
 class FinalReviewV1Test(BrowserWorkflowCase):
-    def test_poll_browser_strict_save_evidence_by_scope(self):
-        """F2: _poll_browser truyen strict_save_evidence=True cho session
-        versioned (website_id != None), False cho legacy — nguyen tac
-        'chi POST /api/hoso 2xx la Luu' chi ap cho v1."""
-        stub_calls = []
-
-        class _StubSession:
-            def poll_manual_login(self):
-                return {"status": "idle"}
-
-            def poll_prepared_pages(self, strict_save_evidence=False):
-                stub_calls.append(strict_save_evidence)
-                return {"saved_record_ids": [], "closed_record_ids": [],
-                        "open_record_ids": []}
-
-        worker = upload_session._BrowserWorker()
-        worker._session = _StubSession()
-        worker._website_id = WEBSITE
-        worker._poll_browser()
-        worker._website_id = None
-        worker._poll_browser()
-        self.assertEqual(stub_calls, [True, False])
-
-        # Session fake that qua login cung duoc poll strict (v1).
-        self.login()
-        self.assertTrue(self.session.last_poll_strict)
-
     def test_scan_cancel_stops_engine_mid_scan(self):
         """F4: cancel giua scan phai cat engine ngay — CancelledByUser la
         Exception bi emit_progress cua engine nuot; adapter doi sang
@@ -893,141 +978,15 @@ class FinalReviewV1Test(BrowserWorkflowCase):
         self.assertEqual(
             self.store.job_for(job.job_id)["status"], "canceled")
 
-    def test_reconcile_covers_flags_without_or_foreign_run(self):
-        """F3: upload.reconcile doc needs_reconcile THEO WEBSITE — flag
-        co run_id=None (mat provenance) hoac stamp run khac van duoc doi
-        chieu va verify, khong wedge vinh vien."""
-        run_id, ids = self.run_scan(["401/2026/CCGD", "402/2026/CCGD"])
-        rid_null, rid_other = ids[0], ids[1]
-        # Flag mat provenance run_id (vd tab uncertain dong lai sau).
-        self.store.add_needs_reconcile(
-            WEBSITE, [rid_null], run_id=None,
-            reason="roi trang khong xac minh")
-        # Flag stamp run khac (provenance sai/khong con ton tai).
-        self.store.add_needs_reconcile(
-            WEBSITE, [rid_other], run_id="run_khac",
-            reason="provenance lech")
-
-        audit_id = self.run_audit(["401/2026", "402/2026"])
-        rjob = self.submit("upload.reconcile", self.v1(
-            run_id=run_id, audit_id=audit_id))
-        snap = self.wait_terminal(rjob)
+    def test_reconcile_command_is_retired(self):
+        """Command/capability reconcile da bo: registry khong con command
+        (consumer nhan command_unknown) va catalog het capability."""
+        self.assertNotIn("upload.reconcile", reg.COMMANDS)
+        wj = self.submit("upload.websites", self.v1())
+        snap = self.wait_terminal(wj)
         self.assertEqual(snap["status"], "succeeded", snap["error"])
-        data = snap["result"]["data"]
-        self.assertEqual(
-            sorted(data["verified_record_ids"]), sorted(ids))
-        self.assertEqual(data["needs_reconcile_record_ids"], [])
-        self.assertEqual(self.store.needs_reconcile_ids(WEBSITE), [])
-        for rid in ids:
-            self.assertEqual(
-                self.registry_status(rid), "uploaded_success")
-        # Queue cua run_id payload refresh; run_khac khong ton tai nen
-        # bump chi vao run trong payload.
-        self.assertGreater(self.store.queue_revision(run_id), 0)
-
-
-# =====================================================================
-# upload.reconcile (§6.15)
-# =====================================================================
-
-@unittest.skipUnless(_engines_available(),
-                     "upload_lab engine/openpyxl missing")
-class ReconcileTest(BrowserWorkflowCase):
-    def test_reconcile_verifies_closed_tab_on_fresh_audit(self):
-        """Tab dong truoc khi Luu → needs_reconcile; audit MOI chua so
-        do → verified + registry uploaded_success + mo khoa +
-        queue_revision tang."""
-        run_id, ids = self.run_scan(["301/2026/CCGD", "302/2026/CCGD"])
-        bid = self.login()
-        job = self.prepare(bid, run_id, ids)
-        self.wait_status(job, "waiting_user")
-        self.session.user_close_tab(ids[0])
-        self.wait_until(
-            lambda: ids[0] in self.store.needs_reconcile_ids(WEBSITE),
-            what="tab dong → needs_reconcile")
-        fj = self.finish_review(bid, job.job_id)
-        self.wait_terminal(fj)
-        self.wait_terminal(job)
-        self.assertNotEqual(
-            self.registry_status(ids[0]), "uploaded_success")
-
-        audit_id = self.run_audit(["301/2026"])
-        qrev = self.store.queue_revision(run_id)
-        rjob = self.submit("upload.reconcile", self.v1(
-            run_id=run_id, audit_id=audit_id))
-        snap = self.wait_terminal(rjob)
-        self.assertEqual(snap["status"], "succeeded", snap["error"])
-        data = snap["result"]["data"]
-        self.assertEqual(data["verified_record_ids"], [ids[0]])
-        self.assertEqual(data["needs_reconcile_record_ids"], [])
-        self.assertEqual(
-            self.registry_status(ids[0]), "uploaded_success")
-        self.assertNotIn(
-            ids[0], self.store.needs_reconcile_ids(WEBSITE))
-        self.assertGreater(self.store.queue_revision(run_id), qrev)
-        # Audit moi da gan vao run de dot sau dung.
-        self.assertEqual(
-            self.store.audit_for_run(run_id)["audit_id"], audit_id)
-
-    def test_reconcile_audit_without_number_keeps_flag(self):
-        """Audit moi KHONG chua so → giu needs_reconcile, khong ghi
-        uploaded_success."""
-        run_id, ids = self.run_scan(["303/2026/CCGD"])
-        rid = ids[0]
-        self.store.add_needs_reconcile(
-            WEBSITE, [rid], run_id=run_id, reason="test")
-        audit_id = self.run_audit(["999/2026"])
-        rjob = self.submit("upload.reconcile", self.v1(
-            run_id=run_id, audit_id=audit_id))
-        snap = self.wait_terminal(rjob)
-        self.assertEqual(snap["status"], "succeeded", snap["error"])
-        data = snap["result"]["data"]
-        self.assertEqual(data["verified_record_ids"], [])
-        self.assertEqual(data["needs_reconcile_record_ids"], [rid])
-        self.assertIn(rid, self.store.needs_reconcile_ids(WEBSITE))
-        self.assertNotEqual(self.registry_status(rid), "uploaded_success")
-
-    def test_reconcile_scope_violations(self):
-        """Sai scope → structured error, khong doi chieu boi."""
-        run_id, ids = self.run_scan(["304/2026/CCGD"])
-        self.store.add_needs_reconcile(
-            WEBSITE, ids, run_id=run_id, reason="test")
-        audit_id = self.run_audit(["304/2026"])
-
-        # run khong ton tai → scope_violation
-        job = self.submit("upload.reconcile", self.v1(
-            run_id="run_khong_co", audit_id=audit_id))
-        snap = self.wait_terminal(job)
-        self.assertEqual(snap["status"], "failed")
-        self.assertEqual(snap["error"]["code"], "scope_violation")
-
-        # audit khong ton tai → scope_violation
-        job = self.submit("upload.reconcile", self.v1(
-            run_id=run_id, audit_id="aud_khong_co"))
-        snap = self.wait_terminal(job)
-        self.assertEqual(snap["status"], "failed")
-        self.assertEqual(snap["error"]["code"], "scope_violation")
-
-        # audit cua website khac → website_mismatch
-        fixture.register_fake_portal_website(
-            self.portal, website_id="fake_other")
-        self.addCleanup(self._unregister_other)
-        audit_other = self.run_audit(
-            ["304/2026"], name="so-khac.xlsx", website_id="fake_other")
-        job = self.submit("upload.reconcile", self.v1(
-            run_id=run_id, audit_id=audit_other))
-        snap = self.wait_terminal(job)
-        self.assertEqual(snap["status"], "failed")
-        self.assertEqual(snap["error"]["code"], "website_mismatch")
-
-        # needs_reconcile con nguyen sau moi lan fail.
-        self.assertEqual(
-            sorted(self.store.needs_reconcile_ids(WEBSITE)), sorted(ids))
-
-    def _unregister_other(self):
-        providers = engine_roots.import_engine_module(
-            "upload_lab", "providers")
-        providers.DEFAULT_REGISTRY._providers.pop("fake_other", None)
+        for site in snap["result"]["data"]["websites"]:
+            self.assertNotIn("reconcile", site["capabilities"])
 
 
 # =====================================================================
@@ -1069,7 +1028,7 @@ class SessionProblemTest(BrowserWorkflowCase):
         self.confirm(bid, job.job_id)
         self.wait_terminal(job)
 
-    def test_browser_lost_mid_review_fails_job_and_marks_unknown(self):
+    def test_browser_lost_mid_review_fails_job_and_frees_resource(self):
         run_id, ids = self.run_scan()
         bid = self.login()
         job = self.prepare(bid, run_id, ids[:2])
@@ -1078,41 +1037,40 @@ class SessionProblemTest(BrowserWorkflowCase):
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "failed")
         self.assertEqual(snap["error"]["code"], "engine_unavailable")
-        # MIN-69 T5: con ho so chua ro da Luu → cam auto-retry mu (§7.4);
-        # client phai upload.reconcile truoc, retry co chu y la command
-        # moi. Marker di kem details cho client.
-        self.assertFalse(snap["error"]["retryable"])
-        self.assertIsNone(snap["error"]["next_action"])
+        # Loi ha tang thuong: retryable, khong khoa vi ket qua Luu chua ro.
+        self.assertTrue(snap["error"]["retryable"])
+        self.assertEqual(snap["error"]["next_action"], "retry")
         details = snap["error"].get("details") or {}
-        self.assertEqual(
-            sorted(details.get("needs_reconcile_record_ids") or []),
-            sorted(ids[:2]))
-        # lost tabs -> needs reconcile, never silently 'saved'
-        held = self.store.needs_reconcile_ids(WEBSITE)
+        self.assertNotIn("needs_reconcile_record_ids", details)
+        # Tab mat chu so huu: store khong giu quyen so huu nua, registry
+        # giu nguyen tien do da chuan bi (khong suy ket qua Luu).
+        self.assertEqual(self.store.open_tab_record_ids(WEBSITE), [])
         for rid in ids[:2]:
-            self.assertIn(rid, held)
-            self.assertNotEqual(self.registry_status(rid), "uploaded_success")
+            self.assertEqual(self.registry_status(rid), "prepared_dry_run")
 
-    def test_session_close_reconciles_and_never_saves(self):
+    def test_session_close_reports_resource_ids_and_never_saves(self):
         run_id, ids = self.run_scan()
         bid = self.login()
         job = self.prepare(bid, run_id, ids[:2])
         self.wait_status(job, "waiting_user")
         self.session.user_save(ids[0])
+        self.session.user_close_tab(ids[1])
         self.wait_until(
-            lambda: ids[0] in self.session_status(bid)
-            ["tabs"]["saved_record_ids"],
-            what="save duoc xac minh truoc close")
+            lambda: ids[1] in self.session_status(bid)
+            ["tabs"]["closed_record_ids"],
+            what="tab dong truoc khi close phien")
         cj = self.submit("upload.session_close", self.v1(browser_id=bid))
         snap = self.wait_terminal(cj)
         self.assertEqual(snap["status"], "succeeded", snap["error"])
         data = snap["result"]["data"]
         self.assertTrue(data["closed"])
-        self.assertIn(ids[0], data["verified_record_ids"])
-        # tab con mo chua xac dinh -> needs_reconcile, khong bao gio auto-save
-        self.assertIn(ids[1], data["needs_reconcile_record_ids"])
-        self.assertEqual(self.registry_status(ids[0]), "uploaded_success")
-        self.assertNotEqual(self.registry_status(ids[1]), "uploaded_success")
+        self.assertIn(ids[1], data["closed_record_ids"])
+        self.assertNotIn("verified_record_ids", data)
+        self.assertNotIn("needs_reconcile_record_ids", data)
+        # Khong ghi ket qua Luu nao; quyen so huu tab da duoc xa.
+        for rid in ids[:2]:
+            self.assertEqual(self.registry_status(rid), "prepared_dry_run")
+        self.assertEqual(self.store.open_tab_record_ids(WEBSITE), [])
         # the waiting prepare job dies with the browser
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "failed")
@@ -1313,7 +1271,7 @@ class _ComboLoc:
 
 
 class _SaveLoc:
-    """Nut Luu cua portal — dem click de chung minh prime co/khong chay."""
+    """Save button counter for the non-submitting preparation boundary."""
 
     def __init__(self):
         self.clicks = []
@@ -1370,10 +1328,8 @@ class _FormPage:
 
 
 @unittest.skipUnless(_engines_available(), "upload_lab engine missing")
-class EngineSaveEvidenceTest(unittest.TestCase):
-    """F1/F2 tren NamDinhUploaderSession that + fake page/locator —
-    khong can Chromium: assert gate prime_save_validation (F1) va
-    strict_save_evidence (F2) chay dung o tang engine."""
+class EngineTabResourceTest(unittest.TestCase):
+    """Real uploader with fake locators: tab resources and non-submit commit."""
 
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
@@ -1425,87 +1381,48 @@ class EngineSaveEvidenceTest(unittest.TestCase):
 
     def _register_page(self, record_id, url):
         page = _FormPage(url)
-        artifact = self.workdir / "upload_runs" / f"r{record_id}"
-        artifact.mkdir(parents=True, exist_ok=True)
         self.session._register_prepared_page(
             SimpleNamespace(record_id=record_id,
                             contract_no="101/2026/CCGD"),
-            page, artifact)
+            page)
         return page
 
-    # ------------------------------------------------------------ F2 strict
-    def test_strict_nav_away_uncertain_once_then_self_heals(self):
-        """Tab roi trang tao moi khong co POST Luu → closed/uncertain
-        MOT LAN, van con tracked, khong finalize; POST 2xx den sau van
-        finalize thanh uploaded_success (self-heal)."""
+    # ------------------------------------------------ tai nguyen tab (cutover)
+    def test_navigated_away_tab_is_still_reported_open(self):
+        """Tab roi trang tao moi (ke ca da bam Luu) van la tab dang mo:
+        poll khong doc POST/dieu huong, khong dong tab, khong ghi registry."""
         rid = self._seed_record("101/2026/CCGD")
         page = self._register_page(
             rid, "https://portal.test/ho-so-cong-chung")
 
-        result = self.session.poll_prepared_pages(strict_save_evidence=True)
-        self.assertEqual(result["closed_record_ids"], [rid])
-        self.assertEqual(result["saved_record_ids"], [])
+        result = self.session.poll_prepared_pages()
+        self.assertEqual(result["closed_record_ids"], [])
         self.assertEqual(result["open_record_ids"], [rid])
         self.assertFalse(page.closed)
         self.assertIn(rid, self.session.prepared_pages)
-        tab = self.session.prepared_pages[rid]
-        self.assertTrue(tab.reported_uncertain)
-        self.assertTrue(
-            any("roi trang tao moi nhung khong co POST Luu" in m
-                for m in self.logs),
-            f"log thieu loi uncertain: {self.logs}")
-        self.assertNotEqual(
-            self._registry_status(rid), "uploaded_success")
+        self.assertEqual(self._registry_status(rid), "prepared_dry_run")
 
-        # Poll lai: uncertain KHONG bao lai, tab van duoc theo doi.
-        again = self.session.poll_prepared_pages(strict_save_evidence=True)
-        self.assertEqual(again["closed_record_ids"], [])
+        # POST /api/hoso 2xx khong con duoc nghe: khong co listener save.
+        self.assertNotIn("response", page.handlers)
+        again = self.session.poll_prepared_pages()
         self.assertEqual(again["open_record_ids"], [rid])
+        self.assertEqual(again["closed_record_ids"], [])
+        self.assertFalse(page.closed)
+        self.assertEqual(self._registry_status(rid), "prepared_dry_run")
 
-        # POST /api/hoso 2xx den sau → nhanh saved chay binh thuong du
-        # reported_uncertain — self-heal + finalize + bo tracking.
-        page.handlers["response"](SimpleNamespace(
-            request=SimpleNamespace(method="POST"),
-            url="https://portal.test/api/hoso", status=200))
-        healed = self.session.poll_prepared_pages(
-            strict_save_evidence=True)
-        self.assertEqual(healed["saved_record_ids"], [rid])
-        self.assertEqual(healed["closed_record_ids"], [])
-        self.assertNotIn(rid, self.session.prepared_pages)
-        self.assertTrue(page.closed)
-        self.assertEqual(
-            self._registry_status(rid), "uploaded_success")
-
-    def test_default_nav_away_still_finalizes_legacy(self):
-        """strict_save_evidence=False (legacy): dieu huong khoi trang
-        tao van duoc tin la da Luu — hanh vi cu khong doi."""
-        rid = self._seed_record("102/2026/CCGD")
-        page = self._register_page(
-            rid, "https://portal.test/ho-so-cong-chung")
-        result = self.session.poll_prepared_pages()
-        self.assertEqual(result["saved_record_ids"], [rid])
-        self.assertEqual(result["closed_record_ids"], [])
-        self.assertTrue(page.closed)
-        self.assertEqual(
-            self._registry_status(rid), "uploaded_success")
-
-    def test_strict_real_close_reports_closed_and_untracks(self):
-        """Tab dong that trong strict mode: bao closed + bo tracking
-        (khac uncertain — uncertain van giu tab)."""
+    def test_closed_tab_reports_closed_and_untracks(self):
+        """Tab dong that: bao closed + bo tracking; khong ghi ket qua Luu."""
         rid = self._seed_record("103/2026/CCGD")
         page = self._register_page(
             rid, "https://portal.test/ho-so-cong-chung")
         page.closed = True
-        result = self.session.poll_prepared_pages(strict_save_evidence=True)
+        result = self.session.poll_prepared_pages()
         self.assertEqual(result["closed_record_ids"], [rid])
         self.assertEqual(result["open_record_ids"], [])
         self.assertNotIn(rid, self.session.prepared_pages)
+        self.assertEqual(self._registry_status(rid), "prepared_dry_run")
 
-    # ------------------------------------------------------------ F1 prime
-    def test_fill_dropdown_prime_gate_never_clicks_save_when_off(self):
-        """prime_save_validation=False → block prime+retype bi skip hoan
-        toan — khong locator nao cua SAVE_BUTTON_SELECTORS bi click;
-        default True van click nhu legacy."""
+    def test_free_text_commit_never_clicks_save_or_presses_enter(self):
         combo = _ComboLoc()
         save = _SaveLoc()
         self.session._resolve_control_locator = (
@@ -1515,34 +1432,11 @@ class EngineSaveEvidenceTest(unittest.TestCase):
         self.session._locator_from_strategy = (
             lambda page, strategy, **kw: save)
         page = _FormPage()
-
-        self.session._prime_save_validation = False
-        ok = self.session._fill_dropdown(page, "ten_hop_dong", "HD A")
-        self.assertTrue(ok)
-        self.assertEqual(save.clicks, [],
-                         "v1 khong duoc click nut Luu khi dien form")
-
-        self.session._prime_save_validation = True
-        combo.value = ""
-        ok = self.session._fill_dropdown(page, "ten_hop_dong", "HD A")
-        self.assertTrue(ok)
-        self.assertGreaterEqual(
-            len(save.clicks), 1,
-            "legacy prime van click Luu de ep validation")
-
-    def test_prepare_manifest_stores_prime_flag(self):
-        """Kwargs prime_save_validation di vao session instance — v1
-        adapter truyen False, default True (legacy/Qt)."""
-        with mock.patch.object(
-                self.uploader, "load_upload_queue",
-                return_value=({"run_id": "r1"}, [], 0)):
-            self.session.prepare_manifest(
-                "manifest.json", threading.Event(),
-                prime_save_validation=False)
-            self.assertFalse(self.session._prime_save_validation)
-            self.session.prepare_manifest(
-                "manifest.json", threading.Event())
-            self.assertTrue(self.session._prime_save_validation)
+        self.assertTrue(self.session._fill_dropdown(page, "ten_hop_dong", "HD A"))
+        self.assertEqual(combo.value, "HD A")
+        self.assertEqual(save.clicks, [])
+        self.assertNotIn("Enter", combo.presses)
+        self.assertIn("Tab", combo.presses)
 
 
 if __name__ == "__main__":

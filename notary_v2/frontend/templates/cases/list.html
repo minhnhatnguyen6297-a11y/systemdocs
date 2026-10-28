@@ -14,7 +14,7 @@
 <div class="card mb-3">
   <div class="card-body py-3">
     <form method="get" class="d-flex gap-2">
-      <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="🔍  Tìm theo tên người chết...">
+      <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="🔍  Tìm theo tên người để lại di sản...">
       <button class="btn btn-primary px-4">Tìm</button>
       {% if q %}<a href="/cases" class="btn btn-outline-secondary">Xoá bộ lọc</a>{% endif %}
     </form>
@@ -41,15 +41,18 @@
         </thead>
         <tbody>
           {% for c in cases %}
+          {% set facts = case_facts.get(c.id) or {} %}
+          {% set owner = facts.get('owner') or {} %}
+          {% set asset = facts.get('asset') or {} %}
           <tr>
             <td class="text-muted" style="font-size:12px">{{ c.id }}</td>
             <td>
               <a href="/cases/{{ c.id }}" class="fw-bold text-decoration-none" style="color:var(--navy)">
-                {{ c.nguoi_chet.ho_ten }}
+                {{ owner.get('name', '') }}
               </a>
-              <div style="font-size:11px; color:var(--muted)">Chết: {{ c.nguoi_chet.ngay_chet.year if c.nguoi_chet.ngay_chet and c.nguoi_chet.ngay_chet.day == 1 and c.nguoi_chet.ngay_chet.month == 1 else (c.nguoi_chet.ngay_chet.strftime('%d/%m/%Y') if c.nguoi_chet.ngay_chet else '') }}</div>
+              <div style="font-size:11px; color:var(--muted)">Chết: {{ owner.get('death', '') }}</div>
             </td>
-            <td><code style="font-size:12px">{{ c.tai_san.so_serial }}</code><div style="font-size:11px; color:var(--muted)">Thửa {{ c.tai_san.so_thua_dat }}</div></td>
+            <td><code style="font-size:12px">{{ asset.get('serial', '') }}</code><div style="font-size:11px; color:var(--muted)">Thửa {{ asset.get('thua', '') }}</div></td>
             <td>
               {% if c.loai_van_ban == 'khai_nhan' %}
                 <span class="badge bg-primary bg-opacity-10 text-primary">Khai nhận</span>
@@ -60,17 +63,15 @@
             <td>{{ c.ngay_lap_ho_so.strftime('%d/%m/%Y') }}</td>
             <td><span class="badge bg-secondary bg-opacity-10 text-secondary">{{ c.participants|length }} người</span></td>
             <td>
-              {% if c.trang_thai == 'locked' %}
-                <span class="badge badge-locked rounded-pill px-2"><i class="bi bi-lock-fill me-1"></i>Đã khoá</span>
+              {% if c.trang_thai == 'done' %}
+                <span class="badge badge-done rounded-pill px-2"><i class="bi bi-check2-circle me-1"></i>Đã lưu</span>
               {% else %}
-                <span class="badge badge-draft rounded-pill px-2"><i class="bi bi-pencil me-1"></i>Bản nháp</span>
+                <span class="badge badge-draft rounded-pill px-2"><i class="bi bi-pencil me-1"></i>Nháp</span>
               {% endif %}
             </td>
             <td>
               <a href="/cases/{{ c.id }}" class="btn btn-sm btn-outline-primary me-1" title="Xem"><i class="bi bi-eye"></i></a>
-              {% if not c.is_locked %}
               <a href="/cases/{{ c.id }}/edit" class="btn btn-sm btn-outline-secondary me-1" title="Sửa"><i class="bi bi-pencil"></i></a>
-              {% endif %}
               <a href="/cases/{{ c.id }}/export-word" class="btn btn-sm btn-outline-success" title="Xuất Word"><i class="bi bi-file-word"></i></a>
             </td>
           </tr>

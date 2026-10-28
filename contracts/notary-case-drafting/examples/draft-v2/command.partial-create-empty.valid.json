@@ -1,0 +1,24 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.6/§13.19 partial-create: nháp rỗng hợp lệ; không owner, không tên, không cần diagram."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2020-4020-8020-000000000020",
+  "command": "notary.workspace_create",
+  "payload": {
+    "idempotency_key": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "case": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan"
+    },
+    "stage": {
+      "people": [],
+      "assets": []
+    }
+  },
+  "client_meta": {
+    "shell_version": "0.1.0",
+    "module": "document-review"
+  }
+}

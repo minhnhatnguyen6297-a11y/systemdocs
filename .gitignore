@@ -47,3 +47,4 @@ graphify-out/.graphify_ast.json
 graphify-out/.graphify_semantic.json
 graphify-out/.graphify_extract.json
 
+shell/dist-app*/

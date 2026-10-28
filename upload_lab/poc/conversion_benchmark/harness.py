@@ -20,7 +20,7 @@ from .router import convert_path
 def _baseline_text(path: Path) -> str | None:
     """Read with the existing local stack only where an honest baseline exists."""
     if path.suffix.lower() == ".docx":
-        from extract_contract import read_docx
+        from extraction_adapter import read_docx
 
         return read_docx(path)
     if path.suffix.lower() == ".xlsx":

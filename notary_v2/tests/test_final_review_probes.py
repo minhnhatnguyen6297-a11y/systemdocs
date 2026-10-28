@@ -25,12 +25,14 @@ def test_changing_issue_date_recomputes_derived_fields(db):
     assert person['noi_cap'] == 'Bộ Công an'
 
 
-def test_explicit_empty_snapshot_meta_does_not_read_master(db):
+def test_meta_column_is_sot_for_word(db):
+    """Cột metadata là SOT: sửa cột thì Word đọc giá trị cột."""
     data = m._create(db, with_state=True)
     case = db.get(m.InheritanceCase, data['case']['id'])
     case.noi_dung_viec = 'Changed outside snapshot'
     db.flush()
-    assert m.word_engine.build_template_mapping(case)['[Nội dung việc]'] == ''
+    assert (m.word_engine.build_template_mapping(case)['[Nội dung việc]']
+            == 'Changed outside snapshot')
 
 
 def test_catalog_recipient_also_participant_survives_delete(db):

@@ -11,7 +11,7 @@ Owner yêu cầu commit và gộp nhánh regex vào `consolidate/monorepo`, xử
 
 Giữ cấu trúc của nhánh chính: spec tại `_bmad-output/specs/`, quyết định tại `_bmad-output/decisions/`, task Backlog cũ tại archive. Không phục hồi cây SOT `docs/spec`, Backlog đang hoạt động hoặc các thư mục agent cũ.
 
-Giữ toàn bộ sửa lỗi đã kiểm và nhãn nơi cấp giấy tờ trên Stage. F01/F04/F05 vẫn Pending. Không tạo luật sửa lỗi nguồn hoặc chức năng mới. Hai engine, validator và fixture dùng cùng xuống dòng LF để bản sao không lệch do Git trên Windows.
+Giữ toàn bộ sửa lỗi đã kiểm và nhãn nơi cấp giấy tờ trên Stage. F04/F05 khi tích hợp vẫn Pending; owner chốt riêng ranh thửa/cấu trúc đầu ra ngày 15/10/2026 tại regex-fields, không tự duyệt đáp án mâu thuẫn. Không tạo luật sửa lỗi nguồn hoặc chức năng mới. Hai engine, validator và fixture dùng cùng xuống dòng LF để bản sao không lệch do Git trên Windows.
 
 Quyết định nhập từ nhánh regex có mã cũ trùng nhánh chính được giữ riêng: `regex-decision-46`, `regex-decision-47`, `regex-sweep-48`. Các decision-46/47/48 của nhánh chính giữ nguyên.
 

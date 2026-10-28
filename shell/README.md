@@ -96,7 +96,7 @@ npm test                                # redact, ipc allowlist, command client,
 python test/test_jobstore.py            # jobstore cancel/drain
 python test/test_upload_workflow.py     # v1 handlers scan/audit/queue
 python test/test_upload_browser_workflow.py    # browser session + fake portal
-python test/test_upload_recovery.py     # restart/reconcile/recovery
+python test/test_upload_recovery.py     # restart/recovery: khong phat lai prepare
 python test/test_engine_adapters.py     # engine that: case→Word, scan, audit
                                         #   (G1_NOTARY_DATA_DIR/G1_UPLOAD_DATA_DIR/G1_OUTPUT_DIR → tempdir)
 ```
@@ -172,6 +172,48 @@ Packaged smoke (khong can terminal tuong tac):
 $env:G1_SMOKE="1"; $env:G1_SMOKE_LOG="$PWD/smoke.json"
 ./dist-app/win-unpacked/g1-shell.exe   # tu thoat; xem smoke.json
 ```
+
+
+## Electron runtime verification (#17)
+
+The shell targets Electron `^44.7.2` (lock resolves `44.7.2`; `allowScripts`
+names that exact artifact). `electron-builder` remains `^24.13.3` / locked
+`24.13.3`. Verified host: Windows 11 x64, build `10.0.26200`; packaged
+production reports Electron `44.7.2`, Chromium `152.0.7977.149`. See the
+[runtime record](../_bmad-output/specs/shell/electron-runtime-support.md).
+
+`npm ci`, `npm test` (408 passed), `npm run build:sidecar`, `npm run dist`,
+and `npm run dist:test` succeeded. Notary: 1115 passed, 2 skipped; adapter
+tests: 239 passed, 2 skipped; debug-boundary check: 6/6. Packaged production
+smoke reached the real sidecar and completed `file.inspect`; an isolated
+before/after `_tree_snapshot` of the 2,975-file install tree found zero
+changed paths for that startup/IPC smoke only. The Notary module returned its
+initial requests. The packaged test-only Chromium loopback diagnostic
+succeeded separately; that does not make `--case all` pass.
+
+Observed limits:
+
+- Production `--case offline` failed in `upload.scan` with the documented
+  `file_token` validation error before its own final snapshot comparison.
+  The separate `G1_SMOKE` snapshot proves no install-tree changes only for
+  startup/sidecar `file.inspect`; the complete offline Upload path remains
+  unproven.
+- Test-package `--case all` timed out waiting for visible `.ul-audit-head`
+  after `upload.download_export` succeeded. It did not reach its Chromium or
+  later Upload steps.
+- The real production Win32 Open path in the Upload UI was exercised without
+  `G1_E2E_PICK_FILES`; its `upload.audit_excel` IPC job failed with
+  `file_ref.path rong/khong phai chuoi`. This UI failure was not bypassed or
+  represented as fixed.
+- A separate public-API picker probe selected a fresh synthetic workbook;
+  `desktop.v1.pickFiles` returned a registered token and `file.inspect` via
+  `desktop.v1.submitCommand` matched the fixture size/hash. This proves the
+  native picker/token/sidecar read boundary, not the Upload UI consumer. See
+  the runtime record and its sanitized evidence.
+
+Python-dependent checks/builds used the repository `notary_v2/venv/Scripts`
+on process PATH because the default `python` lacked `jsonschema`/`playwright`;
+no global environment was changed.
 
 ## Boundary
 

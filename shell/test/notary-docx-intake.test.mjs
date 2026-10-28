@@ -12,6 +12,26 @@ const WORD = require('../src/renderer/notary/word-export-dialog.js');
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 const uuid = () => webcrypto.randomUUID();
 
+// Response workspace_save_case đủ shape cho applyWorkspace, echo payload.
+function saveCaseData(payload, { revision = 3 } = {}) {
+  const c = payload.case || {};
+  return {
+    created: payload.case_id == null,
+    case: { id: payload.case_id != null ? payload.case_id : 1,
+            case_type: c.case_type || 'inheritance',
+            document_type: c.document_type || 'khai_nhan',
+            status: 'active', locked: false, revision },
+    backend_mode: 'real',
+    capabilities: { intake: [], diagram: true, word_export: true },
+    stage: structuredClone(payload.stage || { people: [], assets: [] }),
+    diagram: { state: structuredClone((payload.diagram || {}).state || {}),
+               render_model: null },
+    docx_import: structuredClone(payload.docx_import ||
+      { version: 1, sources: [] }),
+    warnings: [],
+  };
+}
+
 function suggestion(target = 'asset', ambiguous = false) {
   const sourceId = uuid(), candidate = uuid();
   return { suggestion_id: candidate, source_id: uuid(), target, warnings: [], fields: {
@@ -36,27 +56,34 @@ for line in ['HỢP ĐỒNG CHUYỂN NHƯỢNG','Bên A:','Ông Lê Văn Mẫu, 
 stream=io.BytesIO();doc.save(stream)
 ctx=AdapterContext('','',None,None,read_file=lambda _:stream.getvalue())
 print(json.dumps(asyncio.run(extract(SourceSpec(str(uuid.uuid4()),'docx',filename='synthetic.docx'),ctx)),ensure_ascii=False))`;
-  const [candidate] = JSON.parse(execFileSync(process.env.NOTARY_TEST_PYTHON || 'python', ['-B', '-X', 'utf8', '-c', code, root], {encoding:'utf8'}));
+  const [candidate] = JSON.parse(execFileSync(process.env.NOTARY_TEST_PYTHON || 'python3', ['-B', '-X', 'utf8', '-c', code, root], {encoding:'utf8'}));
   const evidence = structuredClone(candidate.fields);
   assert.equal(candidate.fields.so_giay_to.raw_value, '0123456789');
   assert.equal(candidate.fields.noi_cap.raw_value, 'Bộ Coongan');
   let saved, revision = 1;
   const model = M.createModel({client:{run:async(command,payload)=>{
-    if(command === 'notary.workspace_commit_stage') {
+    if(command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+    if(command === 'notary.workspace_save_case') {
       saved = structuredClone({stage:payload.stage, docx_import:payload.docx_import});
-      return {ok:true,data:{...saved, revision:++revision}};
+      return {ok:true,data:{...saveCaseData(payload,{revision:++revision})}};
     }
-    return {ok:true,data:{...structuredClone(saved),case:{id:1,revision,case_type:'inheritance',locked:false}}};
+    // workspace_get: trả đúng những gì đã lưu (DB thật thay đổi).
+    return {ok:true,data:{case:{id:1,revision,case_type:'inheritance',
+      document_type:'khai_nhan',locked:false}, backend_mode:'real',
+      capabilities:{intake:[],diagram:true,word_export:true},
+      stage:structuredClone(saved.stage),
+      docx_import:structuredClone(saved.docx_import),
+      diagram:{state:{version:3,domain:'inheritance',nodes:[]}}}};
   }}});
-  model.newDraft(); model.state.suggestions.push(candidate);
+  await model.newDraft(); model.state.suggestions.push(candidate);
   const row = model.acceptSuggestion(candidate.suggestion_id);
   assert.equal(row.so_giay_to, '0123456789'); assert.equal(row.noi_cap, 'Bộ Coongan');
   model.state.caseId = 1; model.state.revision = 1;
-  await model.commitStage(); await model.openCase(1);
+  await model.saveCase(); await model.openCase(1);
   assert.equal(model.state.stage.people[0].noi_cap, 'Bộ Coongan');
   model.updatePersonField(row.row_id, 'noi_cap', 'Cơ quan người dùng sửa tay');
   model.updatePersonField(row.row_id, 'so_giay_to', 'Số do người dùng ghi tay');
-  await model.commitStage(); await model.openCase(1);
+  await model.saveCase(); await model.openCase(1);
   assert.equal(model.state.stage.people[0].noi_cap, 'Cơ quan người dùng sửa tay');
   assert.equal(model.state.stage.people[0].so_giay_to, 'Số do người dùng ghi tay');
   assert.deepEqual(candidate.fields, evidence);
@@ -65,9 +92,11 @@ print(json.dumps(asyncio.run(extract(SourceSpec(str(uuid.uuid4()),'docx',filenam
 test('capacity retains cards; ambiguous value requires review; land rows decode and source context travels on create', async () => {
   const calls = [];
   const model = M.createModel({ client: { run: async (command, payload) => {
-    calls.push([command, payload]); return { ok: false, error: { code: 'stage_validation_error' } };
+    calls.push([command, payload]);
+    if (command === 'notary.workspace_source_latest') return { ok: true, data: {} };
+    return { ok: false, error: { code: 'stage_validation_error' } };
   } } });
-  model.newDraft('inheritance');
+  await model.newDraft('inheritance');
   const candidate = suggestion('asset', true); model.state.suggestions.push(candidate);
   assert.equal(model.acceptSuggestion(candidate.suggestion_id), null);
   assert.equal(model.state.suggestions.length, 1);
@@ -75,22 +104,29 @@ test('capacity retains cards; ambiguous value requires review; land rows decode 
   const row = model.acceptSuggestion(candidate.suggestion_id);
   assert.equal(row.so_serial, 'YY123456');
   assert.equal(row.land_rows[0].loai_dat, 'ONT');
-  model.addAsset({ so_serial: 'AA123456' }); model.addAsset({ so_serial: 'BB123456' });
+  for (const s of ['AA123456', 'BB123456', 'CC123456', 'DD123456']) model.addAsset({ so_serial: s });
   const overflow = suggestion(); model.state.suggestions.push(overflow);
   assert.equal(model.acceptSuggestion(overflow.suggestion_id), null);
   assert.equal(model.state.suggestions.length, 1);
-  await model.saveDraft();
-  assert.equal(calls[0][1].docx_import.sources[0].records[0].row_id, row.row_id);
+  await model.saveCase();
+  const save = calls.find(([c]) => c === 'notary.workspace_save_case');
+  assert.ok(save, 'không gửi workspace_save_case');
+  assert.equal(save[1].docx_import.sources[0].records[0].row_id, row.row_id);
   assert.equal(candidate.fields.so_serial.raw_value, 'ZZ123456');
-  model.newDraft(); assert.deepEqual(model.state.docxImport.sources, []);
+  await model.newDraft(); assert.deepEqual(model.state.docxImport.sources, []);
 });
 
 test('case switch ignores late intake response; original export blocks uncommitted rows', async () => {
   let finish;
-  const model = M.createModel({ client: { run: () => new Promise((resolve) => { finish = resolve; }) } });
-  model.newDraft();
+  const model = M.createModel({ client: { run: (command) => {
+    if (command === 'notary.workspace_source_latest') {
+      return Promise.resolve({ ok: true, data: {} });
+    }
+    return new Promise((resolve) => { finish = resolve; });
+  } } });
+  await model.newDraft();
   const pending = model.intakeAnalyze([{ kind: 'docx' }]);
-  model.newDraft(); finish({ ok: true, data: { suggestions: [suggestion()] } });
+  await model.newDraft(); finish({ ok: true, data: { suggestions: [suggestion()] } });
   const result = await pending;
   assert.equal(result.stale, true);
   assert.deepEqual(model.state.suggestions, []);
@@ -107,8 +143,8 @@ function dialogContext(model) {
 }
 const button = (box, label) => collect(box, (e) => e.tagName === 'BUTTON' && e.textContent.includes(label))[0];
 
-test('retained review cards identify each source label in header and scalar or land evidence', () => {
-  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+test('retained review cards identify each source label in header and scalar or land evidence', async () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});await model.newDraft();
   const person=suggestion('person'),asset=suggestion();
   person.fields.ho_ten.source_refs[0].source_label='Người từ A.docx';
   asset.fields.so_serial.source_refs[0].source_label='Đất từ B.docx';
@@ -143,30 +179,37 @@ test('stale export response leaves old dialog untouched even when new case has w
   assert.equal(button(box,'Chọn thư mục đích').disabled,true);
 });
 
-test('failed and throwing detach restores source and dirty state for retry without restoring another case', async () => {
-  for (const failure of ['result', 'exception', 'switch']) {
-    let calls = 0;
-    const model = M.createModel({client:{run:async(command,payload)=>{
-      calls++;
-      if (calls === 1) {
-        if (failure === 'switch') { model.newDraft(); return {ok:false,error:{code:'conflict'}}; }
-        if (failure === 'exception') throw new Error('interrupted');
-        return {ok:false,error:{code:'conflict',message:'Thử lại'}};
-      }
-      return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
-    }}});
-    model.newDraft(); model.state.caseId = 1; model.state.revision = 2;
-    model.state.stageDirty = false; model.state.diagramDirty = false; model.state.metaDirty = false;
-    model.state.docxImport = {version:1,sources:[{source_id:uuid(),label:'A.docx',records:[],bindings:[]}]};
-    const before = structuredClone(model.state.docxImport);
-    const {ctx,box} = dialogContext(model); WORD.createWordDialog(ctx).open();
-    await button(box,'Gỡ nguồn Word').onclick();
-    if (failure === 'switch') { assert.deepEqual(model.state.docxImport.sources,[]); continue; }
-    assert.deepEqual(model.state.docxImport,before); assert.equal(model.state.stageDirty,false);
-    assert.ok(button(box,'Gỡ nguồn Word'));
-    await button(box,'Gỡ nguồn Word').onclick();
-    assert.deepEqual(model.state.docxImport.sources,[]); assert.equal(button(box,'Gỡ nguồn Word'),undefined);
-  }
+test('detach source is local: keeps Stage, marks dirty, no IPC; empty context travels on save_case', async () => {
+  const calls = [];
+  const model = M.createModel({client:{run:async(command,payload)=>{
+    calls.push([command,payload]);
+    if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+    if (command === 'notary.workspace_save_case') {
+      return {ok:true,data:saveCaseData(payload)};
+    }
+    return {ok:true,data:{}};
+  }}});
+  await model.newDraft(); model.state.caseId = 1; model.state.revision = 2;
+  model.state.stageDirty = false; model.state.diagramDirty = false; model.state.metaDirty = false;
+  const keep = { row_id: 'p1', ho_ten: 'Người Giữ' };
+  model.state.stage.people = [keep];
+  const sourceId = uuid();
+  model.state.docxImport = {version:1,sources:[{source_id:sourceId,label:'A.docx',records:[],bindings:[]}]};
+  // DB đã có nguồn này; gỡ local xong phải gửi context rỗng (không omit).
+  model.state.committedDocxImport = structuredClone(model.state.docxImport);
+  const {ctx,box} = dialogContext(model); WORD.createWordDialog(ctx).open();
+  calls.length = 0;
+  await button(box,'Gỡ nguồn Word').onclick();
+  assert.deepEqual(model.state.docxImport.sources,[]);
+  assert.equal(calls.length, 0, 'gỡ nguồn không gọi IPC');
+  assert.equal(model.state.stageDirty, true, 'gỡ nguồn phải bật dirty');
+  assert.deepEqual(model.state.stage.people, [keep], 'Stage phải giữ nguyên');
+  assert.equal(button(box,'Gỡ nguồn Word'),undefined);
+  // Bản ghi kế tiếp (Lưu hồ sơ) gửi context rỗng, không omit.
+  const r = await model.saveCase();
+  assert.equal(r.ok, true);
+  const save = calls.find(([c]) => c === 'notary.workspace_save_case')[1];
+  assert.deepEqual(save.docx_import, {version:1,sources:[]});
 });
 
 test('JSON download keeps original schema-valid result after review and invalid pending edits', async () => {
@@ -174,7 +217,7 @@ test('JSON download keeps original schema-valid result after review and invalid 
   candidate.fields.ngay_sinh = {raw_value:'1/2/1980',normalized_value:'1980-02-01',observation_state:'normalized',confidence:null,source_refs:[{kind:'docx',span:[20,30]}]};
   const result = {schema_version:'notary.case-drafting.v1',suggestions:[candidate],errors:[]};
   const original = structuredClone(result);
-  const model = M.createModel({client:{run:async()=>({ok:true,data:result})}}); model.newDraft();
+  const model = M.createModel({client:{run:async()=>({ok:true,data:result})}}); await model.newDraft();
   const {ctx,box}=dialogContext(model);ctx.lib.faceEmpty=x=>x;
   INTAKE.createIntakeDialog(ctx).open();
   collect(box,e=>e.tagName==='TEXTAREA')[0].value='Phân tích'; await button(box,'Phân tích').onclick();
@@ -185,14 +228,16 @@ test('JSON download keeps original schema-valid result after review and invalid 
   URL.createObjectURL = b => {blob=b;return 'blob:synthetic';}; URL.revokeObjectURL=()=>{};
   try { button(box,'Tải JSON').onclick(); } finally { URL.createObjectURL=create;URL.revokeObjectURL=revoke; }
   const downloaded = await blob.text(); assert.deepEqual(JSON.parse(downloaded),original);
-  assert.match(box.textContent,/sửa đổi được lưu vào Stage/);
+  // R16 (owner 23/10/2026): câu dạy "sửa đổi được lưu vào Stage" đã gỡ khỏi
+  // dialog intake — test khóa hành vi mới: câu đó không còn xuất hiện.
+  assert.doesNotMatch(box.textContent,/sửa đổi được lưu vào Stage/);
   const root = fileURLToPath(new URL('../../',import.meta.url));
-  execFileSync(process.env.NOTARY_TEST_PYTHON || 'python',['-c',
+  execFileSync(process.env.NOTARY_TEST_PYTHON || 'python3',['-c',
     "import json,sys; from pathlib import Path; from jsonschema import Draft7Validator; from referencing import Registry,Resource; p=Path(sys.argv[1])/'contracts/notary-case-drafting'; ss=[json.loads(f.read_text(encoding='utf-8')) for f in p.glob('*.schema.json')]; reg=Registry().with_resources([(s['$id'],Resource.from_contents(s)) for s in ss]); s=next(s for s in ss if s['$id'].endswith('/intake.schema.json')); Draft7Validator({'$ref':s['$id']+'#/definitions/result_data'},registry=reg).validate(json.load(sys.stdin))",root],{input:downloaded});
 });
 
-test('invalid source scalar and each land cell require correction; evidence shows span; over20 is capacity', () => {
-  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+test('invalid source scalar and each land cell require correction; evidence shows span; over20 is capacity', async () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});await model.newDraft();
   const sug=suggestion();sug.fields.dien_tich={raw_value:'-50',normalized_value:null,source_refs:[{kind:'docx',core_state:'error',span:[10,13],raw_snippet:'-50'}]};
   sug.fields.land_rows.source_refs=[{core_state:'error',land_row:1,land_field:'dien_tich',span:[40,43],raw_snippet:'-50'}];
   sug.fields.land_rows.normalized_value='[{"loai_dat":"ONT","dien_tich":null}]';model.state.suggestions.push(sug);
@@ -208,38 +253,56 @@ test('invalid source scalar and each land cell require correction; evidence show
   model.state.suggestions.push(many);assert.equal(model.acceptSuggestion(many.suggestion_id),null);assert.match(model.state.notice,/tối đa 20/);
 });
 
-test('binding save failure restores clean context, retains choices and allows retry; selection locks during save', async () => {
-  let finish, commits = 0;
+test('applying bindings is local: repeat/clear allowed, dirty stays, no IPC; save_case carries them', async () => {
+  const calls = [];
+  let failSave = true;
   const sourceId = uuid();
   const proposal = {candidate_id:uuid(), occurrence_id:uuid(), field_key:'ho_ten', slot:'[Người 1 - Họ tên]',
     raw_snippet:'Tên gốc', row_id:uuid(), row_label:'Tên đã lưu', value:'Tên đã lưu', supported:true, selected:false};
   const model = M.createModel({client:{run:async(command,payload)=>{
-    if(command === 'notary.word_export_options') return {ok:true,data:{documents:[{document_key:'original.docx',ready:true}], binding_proposals:[{...proposal,selected:commits > 1}]}};
-    commits++;
-    if(commits === 1) return new Promise(resolve=>{finish=resolve;});
-    return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
+    calls.push([command,payload]);
+    if(command === 'notary.word_export_options') return {ok:true,data:{documents:[{document_key:'original.docx',ready:true}], binding_proposals:[{...proposal}]}};
+    if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+    if (command === 'notary.workspace_save_case') {
+      if (failSave) { failSave = false; return {ok:false,error:{code:'file_locked',message:'Thử lại'}}; }
+      return {ok:true,data:saveCaseData(payload)};
+    }
+    return {ok:true,data:{}};
   }}});
-  model.newDraft(); model.state.caseId=1; model.state.revision=2;
+  await model.newDraft(); model.state.caseId=1; model.state.revision=2;
   model.state.stageDirty=false;model.state.diagramDirty=false;model.state.metaDirty=false;
   model.state.docxImport={version:1,sources:[{source_id:sourceId,label:'A.docx',records:[],bindings:[]}]};
-  const before=structuredClone(model.state.docxImport);
   const {ctx,box}=dialogContext(model);WORD.createWordDialog(ctx).open();
   await button(box,'Dùng hợp đồng Word đã nhập').onclick();
   const choice=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0];
   choice.checked=true;choice.onchange();
-  const pending=button(box,'Xác nhận và lưu').onclick();
-  assert.equal(choice.disabled,true);
-  finish({ok:false,error:{code:'file_locked',message:'Thử lại'}});await pending;
-  assert.equal(model.state.stageDirty,false);
-  assert.deepEqual(model.state.docxImport,before);
-  assert.equal(choice.checked,true);assert.equal(choice.disabled,false);
-  await button(box,'Xác nhận và lưu').onclick();
-  assert.equal(commits,2);assert.equal(model.state.docxImport.sources[0].bindings.length,1);
-  assert.equal(choice.checked,true);assert.equal(choice.disabled,false);
+  calls.length = 0;
+  await button(box,'Áp dụng vị trí đã chọn').onclick();
+  assert.equal(calls.length, 0, 'áp dụng vị trí không gọi IPC');
+  assert.equal(model.state.docxImport.sources[0].bindings.length,1);
+  assert.equal(model.state.stageDirty,true, 'áp dụng vị trí phải bật dirty');
+  assert.equal(choice.checked,true);
+  // Sửa lựa chọn lần hai (kể cả bỏ chọn) vẫn được — chỉ context đổi.
+  choice.checked=false;choice.onchange();
+  await button(box,'Áp dụng vị trí đã chọn').onclick();
+  assert.equal(model.state.docxImport.sources[0].bindings.length,0);
+  // Lỗi Lưu hồ sơ giữ bindings đã áp + dirty; retry gửi đúng payload.
+  choice.checked=true;choice.onchange();
+  await button(box,'Áp dụng vị trí đã chọn').onclick();
+  const failed = await model.saveCase();
+  assert.equal(failed.ok,false);
+  assert.equal(model.state.docxImport.sources[0].bindings.length,1);
+  assert.equal(model.state.stageDirty,true);
+  const ok = await model.saveCase();
+  assert.equal(ok.ok,true);
+  const save = calls.filter(([c]) => c === 'notary.workspace_save_case').at(-1)[1];
+  assert.equal(save.docx_import.sources[0].bindings.length,1);
+  assert.equal(save.docx_import.sources[0].bindings[0].occurrence_id,
+    proposal.occurrence_id);
 });
 
-test('invalid numeric land edits block acceptance until corrected and preserve other reviewed cells', () => {
-  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+test('invalid numeric land edits block acceptance until corrected and preserve other reviewed cells', async () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});await model.newDraft();
   const sug=suggestion();model.state.suggestions.push(sug);
   const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
   const type=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Loại đất')[0];
@@ -259,11 +322,12 @@ test('invalid numeric land edits block acceptance until corrected and preserve o
 
 test('later intake success, failure and cancel retain earlier cards and pending typed reviews', async () => {
   const first=suggestion('person'), second=suggestion('person');let calls=0;
-  const model=M.createModel({client:{run:async()=>{
+  const model=M.createModel({client:{run:async(command)=>{
+    if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
     calls++;
     if(calls<3) return {ok:true,data:{suggestions:[calls===1?first:second],errors:[]}};
     return {ok:false,error:{code:calls===3?'intake.parse_failed':'user_canceled',message:'Nguồn lỗi'}};
-  }}});model.newDraft();
+  }}});await model.newDraft();
   const {ctx,box}=dialogContext(model);ctx.lib.faceEmpty=x=>x;ctx.face=x=>ctx.h('div','error',x);INTAKE.createIntakeDialog(ctx).open();
   const ta=collect(box,e=>e.tagName==='TEXTAREA')[0];
   ta.value='Lần một';await button(box,'Phân tích').onclick();
@@ -277,9 +341,11 @@ test('later intake success, failure and cancel retain earlier cards and pending 
   }
 });
 
-test('reopening Intake exposes pending ambiguity for correction without another analysis', () => {
+test('reopening Intake exposes pending ambiguity for correction without another analysis', async () => {
   let backendCalls=0;
-  const model=M.createModel({client:{run:async()=>{backendCalls++;return {ok:true};}}});model.newDraft();
+  const model=M.createModel({client:{run:async(command)=>{
+    if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+    backendCalls++;return {ok:true};}}});await model.newDraft();
   const sug=suggestion('asset',true);model.state.suggestions.push(sug);
   const first=dialogContext(model);INTAKE.createIntakeDialog(first.ctx).open();
   const badArea=collect(first.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
@@ -292,22 +358,36 @@ test('reopening Intake exposes pending ambiguity for correction without another 
   const area=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
   assert.equal(area.value,'-5');assert.match(reopened.box.textContent,/Diện tích cần/);
   area.value='10';area.onchange();
-  const serial=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Serial giấy chứng nhận')[0];
+  const serial=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Số giấy tờ (GCN)')[0];
   serial.value='YY123456';serial.onchange();
-  button(reopened.box,'Đưa vào Stage').onclick();
+  button(reopened.box,'Đưa vào hồ sơ').onclick();
   assert.equal(model.state.stage.assets[0].so_serial,'YY123456');
   assert.equal(model.state.suggestions.length,0);assert.equal(backendCalls,0);
 });
 
 test('old original export returns stale and cannot clear busy or results of new case export', async () => {
   const resolves=[];
-  const model=M.createModel({client:{run:()=>new Promise(resolve=>resolves.push(resolve))}});
-  model.newDraft();model.state.caseId=1;
+  const model=M.createModel({client:{run:(command)=>{
+    if (command === 'notary.workspace_source_latest') {
+      return Promise.resolve({ok:true,data:{}});
+    }
+    if (command === 'notary.word_export_options') {
+      // W2: chế độ gốc nạp lại vị trí ngay trong hành động xuất.
+      return Promise.resolve({ok:true,data:{
+        documents:[{document_key:'original.docx',ready:true,
+                    block_reason:null}]}});
+    }
+    return new Promise(resolve=>resolves.push(resolve));
+  }}});
+  await model.newDraft();model.state.caseId=1;
   model.state.stageDirty=false;model.state.diagramDirty=false;
   const old=model.exportWord(['original.docx'],{}, {originalSourceId:uuid()});
-  model.newDraft();model.state.caseId=2;
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(resolves.length,1,'batch cũ đã gửi sau khi nạp lại vị trí');
+  await model.newDraft();model.state.caseId=2;
   model.state.stageDirty=false;model.state.diagramDirty=false;
   const current=model.exportWord(['original.docx'],{}, {originalSourceId:uuid()});
+  await Promise.resolve(); await Promise.resolve();
   resolves[0]({ok:true,data:{documents:[{document_key:'old',status:'saved'}]}});
   assert.equal((await old).stale,true);
   assert.equal(model.state.wordBusy,true);assert.equal(model.state.wordResult,null);
@@ -315,18 +395,18 @@ test('old original export returns stale and cannot clear busy or results of new 
   assert.equal(model.state.wordBusy,false);assert.equal(model.state.wordResult.documents[0].document_key,'current');
 });
 
-test('review dialog displays evidence and capacity rejection keeps the visible card', () => {
-  const model = M.createModel({ client: { run: async () => ({ ok: true }) } }); model.newDraft();
-  for (let i = 0; i < 3; i++) model.addAsset({ so_serial: 'AA123456' });
+test('review dialog displays evidence and capacity rejection keeps the visible card', async () => {
+  const model = M.createModel({ client: { run: async () => ({ ok: true }) } }); await model.newDraft();
+  for (let i = 0; i < 5; i++) model.addAsset({ so_serial: 'AA123456' });
   model.state.suggestions.push(suggestion());
   const { ctx, box } = dialogContext(model); INTAKE.createIntakeDialog(ctx).open();
   assert.match(box.textContent, /Xem chữ gốc và vị trí/);
-  button(box, 'Đưa vào Stage').onclick();
-  assert.match(box.textContent, /Đưa vào Stage/);
+  button(box, 'Đưa vào hồ sơ').onclick();
+  assert.match(box.textContent, /Đưa vào hồ sơ/);
   assert.equal(model.state.suggestions.length, 1);
 });
 
-test('original template mapping is explicitly selected and persisted before enabling export', async () => {
+test('original template mapping is explicitly selected and applied locally before export', async () => {
   const sourceId = uuid(); const calls = [];
   const proposal = { candidate_id: uuid(), occurrence_id: uuid(), field_key: 'ho_ten', slot: '[Người 1 - Họ tên]',
     raw_snippet: 'Tên gốc', row_id: uuid(), row_label: 'Tên đã sửa', value: 'Tên đã sửa', supported: true };
@@ -335,19 +415,92 @@ test('original template mapping is explicitly selected and persisted before enab
     canWrite: () => true, hasUnsaved: () => false,
     loadWordOptions: async (_dir, id) => { calls.push(['load', id]); model.state.wordOptions = [{document_key:'original.docx',ready:false}]; return {ok:true}; },
     confirmOriginalBindings: (id, bindings) => { calls.push(['confirm', id, bindings]); return true; },
-    commitStage: async () => { calls.push(['commit']); return {ok:true}; },
   };
   const { ctx, box } = dialogContext(model); WORD.createWordDialog(ctx).open();
   await button(box, 'Dùng hợp đồng Word đã nhập').onclick();
   assert.match(box.textContent, /Tên gốc → Tên đã sửa/);
   const choice = collect(box, (e) => e.tagName === 'INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0];
   assert.ok(!choice.checked, 'no implicit binding confirmation'); choice.checked = true;
-  await button(box, 'Xác nhận và lưu').onclick();
-  assert.deepEqual(calls.map((c) => c[0]), ['load','confirm','commit','load']);
+  await button(box, 'Áp dụng vị trí đã chọn').onclick();
+  // Áp dụng chỉ ghi model; không commit, không tải lại readiness, không nói đã lưu.
+  assert.deepEqual(calls.map((c) => c[0]), ['load','confirm']);
+  assert.equal(button(box, 'Xác nhận và lưu'), undefined);
+  assert.ok(button(box, 'Áp dụng vị trí đã chọn'), 'mapping vẫn sửa tiếp được');
+  assert.equal(collect(box, (e) =>
+    e.tagName === 'INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc')).length, 1);
 });
 
-test('each ambiguous land cell requires its own review and deletion preserves original land identity', () => {
-  const model = M.createModel({ client: { run: async () => ({ ok: true }) } }); model.newDraft();
+for (const applyFirst of [true, false]) {
+  test(`W2: initially blocked original exports after ${applyFirst ? 'local apply' : 'pending choices'}`, async () => {
+    const sourceId = uuid(), destination = { file_token: uuid() }, calls = [], exports = [];
+    const proposal = { candidate_id: uuid(), occurrence_id: uuid(), field_key: 'ho_ten',
+      slot: '[Người 1 - Họ tên]', raw_snippet: 'Tên tổng hợp', row_id: uuid(),
+      row_label: 'Tên đã sửa', value: 'Tên đã sửa', supported: true, selected: false };
+    let savedBindings = [];
+    const model = M.createModel({ client: { run: async (command, payload) => {
+      if (command === 'notary.workspace_source_latest') return { ok: true, data: {} };
+      calls.push([command, payload]);
+      if (command === 'notary.workspace_save_case') {
+        savedBindings = payload.docx_import.sources[0].bindings;
+        return { ok: true, data: saveCaseData(payload, { revision: 3 }) };
+      }
+      if (command === 'notary.word_export_options') return { ok: true, data: {
+        documents: [{ document_key: 'original.docx', display_name: 'Hợp đồng Word gốc',
+          ready: savedBindings.length > 0,
+          block_reason: savedBindings.length ? null : 'word.original_mapping_invalid' }],
+        binding_proposals: [proposal],
+      } };
+      return { ok: true, data: { documents: [] } };
+    } } });
+    await model.newDraft(); model.state.caseId = 1; model.state.revision = 2;
+    model.state.stageDirty = false; model.state.diagramDirty = false; model.state.metaDirty = false;
+    model.state.docxImport = { version: 1, sources: [
+      { source_id: sourceId, label: 'Tổng hợp.docx', records: [], bindings: [] },
+    ] };
+    const exportWord = model.exportWord;
+    model.exportWord = (...args) => { exports.push(args); return exportWord(...args); };
+    const { ctx, box } = dialogContext(model);
+    ctx.pickFiles = async () => ({ ok: true, data: {
+      files: [{ ...destination, is_dir: true, name: 'Đích tổng hợp' }],
+    } });
+    WORD.createWordDialog(ctx).open();
+    await button(box, 'Dùng hợp đồng Word đã nhập').onclick();
+    const originalCheck = () => collect(box, e =>
+      e.tagName === 'INPUT' && e.getAttribute('aria-label') === 'Hợp đồng Word gốc')[0];
+    assert.equal(originalCheck().disabled, true);
+    assert.equal(originalCheck().checked, false);
+    const choice = collect(box, e =>
+      e.tagName === 'INPUT' && e.getAttribute('aria-label')?.includes('Tên tổng hợp'))[0];
+    choice.checked = true; choice.onchange();
+    if (applyFirst) {
+      await button(box, 'Áp dụng vị trí đã chọn').onclick();
+      assert.equal(originalCheck().disabled, false);
+      assert.equal(originalCheck().checked, true);
+      assert.doesNotMatch(box.textContent, /Hãy kiểm tra và xác nhận lại/);
+      assert.equal(savedBindings.length, 0, 'local apply must not save');
+    }
+    await button(box, 'Chọn thư mục đích').onclick();
+    calls.length = 0;
+    await button(box, 'Xuất').onclick();
+    assert.equal(originalCheck().disabled, false);
+    assert.equal(originalCheck().checked, true);
+    assert.equal(exports.length, 1);
+    assert.deepEqual(exports[0][0], ['original.docx']);
+    assert.deepEqual(exports[0][1], destination);
+    assert.equal(exports[0][2].originalSourceId, sourceId);
+    assert.deepEqual(calls.map(c => c[0]), [
+      'notary.workspace_save_case', 'notary.word_export_options', 'notary.word_export_batch',
+    ]);
+    assert.deepEqual(savedBindings, [{ candidate_id: proposal.candidate_id,
+      occurrence_id: proposal.occurrence_id, field_key: proposal.field_key, slot: proposal.slot }]);
+    assert.equal(calls[2][1].original_source_id, sourceId);
+    assert.deepEqual(calls[2][1].document_keys, ['original.docx']);
+    assert.equal(calls[2][1].base_revision, 3);
+  });
+}
+
+test('each ambiguous land cell requires its own review and deletion preserves original land identity', async () => {
+  const model = M.createModel({ client: { run: async () => ({ ok: true }) } }); await model.newDraft();
   const sug = suggestion();
   sug.fields.land_rows.normalized_value = JSON.stringify([
     {loai_dat:null,dien_tich:null,thoi_han:'Lâu dài'}, {loai_dat:'CLN',dien_tich:20,thoi_han:'2050'}]);
@@ -374,8 +527,8 @@ test('each ambiguous land cell requires its own review and deletion preserves or
   assert.deepEqual(model.state.docxImport.sources[0].records[0].land_rows,[2]);
 });
 
-test('raw selected dates normalize before Stage and invalid dates stay unreviewed', () => {
-  const model=M.createModel({client:{run:async()=>({ok:true})}}); model.newDraft();
+test('raw selected dates normalize before Stage and invalid dates stay unreviewed', async () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}}); await model.newDraft();
   const sug=suggestion('person');
   sug.fields.ngay_sinh={raw_value:'1/2/1980',normalized_value:null,source_refs:[{kind:'docx',raw_snippet:'1/2/1980',core_state:'ambiguous'}]};
   model.state.suggestions.push(sug);
@@ -395,10 +548,15 @@ test('raw selected dates normalize before Stage and invalid dates stay unreviewe
   assert.equal(model.acceptSuggestion(sug.suggestion_id).ngay_sinh,'1980-03-02');
 });
 
-test('ninth source cannot mutate Stage and explicit detach allows recovery with empty context on commit', async () => {
+test('ninth source cannot mutate Stage and explicit detach allows recovery with empty context on save', async () => {
   const calls=[];
-  const model=M.createModel({client:{run:async(command,payload)=>{calls.push([command,payload]);return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};}}});
-  model.newDraft();
+  const model=M.createModel({client:{run:async(command,payload)=>{calls.push([command,payload]);
+    if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+    if (command === 'notary.workspace_save_case') return {ok:true,data:saveCaseData(payload)};
+    return {ok:true,data:{}};}}});
+  await model.newDraft();
+  // DB đã có một nguồn đã lưu → gỡ hết trong phiên phải gửi sources rỗng.
+  model.state.committedDocxImport = {version:1,sources:[{source_id:uuid(),records:[],bindings:[]}]};
   for(let i=0;i<8;i++){const s=suggestion('person');model.state.suggestions.push(s); assert.ok(model.acceptSuggestion(s.suggestion_id));}
   const ninth=suggestion('person');model.state.suggestions.push(ninth);
   assert.equal(model.acceptSuggestion(ninth.suggestion_id),null);
@@ -408,23 +566,43 @@ test('ninth source cannot mutate Stage and explicit detach allows recovery with 
   assert.equal(model.state.stage.people.length,9);
   for(const s of [...model.state.docxImport.sources]) model.detachOriginalSource(s.source_id);
   model.state.caseId=1;model.state.revision=2;
-  await model.commitStage();
+  await model.saveCase();
   assert.deepEqual(calls.at(-1)[1].docx_import,{version:1,sources:[]});
 });
 
-test('dirty original export calls no backend; clean export includes source and saved revision', async () => {
+test('W2: original export dirty tự lưu rồi xuất revision mới; sạch dùng revision đã lưu', async () => {
   const calls=[];
-  const model=M.createModel({client:{run:async(command,payload)=>{calls.push([command,payload]);return {ok:true,data:{documents:[]}};}}});
-  model.newDraft();model.state.caseId=12;model.state.revision=7;
+  let revision=7;
+  const model=M.createModel({client:{run:async(command,payload)=>{
+    if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+    if (command === 'notary.workspace_save_case') {
+      revision += 1;
+      calls.push([command,payload]);
+      return {ok:true,data:saveCaseData(payload,{revision})};
+    }
+    if (command === 'notary.word_export_options') {
+      return {ok:true,data:{documents:[
+        {document_key:'original.docx',ready:true,block_reason:null}]}};
+    }
+    calls.push([command,payload]);
+    return {ok:true,data:{documents:[]}};
+  }}});
+  await model.newDraft();model.state.caseId=12;model.state.revision=7;
   const sourceId=uuid(); const dest={file_token:uuid()};
   model.state.stageDirty=true;
-  assert.equal((await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId})).ok,false);
-  model.state.stageDirty=false;model.state.diagramDirty=true;
-  assert.equal((await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId})).ok,false);
-  assert.equal(calls.length,0);
-  model.state.diagramDirty=false;
+  const r=await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId});
+  assert.equal(r.ok,true);
+  assert.deepEqual(calls.map(c=>c[0]),
+    ['notary.workspace_save_case','notary.word_export_batch']);
+  assert.equal(calls[0][1].case_id,12);
+  assert.equal(calls[0][1].base_revision,7);
+  assert.equal(calls[1][1].original_source_id,sourceId);
+  assert.equal(calls[1][1].base_revision,8);
+  // Sạch → không lưu lại; batch dùng revision vừa lưu.
+  calls.length=0;
   await model.exportWord(['original.docx'],dest,{originalSourceId:sourceId});
-  assert.equal(calls[0][1].original_source_id,sourceId); assert.equal(calls[0][1].base_revision,7);
+  assert.deepEqual(calls.map(c=>c[0]),['notary.word_export_batch']);
+  assert.equal(calls[0][1].base_revision,8);
 });
 
 test('mapping reopens saved choices, disables empty slot with reason, clears all and identifies sources', async () => {
@@ -437,7 +615,7 @@ test('mapping reopens saved choices, disables empty slot with reason, clears all
     wordBindingProposals:proposals,committedCaseInfo:{},caseInfo:{},wordOptions:[]},
     canWrite:()=>true,hasUnsaved:()=>false,
     loadWordOptions:async()=>{model.state.wordOptions=[{document_key:'original.docx',ready:true}];return {ok:true};},
-    confirmOriginalBindings:(_id,bindings)=>{calls.push(bindings);return true;},commitStage:async()=>({ok:true}),
+    confirmOriginalBindings:(_id,bindings)=>{calls.push(bindings);return true;},
     detachOriginalSource:sourceId=>{calls.push(sourceId);return true;}};
   const {ctx,box}=dialogContext(model);WORD.createWordDialog(ctx).open();
   assert.match(box.textContent,/Mẫu A.docx/);assert.match(box.textContent,/Mẫu B.docx/);
@@ -448,43 +626,51 @@ test('mapping reopens saved choices, disables empty slot with reason, clears all
   assert.match(box.textContent,/Vị trí chưa có giá trị đã lưu/);
   choice.checked=false;
   choice.onchange();
-  assert.equal(button(box,'Xuất').disabled,true,'unsaved choices cannot misdescribe the export');
-  await button(box,'Xác nhận và lưu').onclick();
+  assert.equal(button(box,'Xuất').disabled,false,
+    'W2: Xuất tự áp lựa chọn hiện tại — không bắt bấm Áp dụng trước');
+  await button(box,'Áp dụng vị trí đã chọn').onclick();
   assert.deepEqual(calls[0],[]);
-  assert.ok(button(box,'Xác nhận và lưu'),'mapping remains available after save');
+  assert.ok(button(box,'Áp dụng vị trí đã chọn'),'mapping remains available after apply');
   assert.equal(collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc')).length,1);
   await button(box,'Gỡ nguồn Word: Mẫu B.docx').onclick();
   assert.equal(calls.length,2);
   assert.match(box.textContent,/Dùng hợp đồng Word đã nhập: Mẫu A.docx/);
 });
 
-test('detach holds the save lock until commit finishes', async () => {
-  let finish; let detachCount=0, commitCount=0;
-  const model={state:{docxImport:{sources:[{source_id:uuid(),label:'A.docx'},{source_id:uuid(),label:'B.docx'}]},
+test('detach source is synchronous and local: other sources stay, no save lock', async () => {
+  const idA=uuid(), idB=uuid(), calls=[];
+  const model={state:{docxImport:{sources:[{source_id:idA,label:'A.docx'},{source_id:idB,label:'B.docx'}]},
     committedCaseInfo:{},caseInfo:{},wordOptions:[]},canWrite:()=>true,hasUnsaved:()=>false,
-    detachOriginalSource:()=>{detachCount++;return true;},
-    commitStage:()=>{commitCount++;return new Promise(resolve=>{finish=resolve;});}};
+    detachOriginalSource:(id)=>{calls.push(id);
+      model.state.docxImport.sources=model.state.docxImport.sources.filter(s=>s.source_id!==id);
+      return true;}};
   const {ctx,box}=dialogContext(model);WORD.createWordDialog(ctx).open();
-  const pending=button(box,'Gỡ nguồn Word: A.docx').onclick();
-  await button(box,'Gỡ nguồn Word: B.docx').onclick();
-  assert.equal(detachCount,1);assert.equal(commitCount,1);
-  finish({ok:true});await pending;
+  button(box,'Gỡ nguồn Word: A.docx').onclick();
+  assert.deepEqual(calls,[idA]);
   assert.match(box.textContent,/B.docx/);
+  button(box,'Gỡ nguồn Word: B.docx').onclick();
+  assert.deepEqual(calls,[idA,idB]);
+  assert.equal(button(box,'Gỡ nguồn Word'),undefined);
+  assert.deepEqual(model.state.docxImport.sources,[]);
 });
 
-test('localized area evidence uses complete number normalization', () => {
-  const model=M.createModel({client:{run:async()=>({ok:true})}});model.newDraft();
+test('localized area evidence uses complete number normalization', async () => {
+  const model=M.createModel({client:{run:async()=>({ok:true})}});await model.newDraft();
   const sug=suggestion();sug.fields.land_rows.source_refs=[{core_state:'ambiguous',land_row:1,land_field:'dien_tich',raw_snippet:'1.234,5'}];
   model.state.suggestions.push(sug);const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
   collect(box,e=>e.tagName==='BUTTON' && e.textContent==='Chọn giá trị này').at(-1).onclick();
   assert.equal(model.acceptSuggestion(sug.suggestion_id).land_rows[0].dien_tich,1234.5);
 });
 
-test('localized typed area survives text input and deleting all land rows commits empty identity', async () => {
+test('localized typed area survives text input and deleting all land rows saves empty identity', async () => {
   const calls=[];
   const model=M.createModel({client:{run:async(command,payload)=>{
-    calls.push(payload);return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
-  }}});model.newDraft();
+    if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+    if (command === 'notary.workspace_save_case') {
+      calls.push(payload); return {ok:true,data:saveCaseData(payload)};
+    }
+    return {ok:true,data:{}};
+  }}});await model.newDraft();
   const sug=suggestion();model.state.suggestions.push(sug);
   const {ctx,box}=dialogContext(model);INTAKE.createIntakeDialog(ctx).open();
   const area=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
@@ -495,17 +681,21 @@ test('localized typed area survives text input and deleting all land rows commit
   const row=model.acceptSuggestion(sug.suggestion_id);
   assert.ok(row);assert.deepEqual(row.land_rows,[]);
   assert.deepEqual(model.state.docxImport.sources[0].records[0].land_rows,[]);
-  model.state.caseId=1;model.state.revision=2;await model.commitStage();
+  model.state.caseId=1;model.state.revision=2;await model.saveCase();
   assert.deepEqual(calls[0].stage.assets[0].land_rows,[]);
   assert.deepEqual(calls[0].docx_import.sources[0].records[0].land_rows,[]);
 });
 
-test('invalid source dates block accept until correction then commit canonical date with original evidence', async () => {
+test('invalid source dates block accept until correction then save canonical date with original evidence', async () => {
   for(const raw of ['31/02/1980','1980-02-31']) {
     let saved;
-    const model=M.createModel({client:{run:async(_command,payload)=>{
-      saved=payload;return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
-    }}});model.newDraft();
+    const model=M.createModel({client:{run:async(command,payload)=>{
+      if (command === 'notary.workspace_source_latest') return {ok:true,data:{}};
+      if (command === 'notary.workspace_save_case') {
+        saved=payload; return {ok:true,data:saveCaseData(payload)};
+      }
+      return {ok:true,data:{}};
+    }}});await model.newDraft();
     const sug=suggestion('person');sug.fields.ngay_sinh={raw_value:raw,normalized_value:null,
       source_refs:[{kind:'docx',core_state:'error',raw_snippet:raw}]};model.state.suggestions.push(sug);
     assert.equal(model.acceptSuggestion(sug.suggestion_id),null);
@@ -514,93 +704,118 @@ test('invalid source dates block accept until correction then commit canonical d
     date.value='1980-02-29';date.onchange();
     assert.equal(model.acceptSuggestion(sug.suggestion_id).ngay_sinh,'1980-02-29');
     assert.equal(sug.fields.ngay_sinh.raw_value,raw);
-    model.state.caseId=1;model.state.revision=2;await model.commitStage();
+    model.state.caseId=1;model.state.revision=2;await model.saveCase();
     assert.equal(saved.stage.people[0].ngay_sinh,'1980-02-29');
   }
 });
 
-test('saved bindings survive options reload failure and source retry; stale source proposals disappear immediately', async () => {
+test('applied bindings persist via save_case; later options reload failure keeps them and retry shows DB choices', async () => {
   for(const failure of ['result','throw']) {
-    let loads=0, finish;
+    let loads=0, savedContext;
     const id=uuid(), proposal={candidate_id:uuid(),occurrence_id:uuid(),field_key:'ho_ten',slot:'[Người 1 - Họ tên]',
       raw_snippet:'Tên gốc',row_id:uuid(),row_label:'Tên đã lưu',value:'Tên đã lưu',supported:true,selected:false};
     const model=M.createModel({client:{run:async(command,payload)=>{
+      if(command==='notary.workspace_source_latest') return {ok:true,data:{}};
+      if(command==='notary.workspace_save_case') {
+        savedContext=structuredClone(payload.docx_import);
+        return {ok:true,data:saveCaseData(payload,{revision:3})};
+      }
       if(command==='notary.word_export_options') {
         loads++;
-        if(loads===2) {if(failure==='throw') throw new Error('reload failed');return {ok:false,error:{code:'reload_failed'}};}
-        if(loads===3) return new Promise((resolve,reject)=>{finish=()=>failure==='throw'
-          ? reject(new Error('retry failed')) : resolve({ok:false,error:{code:'retry_failed'}});});
-        return {ok:true,data:{documents:[{document_key:'original.docx',ready:true}],binding_proposals:[{...proposal,selected:loads>3}]}};
+        if(loads===2) {
+          if(failure==='throw') throw new Error('reload failed');
+          return {ok:false,error:{code:'reload_failed'}};
+        }
+        return {ok:true,data:{documents:[{document_key:'original.docx',ready:true}],
+          binding_proposals:[{...proposal,selected:loads>1}]}};
       }
-      return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
-    }}});model.newDraft();model.state.caseId=1;model.state.revision=2;
+      return {ok:true,data:{}};
+    }}});
+    await model.newDraft();model.state.caseId=1;model.state.revision=2;
     model.state.stageDirty=false;model.state.diagramDirty=false;model.state.metaDirty=false;
     model.state.docxImport={version:1,sources:[{source_id:id,label:'A.docx',records:[],bindings:[]}]};
     const {ctx,box}=dialogContext(model);const notices=[];ctx.notify=t=>notices.push(t);WORD.createWordDialog(ctx).open();
     await button(box,'Dùng hợp đồng Word đã nhập').onclick();
     const choice=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0];
-    choice.checked=true;choice.onchange();await button(box,'Xác nhận và lưu').onclick();
-    assert.equal(model.state.revision,3);assert.equal(model.state.stageDirty,false);
+    assert.equal(choice.checked,false);
+    choice.checked=true;choice.onchange();
+    await button(box,'Áp dụng vị trí đã chọn').onclick();
     assert.equal(model.state.docxImport.sources[0].bindings.length,1);
-    assert.match(box.textContent,/Đã lưu vị trí Word, nhưng chưa tải lại/);
-    assert.ok(notices.some(t=>/Đã lưu.*thất bại/.test(t)));
-    assert.equal(button(box,'Xác nhận và lưu'),undefined);
-    assert.deepEqual(model.state.wordBindingProposals,[]);
-    const pending=button(box,'Dùng hợp đồng Word đã nhập').onclick();
-    assert.match(box.textContent,/Đang tải/);assert.doesNotMatch(box.textContent,/Tên gốc →/);
-    assert.equal(button(box,'Xuất').disabled,true);finish();await pending;
-    assert.doesNotMatch(box.textContent,/Tên gốc →/);assert.match(box.textContent,/chọn lại nguồn để thử lại/);
+    assert.equal(model.state.stageDirty,true,'áp dụng vị trí phải bật dirty');
+    await model.saveCase();
+    assert.equal(savedContext.sources[0].bindings.length,1);
+    // Sau Lưu: mở lại nguồn để lấy readiness; lần tải kế tiếp lỗi/throw.
     await button(box,'Dùng hợp đồng Word đã nhập').onclick();
-    assert.ok(button(box,'Xác nhận và lưu'));
-    assert.equal(collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0].checked,true);
+    assert.doesNotMatch(box.textContent,/Tên gốc →/);
+    assert.match(box.textContent,
+      /Không tải được các vị trí Word|reload failed/);
+    assert.deepEqual(model.state.wordBindingProposals,[]);
+    assert.equal(model.state.docxImport.sources[0].bindings.length,1,
+      'lỗi tải lại không được xoá bindings đã lưu');
+    // Thử lại: DB đã lưu binding nên choices được chọn từ server.
+    await button(box,'Dùng hợp đồng Word đã nhập').onclick();
+    const again=collect(box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')?.includes('Tên gốc'))[0];
+    assert.equal(again.checked,true);
   }
 });
 
-test('real model commit and get restore original land identity after server removes UI-only keys', async () => {
-  let saved, revision=1;const calls=[];
+test('real model save and get restore original land identity after server removes UI-only keys', async () => {
+  let saved, revision=1,savePayloads=[];const calls=[];
   const model=M.createModel({client:{run:async(command,payload)=>{
     calls.push([command,payload]);
-    if(command==='notary.workspace_commit_stage'){
+    if(command==='notary.workspace_source_latest') return {ok:true,data:{}};
+    if(command==='notary.workspace_save_case'){
       assert.equal(payload.stage.assets[0].land_rows[0]._source_land_row,undefined);
+      savePayloads.push(payload);
       saved=structuredClone({stage:payload.stage,docx_import:payload.docx_import});revision++;
-      return {ok:true,data:{...saved,revision}};
+      return {ok:true,data:saveCaseData(payload,{revision})};
     }
-    return {ok:true,data:{...structuredClone(saved),case:{id:1,revision,case_type:'inheritance',locked:false}}};
-  }}});model.newDraft();
+    return {ok:true,data:{case:{id:1,revision,case_type:'inheritance',
+      document_type:'khai_nhan',locked:false}, backend_mode:'real',
+      capabilities:{intake:[],diagram:true,word_export:true},
+      stage:structuredClone(saved.stage),
+      docx_import:structuredClone(saved.docx_import),
+      diagram:{state:{version:3,domain:'inheritance',nodes:[]}}}};
+  }}});await model.newDraft();
   const sug=suggestion();sug.fields.land_rows.land_identity=[21];model.state.suggestions.push(sug);
   const row=model.acceptSuggestion(sug.suggestion_id);model.state.caseId=1;model.state.revision=1;
-  await model.commitStage();
+  await model.saveCase();
   assert.equal(model.state.stage.assets[0].land_rows[0]._source_land_row,21);
   await model.openCase(1);
   assert.equal(model.state.stage.assets[0].land_rows[0]._source_land_row,21);
   model.updateAssetField(row.row_id,'land_rows',[{...model.state.stage.assets[0].land_rows[0],dien_tich:77}]);
-  await model.commitStage();
-  assert.deepEqual(saved.docx_import.sources[0].records[0].land_rows,[21]);
+  await model.saveCase();
+  assert.deepEqual(savePayloads[0].docx_import.sources[0].records[0].land_rows,[21]);
+  assert.equal(savePayloads[1].docx_import, undefined,
+    'provenance không đổi thì không gửi lại (giữ bản đã lưu)');
   assert.equal(saved.stage.assets[0].land_rows[0].dien_tich,77);
-  assert.deepEqual(calls.map(c=>c[0]),['notary.workspace_commit_stage','notary.workspace_get','notary.workspace_commit_stage']);
+  assert.deepEqual(calls.map(c=>c[0]).filter(c=>c!=='notary.workspace_source_latest'),
+    ['notary.workspace_save_case','notary.workspace_get','notary.workspace_save_case']);
 });
 
-test('case switch during saved mapping reload never updates the new case dialog state', async () => {
+test('case switch during options load never updates the new case dialog state', async () => {
   let finish,loads=0;
   const id=uuid(),proposal={candidate_id:uuid(),occurrence_id:uuid(),field_key:'ho_ten',slot:'[Người 1 - Họ tên]',
     raw_snippet:'Tên gốc',row_id:uuid(),row_label:'Tên đã lưu',value:'Tên đã lưu',supported:true};
-  const model=M.createModel({client:{run:async(command,payload)=>{
+  const model=M.createModel({client:{run:async(command)=>{
+    if(command==='notary.workspace_source_latest') return {ok:true,data:{}};
     if(command==='notary.word_export_options') {
       if(++loads===2) return new Promise(resolve=>{finish=resolve;});
       return {ok:true,data:{documents:[],binding_proposals:[proposal]}};
     }
-    return {ok:true,data:{revision:3,stage:payload.stage,docx_import:payload.docx_import}};
-  }}});model.newDraft();model.state.caseId=1;model.state.revision=2;
+    return {ok:true,data:{}};
+  }}});
+  await model.newDraft();model.state.caseId=1;model.state.revision=2;
   model.state.stageDirty=false;model.state.diagramDirty=false;model.state.metaDirty=false;
   model.state.docxImport={version:1,sources:[{source_id:id,label:'A.docx',records:[],bindings:[]}]};
   const {ctx,box}=dialogContext(model);const notices=[];ctx.notify=t=>notices.push(t);WORD.createWordDialog(ctx).open();
   await button(box,'Dùng hợp đồng Word đã nhập').onclick();
-  const pending=button(box,'Xác nhận và lưu').onclick();
-  await Promise.resolve();await Promise.resolve();
-  model.newDraft();model.state.caseId=2;model.state.revision=7;
-  model.state.wordOptions=[{document_key:'new-case.docx',ready:true}];
+  const pending=button(box,'Dùng hợp đồng Word đã nhập').onclick();
+  await model.newDraft();               // đổi hồ sơ khi response cũ còn treo
   finish({ok:false,error:{code:'reload_failed'}});await pending;
-  assert.equal(model.state.revision,7);assert.deepEqual(model.state.docxImport.sources,[]);
-  assert.equal(model.state.wordOptions[0].document_key,'new-case.docx');
-  assert.deepEqual(notices,[]);assert.doesNotMatch(box.textContent,/Đã lưu vị trí Word, nhưng/);
+  assert.equal(model.state.caseId,null);
+  assert.deepEqual(model.state.docxImport.sources,[]);
+  assert.equal(model.state.wordOptions,null);
+  assert.deepEqual(notices,[]);
+  assert.doesNotMatch(box.textContent,/Không tải được các vị trí Word/);
 });

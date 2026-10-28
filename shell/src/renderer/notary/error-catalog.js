@@ -11,13 +11,13 @@
  *   - shell/sidecar/notary_adapter.py + notary_mock_adapter.py (CommandError)
  *   - shell/src/main/command-client.js + renderer.js (transport codes)
  *
- * Nguyên tắc hiển thị: user KHÔNG nhìn mã snake_case trần. describeError
- * trả { code, title, hint } — title là câu tiếng Việt; code giữ để tra
- * cứu/diagnostics (hiển thị mờ hoặc tooltip, không phải nội dung chính).
+ * Nguyên tắc hiển thị (R12): mỗi lỗi hiện cho user ĐÚNG MỘT câu ngắn
+ * (title) — không hint dạy thao tác, không hậu tố mã. Code + hint giữ
+ * trong catalog làm tài liệu nội bộ/diagnostics, không in lên giao diện.
  */
 
-// code → { title, hint } — title: chuyện gì; hint: người dùng làm gì /
-// rule ẩn nào đang được bảo vệ. hint=null khi title đã tự đủ.
+// code → { title, hint } — title: câu hiển thị duy nhất; hint: rule ẩn
+// nội bộ (không render). hint=null khi title đã tự đủ.
 const ERROR_CATALOG = {
   // ---- Transport / vỏ ứng dụng ----
   submit_failed: {
@@ -31,6 +31,9 @@ const ERROR_CATALOG = {
   engine_shutdown: {
     title: 'Engine nghiệp vụ đã dừng giữa chừng',
     hint: 'Khởi động lại ứng dụng để dựng lại engine.',
+  },
+  engine_internal_error: {
+    title: 'Lỗi nội bộ của engine nghiệp vụ',
   },
   engine_version_mismatch: {
     title: 'Shell và engine không khớp phiên bản contract',
@@ -91,17 +94,22 @@ const ERROR_CATALOG = {
     title: 'Hồ sơ đã thay đổi ở phiên bản khác',
     hint: 'Tải lại bản mới hoặc giữ nháp để sao chép tay.',
   },
+  workspace_storage_error: {
+    title: 'Không ghi được hồ sơ do ràng buộc dữ liệu nội bộ',
+    hint: 'Dữ liệu hồ sơ chưa thay đổi. Đây là lỗi kỹ thuật — thử lại; ' +
+      'nếu vẫn lỗi, chụp thông báo này để kiểm tra.',
+  },
   workspace_owner_required: {
     title: 'Chưa chọn người để lại tài sản',
     hint: 'Kéo người để lại (đã mất) từ bảng Người vào ô khởi tạo ' +
       'trên sơ đồ thừa kế.',
   },
   stage: {
-    title: 'Dữ liệu Stage chưa hợp lệ',
+    title: 'Dữ liệu hồ sơ chưa hợp lệ',
     hint: 'Sửa các ô/dòng đánh dấu đỏ rồi lưu lại.',
   },
   stage_validation_error: {
-    title: 'Dữ liệu Stage chưa hợp lệ',
+    title: 'Dữ liệu hồ sơ chưa hợp lệ',
     hint: 'Sửa các ô/dòng đánh dấu đỏ rồi lưu lại.',
   },
   validation_error: { title: 'Dữ liệu không hợp lệ' },
@@ -117,12 +125,12 @@ const ERROR_CATALOG = {
     title: 'Sơ đồ không đúng loại việc của hồ sơ',
   },
   diagram_reference_outside_stage: {
-    title: 'Sơ đồ tham chiếu người không còn trong Stage',
-    hint: 'Người đó có thể đã bị xóa khỏi Stage — gán lại trên sơ đồ.',
+    title: 'Sơ đồ tham chiếu người không còn trong hồ sơ',
+    hint: 'Người đó có thể đã bị xóa khỏi hồ sơ — gán lại trên sơ đồ.',
   },
 
   // ---- Field-level (trong details.fields của stage_validation_error) ----
-  required: { title: 'Trường bắt buộc chưa có giá trị' },
+  required: { title: 'Mục bắt buộc chưa có giá trị' },
   row: { title: 'Dòng dữ liệu không hợp lệ' },
   invalid_date: {
     title: 'Ngày không hợp lệ',
@@ -135,9 +143,9 @@ const ERROR_CATALOG = {
 
   // ---- Engine thừa kế (inheritance_engine.py) ----
   missing_land_owner: {
-    title: 'Chưa có người để lại tài sản trên sơ đồ',
-    hint: 'Kéo người để lại vào ô khởi tạo — engine chỉ tính được ' +
-      'khi có người đã mất sở hữu tài sản.',
+    title: 'Chưa đánh dấu Chủ đất cho người để lại tài sản',
+    hint: 'Chưa vị trí tài sản nào được bật chip "Chủ" trên sơ đồ. ' +
+      'Bật ít nhất một chip Chủ trên ô người để lại tài sản rồi lưu lại.',
   },
   no_valid_heir: {
     title: 'Không có người thừa kế hợp lệ',
@@ -145,7 +153,7 @@ const ERROR_CATALOG = {
       'các nhánh trên sơ đồ.',
   },
   unknown_person: {
-    title: 'Sơ đồ tham chiếu người không có trong Stage',
+    title: 'Sơ đồ tham chiếu người không có trong hồ sơ',
   },
   duplicate_person: {
     title: 'Một người đang nằm trên nhiều ô sơ đồ',
@@ -159,10 +167,6 @@ const ERROR_CATALOG = {
     title: 'Quan hệ gia đình tạo vòng lặp',
     hint: 'Kiểm tra lại cha/mẹ — con trên các ô liên quan.',
   },
-  spouse_conflict: {
-    title: 'Quan hệ vợ/chồng mâu thuẫn',
-    hint: 'Hai ô phải khai báo vợ/chồng qua lại đúng một cặp.',
-  },
   self_parent: { title: 'Một ô tự nhận chính mình là cha/mẹ' },
   self_spouse: { title: 'Một ô tự nhận chính mình là vợ/chồng' },
   dangling_parent: { title: 'Quan hệ cha/mẹ trỏ tới ô không tồn tại' },
@@ -175,7 +179,7 @@ const ERROR_CATALOG = {
   invalid_spouse: { title: 'Quan hệ vợ/chồng không hợp lệ' },
   invalid_position: {
     title: 'Vị trí tài sản trên ô sơ đồ không hợp lệ',
-    hint: 'Vị trí phải nằm trong số tài sản hiện có ở Stage.',
+    hint: 'Vị trí phải nằm trong số tài sản hiện có ở hồ sơ.',
   },
   missing_position: { title: 'Một ô thiếu vị trí tài sản bắt buộc' },
   invalid_death_date: {
@@ -224,6 +228,9 @@ const ERROR_CATALOG = {
   word_duplicate_document_key: {
     title: 'Loại văn bản bị chọn trùng',
   },
+  'word.too_many_people': {
+    title: 'Quá 20 người trong hồ sơ',
+  },
 
   // ---- Khác ----
   unknown_website: { title: 'Không nhận diện được trang đích' },
@@ -235,9 +242,12 @@ function describeError(err) {
   const e = err || {};
   const code = e.code || 'unknown';
   const ent = ERROR_CATALOG[code];
+  // Strip repeated Python exception wrappers only from the display fallback.
+  const message = (e.message || '').replace(
+    /^(?:\s*(?:[\w.]*Error|[\w.]*Exception):\s*)+/, '');
   return {
     code,
-    title: ent ? ent.title : (e.message || code),
+    title: ent ? ent.title : (message || ERROR_CATALOG.unknown.title),
     hint: (ent && ent.hint) || null,
     retryable: !!e.retryable,
     nextAction: e.next_action || null,
@@ -245,15 +255,45 @@ function describeError(err) {
   };
 }
 
-// Dòng thông báo ngắn cho toast/banner: "Title — hint". Mã lỗi kèm ở
-// cuối trong ngoặc (mờ, để tra cứu) — không phải nội dung chính.
+// Dòng thông báo duy nhất cho UI (R12): chỉ title — một câu nói chuyện
+// gì xảy ra. Không ghép hint, không in mã. Code/hint vẫn tra được qua
+// describeError cho log/diagnostics.
 function errText(err) {
-  const d = describeError(err);
-  const base = d.hint ? `${d.title} — ${d.hint}` : d.title;
-  return `${base} (${d.code})`;
+  return describeError(err).title;
+}
+// Toast errors use the same user-facing catalog; startup unavailability is
+// already represented by the engine banner and must not leave a stale toast.
+function toastErrorText(err, engineState) {
+  if (err && err.code === 'engine_unavailable' &&
+      (engineState === 'starting' || engineState === 'restarting')) {
+    return null;
+  }
+  return errText(err);
 }
 
-const G1_NOTARY_ERRORS = { ERROR_CATALOG, describeError, errText };
+// Mã lỗi thuộc vùng sơ đồ/engine — R13 định tuyến dòng lỗi về vùng
+// Sơ đồ thay vì card Stage. `stage_validation_error` chỉ rơi vào đây khi
+// đến từ evaluate (lỗi field của đường Lưu nằm trong fieldErrors).
+const DIAGRAM_ERROR_CODES = new Set([
+  'diagram_invalid_state', 'diagram_owner_mismatch',
+  'diagram_domain_mismatch', 'diagram_reference_outside_stage',
+  'missing_land_owner', 'no_valid_heir', 'unknown_person',
+  'duplicate_person', 'duplicate_node_id', 'duplicate_node',
+  'duplicate_parent', 'missing_node_id', 'ancestry_cycle',
+  'spouse_conflict', 'self_parent', 'self_spouse', 'dangling_parent',
+  'dangling_spouse', 'too_many_parents', 'invalid_parent_slots',
+  'invalid_parent', 'invalid_spouse', 'invalid_position',
+  'missing_position', 'invalid_death_date', 'invalid_domain',
+  'invalid_node_id', 'invalid_node', 'invalid_nodes', 'invalid_version',
+  'invalid_input', 'conservation_failed', 'stage_validation_error',
+]);
+
+function isDiagramError(code) {
+  return DIAGRAM_ERROR_CODES.has(String(code || ''));
+}
+
+const G1_NOTARY_ERRORS = { ERROR_CATALOG, describeError, errText,
+                           toastErrorText, isDiagramError };
 
 if (typeof window !== 'undefined') window.G1_NOTARY_ERRORS = G1_NOTARY_ERRORS;
 if (typeof module !== 'undefined' && module.exports) {

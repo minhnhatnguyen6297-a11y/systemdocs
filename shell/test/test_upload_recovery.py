@@ -6,14 +6,15 @@ failed{engine_restarted}, terminal giu nguyen, command_id cu khong chay
 lai handler, command_id cu + payload khac → command_id_conflict.
 
 Lop 2 (FakePortal — tai dung BrowserWorkflowCase): crash giua review →
-open_tabs → needs_reconcile; crash sau Save nhung truoc khi registry
-ghi uploaded_success → van can doi chieu; shutdown reconcile/dong
+job failed + mat quyen so huu tab (khong suy ket qua Luu); shutdown dong
 browser sach; restart khong replay handler prepare; toan bo muc loi →
 failed (khong phai partial).
 
 Chay: python test/test_upload_recovery.py
 """
 
+import json
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -261,8 +262,6 @@ class WorkspaceSweepTest(unittest.TestCase):
                          waiting_on="review")
         store.upsert_job("j_done", website_id="w1", status="succeeded")
         store.add_open_tabs("w1", [5, 6], run_id="run_1")
-        store.add_needs_reconcile("w1", [9], run_id="run_1",
-                                reason="cu")
         store.close()
 
         store2 = UploadWorkspaceStore(self.db)
@@ -274,11 +273,53 @@ class WorkspaceSweepTest(unittest.TestCase):
         # Browser 'open' cua process cu → closed.
         self.assertIsNone(store2.current_browser("w1"))
         self.assertEqual(store2.browser_for("brw_1")["status"], "closed")
-        # open_tabs khong con chu so huu → needs_reconcile (giu run_id),
-        # KHONG bao gio coi la da Luu.
+        # open_tabs mat chu so huu → xoa (chi la tai nguyen; khong suy ket
+        # qua Luu nao duoc ghi lai).
         self.assertEqual(store2.open_tab_record_ids("w1"), [])
-        self.assertEqual(
-            sorted(store2.needs_reconcile_ids("w1")), [5, 6, 9])
+
+    def test_legacy_save_column_is_hidden_and_data_preserved(self):
+        """DB cu truoc cutover con cot Save (`verified_record_ids`): store
+        moi van doc/ghi job binh thuong, serializer khong lo cot do ra, va
+        du lieu vat ly giu nguyen (khong migrate/xoa)."""
+        legacy_value = json.dumps([9, 11])
+        store = UploadWorkspaceStore(self.db)
+        store.upsert_job("j_legacy", command="upload.prepare",
+                         website_id="w1", record_ids=[1, 2],
+                         status="waiting_user", waiting_on="review")
+        store.close()
+
+        # Mo phong DB cu: cot Save con nguyen, co du lieu lich su.
+        conn = sqlite3.connect(str(self.db))
+        try:
+            conn.execute("ALTER TABLE workflow_jobs ADD COLUMN"
+                         " verified_record_ids TEXT")
+            conn.execute("UPDATE workflow_jobs SET verified_record_ids=?"
+                         " WHERE job_id='j_legacy'", (legacy_value,))
+            conn.commit()
+        finally:
+            conn.close()
+
+        store2 = UploadWorkspaceStore(self.db)
+        self.addCleanup(store2.close)
+        row = store2.job_for("j_legacy")
+        self.assertNotIn("verified_record_ids", row)
+        self.assertEqual(row["record_ids"], [1, 2])
+        self.assertEqual(row["command"], "upload.prepare")
+        # Sweep cua process moi van chay: job non-terminal → failed.
+        self.assertEqual(row["status"], "failed")
+        self.assertIsNone(row["waiting_on"])
+        # Ghi tiep tren cung row van hoat dong.
+        store2.set_job_status("j_legacy", "succeeded")
+        self.assertEqual(store2.job_for("j_legacy")["status"], "succeeded")
+
+        conn = sqlite3.connect(str(self.db))
+        try:
+            kept = conn.execute(
+                "SELECT verified_record_ids FROM workflow_jobs"
+                " WHERE job_id='j_legacy'").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(kept, legacy_value)
 
 
 # =====================================================================
@@ -310,9 +351,9 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
         return store
 
     # ------------------------------------------------------------ crash
-    def test_crash_mid_review_marks_needs_reconcile_and_row_failed(self):
-        """Process chet giua review: tab dang mo → needs_reconcile (giu
-        run_id), workflow_jobs row → failed, browser row → closed."""
+    def test_crash_mid_review_row_failed_and_tabs_released(self):
+        """Process chet giua review: workflow_jobs row → failed, browser
+        row → closed, quyen so huu tab bi xa; khong ghi ket qua Luu."""
         run_id, ids = self.run_scan(tbw.CONTRACT_NOS[:2])
         bid = self.login()
         job = self.prepare(bid, run_id, ids)
@@ -320,7 +361,7 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
 
         # "Chet process" o lop browser: giet thread khong qua shutdown —
         # loop finally dong session + nha wait, open_tabs con treo trong
-        # store (khong ai doi chieu duoc nua).
+        # store (khong ai so huu duoc nua).
         self.browser._stop.set()
         self.browser._thread.join(timeout=5)
         snap = self.wait_terminal(job)
@@ -332,62 +373,42 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
         self.store = tbw.upload_workspace.open_store()
 
         self.assertEqual(
-            sorted(self.store.needs_reconcile_ids(tbw.WEBSITE)),
-            sorted(ids))
-        self.assertEqual(
             self.store.open_tab_record_ids(tbw.WEBSITE), [])
         self.assertIsNone(self.store.current_browser(tbw.WEBSITE))
+        # Ho so van la da chuan bi trong luot — khong suy ket qua Luu.
         for rid in ids:
-            self.assertNotEqual(
-                self.registry_status(rid), "uploaded_success")
+            self.assertEqual(self.registry_status(rid), "prepared_dry_run")
 
-    def test_crash_after_save_before_registry_keeps_uncertain(self):
-        """Save da len portal (POST 2xx) nhung process chet TRUOC khi
-        browser poll ghi registry → ho so van needs_reconcile (khong
-        'da Luu' mu); audit moi + reconcile xac minh lai — KHONG POST
-        lai."""
+    def test_crash_after_portal_save_keeps_local_progress_only(self):
+        """Nguoi dung da bam Luu tren portal nhung process chet TRUOC khi
+        dong tab: app khong ghi 'da Luu'; su that nam o so chinh thuc."""
         run_id, ids = self.run_scan(tbw.CONTRACT_NOS[:1])
         bid = self.login()
         job = self.prepare(bid, run_id, ids)
         self.wait_status(job, "waiting_user")
-        # Chan idle poll: interval dai + cho nhip dang cho het → evidence
-        # save chua duoc browser thread tieu thu (mau
-        # test_session_status_reads_snapshot_never_spawns_browser).
+        # Chan idle poll: interval dai + cho nhip dang cho het → trang thai
+        # tab chua duoc browser thread tieu thu.
         self.browser._poll_interval = 600
         time.sleep(0.25)
         self.session.user_save(ids[0])
         self.assertEqual(len(self.portal.saved_contract_nos), 1)
 
-        # "Chet" khong graceful: KHONG dung shutdown — mo store moi
-        # trong khi zombie thread con block trong queue.get(600); zombie
-        # duoc don o cleanup qua browser.shutdown → _poll_then_close.
+        # "Chet" khong graceful: mo store moi trong khi zombie thread con
+        # block trong queue.get(600); zombie duoc don o cleanup qua
+        # browser.shutdown → _poll_then_close.
         tbw.upload_workspace.reset_store_for_tests()
         self.store = tbw.upload_workspace.open_store()
-        self.assertIn(ids[0],
-                      self.store.needs_reconcile_ids(tbw.WEBSITE))
-        self.assertNotEqual(
-            self.registry_status(ids[0]), "uploaded_success")
+        self.assertEqual(self.store.open_tab_record_ids(tbw.WEBSITE), [])
+        self.assertEqual(self.registry_status(ids[0]), "prepared_dry_run")
 
-        # Reconcile voi audit MOI chua so → verified + registry ghi
-        # uploaded_success; portal KHONG bi POST lai lan nao.
+        # Doi chieu lai bang so chinh thuc (tai/nap Excel): ho so da co
+        # trong so → queue khong con chon mac dinh no nua.
         audit_id = self.run_audit(["101/2026"])
-        saves_before = len(self.portal.saved_contract_nos)
-        rjob = self.submit("upload.reconcile", self.v1(
-            run_id=run_id, audit_id=audit_id))
-        snap = self.wait_terminal(rjob)
-        self.assertEqual(snap["status"], "succeeded", snap["error"])
-        data = snap["result"]["data"]
-        self.assertEqual(data["verified_record_ids"], ids)
-        self.assertEqual(data["needs_reconcile_record_ids"], [])
-        self.assertEqual(
-            self.registry_status(ids[0]), "uploaded_success")
-        self.assertEqual(len(self.portal.saved_contract_nos),
-                         saves_before,
-                         "reconcile khong duoc gui lai POST /api/hoso")
-        # Zombie thread van giu session cu: shutdown se poll lan cuoi
-        # (tieu thu save evidence → ghi registry) roi dong — thuc hien
-        # o cleanup, khong anh huong assertion tren.
-        self.browser._poll_interval = 0.05
+        queue = self.queue_get(run_id, audit_id=audit_id)
+        row = next(r for r in queue["folder_rows"]
+                   if r["record_id"] == ids[0])
+        self.assertFalse(row["selected"])
+        self.assertIn("da co trong Excel", row["ghi_chu"])
 
     def test_restart_materializes_engine_restarted_and_no_replay(self):
         """Restart giua luc prepare chay: JobStore moi materialize job cu
@@ -447,10 +468,9 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
         jobs2.cancel(retry.job_id)
 
     # ------------------------------------------------------------ shutdown
-    def test_graceful_shutdown_reconciles_then_closes(self):
-        """worker.shutdown: poll cuoi nhan Save da xac minh → registry
-        ghi uploaded_success; tab con mo chua xac minh → needs_reconcile;
-        thread chet sach, khong de browser mo co."""
+    def test_graceful_shutdown_closes_browser_and_releases_tabs(self):
+        """worker.shutdown: poll lan cuoi + dong phien; quyen so huu tab
+        duoc xa; khong ghi ket qua Luu nao."""
         run_id, ids = self.run_scan(tbw.CONTRACT_NOS[:2])
         bid = self.login()
         job = self.prepare(bid, run_id, ids)
@@ -460,13 +480,10 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
         self.browser.shutdown(timeout=5)
         self.assertFalse(self.browser._thread.is_alive(),
                          "browser thread con song sau shutdown")
-        # Save da xac minh truoc khi dong → ghi registry.
-        self.assertEqual(
-            self.registry_status(ids[0]), "uploaded_success")
-        # Tab con mo chua xac minh → needs_reconcile, khong bao gio
-        # coi la saved.
-        self.assertIn(ids[1],
-                      self.store.needs_reconcile_ids(tbw.WEBSITE))
+        # Tat ca tab da mat quyen so huu (phien da dong).
+        self.assertEqual(self.store.open_tab_record_ids(tbw.WEBSITE), [])
+        for rid in ids:
+            self.assertEqual(self.registry_status(rid), "prepared_dry_run")
         # Job dang cho duoc nha → failed (browser chet), khong treo.
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "failed")
@@ -514,11 +531,9 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
                 elapsed, 1.75,
                 f"shutdown chan {elapsed:.2f}s — budget khong duoc "
                 "chia giua reconcile va join")
-            # Sweep van chay sau join timeout: tab chua xac minh →
-            # needs_reconcile, khong bao gio 'da Luu'.
+            # Sweep van chay sau join timeout: quyen so huu tab bi xa.
             self.assertEqual(
-                sorted(self.store.needs_reconcile_ids(tbw.WEBSITE)),
-                sorted(ids))
+                self.store.open_tab_record_ids(tbw.WEBSITE), [])
         finally:
             # Nha gate de zombie thread (daemon) thoat — cleanup
             # browser.shutdown tiep theo khong phai cho 30s.
@@ -607,10 +622,9 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
             [b["record_id"] for b in bd["failed"]], [ids[0]])
         self.assertEqual(bd["failed"][0]["stage"], "prepared")
 
-    def test_failure_with_unclear_records_disables_auto_retry(self):
-        """Browser chet giua review → job failed{engine_unavailable} NHUNG
-        retryable=False + details.needs_reconcile_record_ids — cam
-        auto-replay mu cho toi khi upload.reconcile doi chieu (§7.4)."""
+    def test_failure_when_browser_lost_is_plain_retryable(self):
+        """Browser chet giua review → job failed{engine_unavailable} va
+        retryable=True (loi ha tang thuong); khong khoa vi ket qua Luu."""
         run_id, ids = self.run_scan(tbw.CONTRACT_NOS[:2])
         bid = self.login()
         job = self.prepare(bid, run_id, ids)
@@ -619,14 +633,10 @@ class UploadRecoveryTest(tbw.BrowserWorkflowCase):
         snap = self.wait_terminal(job)
         self.assertEqual(snap["status"], "failed")
         self.assertEqual(snap["error"]["code"], "engine_unavailable")
-        self.assertFalse(
-            snap["error"]["retryable"],
-            "auto-retry phai tat khi con ho so chua ro Luu")
-        self.assertIsNone(snap["error"]["next_action"])
+        self.assertTrue(snap["error"]["retryable"])
+        self.assertEqual(snap["error"]["next_action"], "retry")
         details = snap["error"].get("details") or {}
-        self.assertEqual(
-            sorted(details.get("needs_reconcile_record_ids") or []),
-            sorted(ids))
+        self.assertNotIn("needs_reconcile_record_ids", details)
 
 
 if __name__ == "__main__":

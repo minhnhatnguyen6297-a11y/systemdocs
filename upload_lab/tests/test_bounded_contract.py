@@ -3,11 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 from docx import Document
-import extract_contract as engine
+from extraction_adapter import extract
+from regex_workbench.engine import contract_extract as engine
 
 
 class BoundedContractTests(unittest.TestCase):
-    def native(self, text, tables=()):
+    def native(self, text, tables=(), *, payload=False):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'fixture.docx'
             doc = Document()
@@ -19,7 +20,8 @@ class BoundedContractTests(unittest.TestCase):
                     for cell, value in zip(row.cells, cells):
                         cell.text = value
             doc.save(path)
-            return engine.extract(path)['raw']
+            result = extract(path)
+            return result if payload else result['raw']
 
     def test_representative_shapes_keep_sides_and_addresses(self):
         for label in ['Đại diện: ông', 'Đại diện ông', ' | | Đại diện: ông']:
@@ -116,8 +118,9 @@ LỜI CHỨNG''')
 1. Tôi – Người Mẫu cam kết thửa đất trên là tài sản riêng.
 LỜI CHỨNG
 Tại Văn phòng Mẫu, địa chỉ: Địa chỉ Văn phòng.'''
-        raw = self.native('VĂN BẢN CAM KẾT\nVỀ TÀI SẢN RIÊNG CỦA VỢ CHỒNG\n' + body)
-        self.assertEqual(raw['document_kind'], engine.DOC_KIND_ASSET_COMMITMENT)
+        payload = self.native('VĂN BẢN CAM KẾT\nVỀ TÀI SẢN RIÊNG CỦA VỢ CHỒNG\n' + body, payload=True)
+        self.assertEqual(payload['case']['loaivanbannhandien'], engine.DOC_KIND_ASSET_COMMITMENT)
+        raw = payload['raw']
         row, = raw['danh_sach_thua_dat']
         self.assertEqual((row['so_thua_dat'], row['so_to_ban_do'], row['dia_chi'], row['ngay_cap_gcn']), ('11', '205', 'Phố Mẫu, tỉnh Mẫu', '03/04/2025'))
         moved = body.replace('- Địa chỉ thửa đất: Phố Mẫu, tỉnh Mẫu\n', '').replace('- Loại đất:', '- Địa chỉ thửa đất: Phố Mẫu, tỉnh Mẫu\n- Loại đất:')

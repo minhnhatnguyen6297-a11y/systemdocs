@@ -22,10 +22,10 @@ flowchart LR
     C[Web Sổ Công chứng] -->|Stage 2: Audit & Reconcile| D{So khớp Danh sách}
     B --> D
     D -->|Chưa có trên web| E[Stage 3: Playwright Uploader]
-    E -->|Dry-run / Finalize| C
+    E -->|Dry-run: điền sẵn, dừng trước nút Lưu| C
 ```
 
-### Giai đoạn 1: Quét & Trích xuất (`batch_scan.py` + `extract_contract.py`)
+### Giai đoạn 1: Quét & Trích xuất (`batch_scan.py` + `extraction_adapter.py` + lõi luật chung)
 1. **Đọc tệp tin**:
    - `.docx`: Đọc bằng `python-docx`, bảo toàn thứ tự đoạn văn và bảng biểu (`table`) để tránh trộn lẫn Bên A / Bên B.
    - `.doc`: Đọc bằng Windows IFilter (`query.dll`) không cần Microsoft Word.
@@ -63,11 +63,11 @@ flowchart LR
 3. **Chuẩn bị theo đợt & người dùng tự bấm Lưu**:
    - Người dùng chọn số tab mở mỗi đợt (1–30) ngay trên tab *Quét & Upload Hồ Sơ*; mỗi tab gắn với một `record_id` nên không mở trùng hồ sơ.
    - App điền sẵn rồi **dừng trước nút Lưu** — người dùng kiểm tra trực quan và tự bấm *Lưu*. App không bấm thay.
-   - App nhận biết đã Lưu qua phản hồi `POST /api/hoso` thành công (hoặc web chuyển khỏi trang tạo nhanh), tự đóng tab đó, cập nhật `uploaded_success` vào `registry.sqlite3` và bỏ dòng khỏi bảng.
-   - Bấm *Tiếp tục N số tiếp theo* để mở đợt mới; app không tự mở đợt kế tiếp.
+   - Dữ liệu đã được website ghi nhận chính thức là nguồn sự thật (SOT): app **không** suy kết quả Lưu từ `POST /api/hoso`, điều hướng hay đóng tab, không tích lũy số đếm đã Lưu và không tự mở lại hồ sơ chưa Lưu. Muốn biết hồ sơ đã lên web hay chưa, tải/nạp lại sổ Excel chính thức.
+   - Trong một lượt quét, app nhớ tiến độ hồ sơ **đã chuẩn bị** để chia đợt: *Tiếp tục N số tiếp theo* chỉ mở các hồ sơ đã chọn nhưng chưa chuẩn bị; app không tự mở đợt kế tiếp.
 
 > [!NOTE]
-> Đăng nhập và nhận diện Lưu xem tại [`portal-session.md`](../_bmad-output/specs/upload_lab/portal-session.md). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
+> Đăng nhập và quy tắc điền-sẵn-rồi-dừng xem tại [`portal-session.md`](../_bmad-output/specs/upload_lab/README.md#portal). Đặc tả Fluent UI và kế hoạch kiểm tra môi trường được quản lý trên Linear tại [MIN-31](https://linear.app/minhnotary/issue/MIN-31/upload-lab-fluent-ui-redesign-specification-windows-11).
 
 ---
 
@@ -87,7 +87,7 @@ flowchart LR
 | `tai_san` | Đoạn mô tả thửa đất, diện tích, GCN, dừng trước cam đoan | `Quyền sử dụng đất tại xã A... Thửa số 10...` |
 
 > [!NOTE]
-> Chi tiết regex nhận diện và điểm bắt đầu/kết thúc từng loại văn bản: [`regex-rules.md`](../_bmad-output/specs/upload_lab/regex-rules.md).
+> Chi tiết regex nhận diện và điểm bắt đầu/kết thúc từng loại văn bản: [`regex-rules.md`](../_bmad-output/specs/shared/extraction-rules.md#types).
 
 ---
 
@@ -99,7 +99,7 @@ upload_lab/
 |-- run_ui.bat                      # Bootstrap shell: kiểm tra Python & gọi bootstrap_ui.py
 |-- bootstrap_ui.py                 # Tự tạo .venv, cài dependencies & mở UI
 |-- ui_runner.py                    # Entry point khởi chạy PySide6 UI
-|-- extract_contract.py             # Trích xuất Word sang JSON web form
+|-- extraction_adapter.py           # Ranh consumer: đọc Word -> gọi lõi luật chung -> JSON web form
 |-- batch_scan.py                   # Quét folder, xuất manifest, ghi SQLite
 |-- playwright_uploader.py          # Script điều khiển trình duyệt Playwright
 |-- uploader_selectors.py           # Selectors định vị phần tử web form
@@ -129,7 +129,7 @@ Spec sản phẩm và ảnh tham chiếu nằm ngoài cây code này, tại
 đúng **hai tab** — *Audit Sổ Công Chứng* và *Quét & Upload Hồ Sơ*, mỗi tab toàn
 chiều rộng. Không còn tab Cấu hình (chuyển lên đầu tab Audit cùng dropdown
 website) và không còn trang Nhật ký (log chỉ là chẩn đoán backend đã lọc).
-Đặc tả hành vi và thị giác riêng: [`ui.md`](../_bmad-output/specs/upload_lab/ui.md) +
+Đặc tả hành vi và thị giác riêng: [`ui.md`](../_bmad-output/specs/upload_lab/README.md#ui) +
 [`../_bmad-output/specs/ui/`](../_bmad-output/specs/ui/) (token chung đã duyệt, cách áp riêng
 cho Upload còn Proposed); giao tiếp shell ↔ Python
 theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.md)
@@ -144,7 +144,7 @@ theo contract [`../contracts/upload-workflow.md`](../contracts/upload-workflow.m
 - **Kiểm tra hồi quy giao diện**: `./.venv/Scripts/python.exe ./tools/inspect_ui_style.py` để dump metric/màu thực tế của widget.
 
 > [!IMPORTANT]
-> Thiết kế UI đích (Electron shell) nằm tại [`ui.md`](../_bmad-output/specs/upload_lab/ui.md), gồm hành vi/bố cục và lớp thị giác riêng. Thay đổi giao diện Qt hiện trạng đối chiếu `ui_qt/main_window.py` và `ui_qt/theme.py`; quy tắc sản phẩm dài hạn cập nhật ở cây spec chung.
+> Thiết kế UI đích (Electron shell) nằm tại [`ui.md`](../_bmad-output/specs/upload_lab/README.md#ui), gồm hành vi/bố cục và lớp thị giác riêng. Thay đổi giao diện Qt hiện trạng đối chiếu `ui_qt/main_window.py` và `ui_qt/theme.py`; quy tắc sản phẩm dài hạn cập nhật ở cây spec chung.
 
 ---
 

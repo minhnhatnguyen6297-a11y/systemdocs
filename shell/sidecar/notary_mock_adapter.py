@@ -10,7 +10,7 @@ case_id). Fixture la database gia cua mock — "mock tra fixture bat bien".
 Thieu thu muc fixture (packaged build, khong bao gio vi gateway chan) ->
 fallback seed toi thieu trong code.
 
-Scenario mac dinh: 42 ready | 43 empty | 44 locked | 45 gift (unsupported)
+Scenario mac dinh: 42 ready | 43 empty | 44 done | 45 gift (unsupported)
 | 46 ready + pool chua gan. Khac -> case_not_found.
 
 Marker deterministic (khong PII, khong parse that):
@@ -49,9 +49,9 @@ CASE_TYPES = (CASE_TYPE_INHERITANCE, CASE_TYPE_TWO_PARTY)
 DOCUMENT_TYPES = ("khai_nhan", "thoa_thuan")
 DOCUMENT_TYPES_TWO_PARTY = ("chuyen_nhuong", "tang_cho",
                             "cho_thue", "dat_coc")
-MAX_ASSETS = 3
+MAX_ASSETS = 5
 MAX_PEOPLE_TWO_PARTY = 30
-POSITIONS = (1, 2, 3)
+POSITIONS = tuple(range(1, MAX_ASSETS + 1))
 TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
 TWO_PARTY_ID_SET = set(TWO_PARTY_IDS)
 
@@ -68,13 +68,14 @@ UUID4_RX = re.compile(
     r"-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 DATE_OR_YEAR_RX = re.compile(r"^\d{4}(-\d{2}-\d{2})?$")
 DATE_FULL_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-SERIAL_RX = re.compile(r"^[A-Z]{2}\d{6,8}$")
 DOC_KEY_RX = re.compile(r"^[a-z][a-z0-9_]*$")
 GENDERS = ("Nam", "Nữ", None)
 INTAKE_KINDS = ("image", "pdf", "docx", "xlsx", "text")
 NODE_BOOL_FIELDS = ("hidden", "deleted")
-NODE_FIELDS = {"id", "personId", "parentSlotIds", "spouseSlotId",
-               "ownPositions", "receivePositions", "hidden", "deleted"}
+NODE_FIELDS = {
+    "id", "personId", "parentSlotIds", "spouseSlotIds", "spouseSlotId",
+    "spouseSuggestionId", "ownPositions", "receivePositions",
+    "hidden", "deleted"}
 NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 PERSON_FIELDS = ("row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
                  "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap",
@@ -150,7 +151,7 @@ def _builtin_cases():
     return {
         "43": {
             "case_type": "inheritance", "document_type": "khai_nhan",
-            "status": "draft", "locked": False, "revision": 1,
+            "status": "draft", "revision": 1,
             "stage": {"owner_row_id": None, "people": [], "assets": []},
             "diagram": {"domain": "inheritance",
                         "state": {"version": 3, "domain": "inheritance",
@@ -164,7 +165,7 @@ def _builtin_cases():
 # conflict/intake-partial la ban giam); seed mac dinh lay phien ban
 # "primary" truoc. Seed rieng trong test dung reset_backend(seed).
 _FIXTURE_PRIORITY = (
-    "ready", "ready-two-party", "empty", "locked", "unsupported",
+    "ready", "ready-two-party", "empty", "done", "unsupported",
     "diagram-warning", "intake-partial", "conflict", "word-collision",
     "word-partial", "word-all-failed", "word-canceled",
 )
@@ -206,6 +207,8 @@ class _MockState:
                 self.customers[int(c["id"])] = dict(c)
         # idempotency_key -> case_id (workspace_create replay, §4.3)
         self._idempotency = {}
+        # idempotency_key -> creation hash (workspace_save_case replay)
+        self._idempotency_hashes = {}
         raw = (seed or {}).get("cases") or _load_default_cases()
         self.cases = {}
         for cid, c in raw.items():
@@ -218,7 +221,6 @@ class _MockState:
         case.setdefault("case_type", "inheritance")
         case.setdefault("document_type", "khai_nhan")
         case.setdefault("status", "draft")
-        case.setdefault("locked", False)
         case.setdefault("revision", 1)
         case.setdefault("ngay_lap_ho_so", None)
         case.setdefault("noi_niem_yet", None)
@@ -314,13 +316,6 @@ def _check_supported(case):
                            details={"case_type": ct})
 
 
-def _check_writable(case):
-    # Real parity (commit_stage/save_diagram): locked TRUOC case_type —
-    # gift+locked -> workspace_locked, khong phai case_type_unsupported.
-    if case.get("locked"):
-        raise CommandError("workspace_locked",
-                           f"hồ sơ #{case['id']} đã khóa")
-    _check_supported(case)
 
 
 def _check_base_revision(case, payload):
@@ -465,14 +460,24 @@ def _validate_diagram_state(state):
         elif nid in ps:
             errors.append({"code": "self_parent", "node": nid,
                            "message": f"{nid} tự làm cha"})
-        ss = n.get("spouseSlotId")
-        if ss is not None and not (isinstance(ss, str) and ss.strip()):
-            errors.append({"code": "invalid_spouse", "node": nid,
-                           "message": f"{w}.spouseSlotId phải là "
-                                      "string non-empty/null"})
-        elif ss == nid:
+        spouse_ids = n.get("spouseSlotIds")
+        if not isinstance(spouse_ids, list) or any(
+                not isinstance(value, str) or not value.strip()
+                for value in spouse_ids):
+            errors.append({"code": "invalid_spouse_slots", "node": nid,
+                           "message": f"{w}.spouseSlotIds phải là list "
+                                      "chuỗi không rỗng"})
+            spouse_ids = []
+        elif len(set(spouse_ids)) != len(spouse_ids):
+            errors.append({"code": "duplicate_spouse", "node": nid,
+                           "message": f"{w}.spouseSlotIds bị trùng"})
+        elif nid in spouse_ids:
             errors.append({"code": "self_spouse", "node": nid,
                            "message": f"{nid} tự làm vợ/chồng"})
+        expected = spouse_ids[-1] if spouse_ids else None
+        if n.get("spouseSlotId") != expected:
+            errors.append({"code": "invalid_spouse_mirror", "node": nid,
+                           "message": f"{w}.spouseSlotId không khớp slot"})
         for pf in ("ownPositions", "receivePositions"):
             arr = n.get(pf)
             if not isinstance(arr, list):
@@ -500,19 +505,11 @@ def _validate_diagram_state(state):
                     errors.append({"code": "dangling_parent", "node": nid,
                                    "message": f"{nid} tham chiếu parent "
                                               f"{p!r} không tồn tại"})
-            ss = n.get("spouseSlotId")
-            if isinstance(ss, str):
-                if ss not in ids:
+            for spouse_id in filter(None, n.get("spouseSlotIds") or []):
+                if spouse_id not in ids:
                     errors.append({"code": "dangling_spouse", "node": nid,
                                    "message": f"{nid} tham chiếu spouse "
-                                              f"{ss!r} không tồn tại"})
-                else:
-                    other = node_by_id.get(ss) or {}
-                    if other.get("spouseSlotId") != nid:
-                        errors.append({"code": "spouse_conflict",
-                                       "node": nid,
-                                       "message": f"{nid}↔{ss} spouse "
-                                                  "không đối xứng"})
+                                              f"{spouse_id!r} không tồn tại"})
         for nid in ids:
             seen = set()
             frontier = list(
@@ -557,7 +554,9 @@ def _persisted_diagram_state(state):
             "nodes": [{
                 "id": n["id"], "personId": n.get("personId"),
                 "parentSlotIds": list(n.get("parentSlotIds") or []),
+                "spouseSlotIds": list(n.get("spouseSlotIds") or []),
                 "spouseSlotId": n.get("spouseSlotId"),
+                "spouseSuggestionId": n.get("spouseSuggestionId"),
                 "ownPositions": list(n.get("ownPositions") or []),
                 "receivePositions": list(n.get("receivePositions") or []),
                 "hidden": n["hidden"], "deleted": n["deleted"]}
@@ -588,14 +587,13 @@ def _render(state, stage):
     if not landowners:
         if not nodes:
             return empty
-        rm = copy.deepcopy(empty)
-        rm["requiredSlots"] = _required_slots(nodes)
-        return rm
+        return copy.deepcopy(empty)
     deceased = [n for n in landowners
                 if (stage_people.get(n["personId"]) or {}).get("ngay_chet")]
     assigned = {n["personId"] for n in nodes if n.get("personId")}
     unassigned_pool = [rid for rid in stage_people if rid not in assigned]
-    warnings = []
+    slot_model = _slot_evaluation(state.get("nodes") or [], stage)
+    warnings = list(slot_model["warnings"])
     if unassigned_pool:
         warnings.append({
             "code": "diagram.unassigned_pool_person",
@@ -603,7 +601,7 @@ def _render(state, stage):
     receivers = [n for n in nodes
                  if n.get("receivePositions") and n.get("personId")]
     rm = {"engineVersion": 2, "status": "complete", "allocations": {},
-          "breakdowns": [], "requiredSlots": _required_slots(nodes),
+          "breakdowns": [], "requiredSlots": slot_model["requiredSlots"],
           "warnings": warnings, "errors": [], "unresolvedEstates": [],
           "conservation": {"allocated": "0", "unresolved": "0",
                            "total": "0"}}
@@ -664,14 +662,23 @@ def _alloc(base, inherited, distributed, final):
             "displayPercent": "0.00"}
 
 
-def _required_slots(nodes):
-    return [{"anchorSlotId": n["id"], "reason": "active_estate",
-             "slotTypes": ["father", "mother", "spouse", "child"],
-             "minimumEmptyChildSlots": 0}
-            for n in nodes
-            if isinstance(n, dict) and n.get("id") and not n.get("personId")
-            and not n.get("deleted")]
+def _slot_evaluation(nodes, stage):
+    """Use the authoritative pure engine, retaining tombstones for references."""
+    from engine_roots import import_engine_module
 
+    engine = import_engine_module("notary_v2", "services.inheritance_engine")
+    engine_nodes = [{
+        **node,
+        "isLandOwner": bool(node.get("ownPositions")),
+        "willReceive": bool(node.get("receivePositions")),
+    } for node in nodes if isinstance(node, dict)]
+    return engine.run_inheritance_case(
+        {"version": 2, "nodes": engine_nodes}, _person_map({"stage": stage}),
+    )
+
+
+def _required_slots(nodes, stage):
+    return _slot_evaluation(nodes, stage)["requiredSlots"]
 
 def _payload_diagram_state(payload):
     """Lay diagram.state tu payload — thieu field -> validation_error
@@ -801,9 +808,12 @@ def _prune_diagram(case):
         if isinstance(n.get("parentSlotIds"), list):
             n["parentSlotIds"] = [p for p in n["parentSlotIds"]
                                   if p in node_ids and p not in dropped]
-        ss = n.get("spouseSlotId")
-        if ss is not None and (ss not in node_ids or ss in dropped):
-            n["spouseSlotId"] = None
+        spouses = n.get("spouseSlotIds") or []
+        n["spouseSlotIds"] = [
+            spouse for spouse in spouses
+            if spouse and spouse in node_ids and spouse not in dropped]
+        n["spouseSlotId"] = (
+            n["spouseSlotIds"][-1] if n["spouseSlotIds"] else None)
         if two_party:
             continue
         for k in ("ownPositions", "receivePositions"):
@@ -875,9 +885,6 @@ def _validate_stage(stage, case_type):
     errs = []
     seen = set()
     seen_pkeys = set()
-    seen_pentities = set()
-    seen_serials = set()
-    seen_aentities = set()
 
     def _nullable(r, field, w):
         """Parity _check_nullable_str: non-string → invalid_type;
@@ -915,17 +922,7 @@ def _validate_stage(stage, case_type):
                              "row_id trùng trong payload"))
         else:
             seen.add(rid)
-        eid = r.get("entity_id")
-        if eid is not None and (not isinstance(eid, int)
-                                or isinstance(eid, bool) or eid < 1):
-            errs.append(_err(w, "entity_id", "invalid_type",
-                             "entity_id phải là int >= 1/null"))
-        elif eid is not None:
-            if eid in seen_pentities:
-                errs.append(_err(w, "entity_id", "invalid_format",
-                                 "entity_id trùng với dòng khác"))
-            else:
-                seen_pentities.add(eid)
+        r = {**r, "entity_id": _entity_hint(r.get("entity_id"))}
         ht = r.get("ho_ten")
         if not (isinstance(ht, str) and ht.strip()):
             errs.append(_err(w, "ho_ten", "required", "ho_ten bắt buộc"))
@@ -971,30 +968,11 @@ def _validate_stage(stage, case_type):
                              "row_id trùng trong payload"))
         else:
             seen.add(rid)
-        eid = r.get("entity_id")
-        if eid is not None and (not isinstance(eid, int)
-                                or isinstance(eid, bool) or eid < 1):
-            errs.append(_err(w, "entity_id", "invalid_type",
-                             "entity_id phải là int >= 1/null"))
-        elif eid is not None:
-            if eid in seen_aentities:
-                errs.append(_err(w, "entity_id", "invalid_format",
-                                 "entity_id trùng với dòng khác"))
-            else:
-                seen_aentities.add(eid)
+        r = {**r, "entity_id": _entity_hint(r.get("entity_id"))}
         serial = r.get("so_serial")
-        canon = serial.strip() if isinstance(serial, str) else serial
-        if not canon:
-            errs.append(_err(w, "so_serial", "required",
-                             "so_serial bắt buộc"))
-        elif not SERIAL_RX.match(canon):
-            errs.append(_err(w, "so_serial", "invalid_format",
-                             "so_serial phải canonical [A-Z]{2}\\d{6,8}"))
-        elif canon in seen_serials:
-            errs.append(_err(w, "so_serial", "invalid_format",
-                             "so_serial trùng với dòng khác"))
-        else:
-            seen_serials.add(canon)
+        if not isinstance(serial, str):
+            errs.append(_err(w, "so_serial", "invalid_type",
+                             "so_serial phải là chuỗi"))
         dc = r.get("dia_chi")
         if not (isinstance(dc, str) and dc.strip()):
             errs.append(_err(w, "dia_chi", "required", "dia_chi bắt buộc"))
@@ -1028,7 +1006,7 @@ def _validate_stage(stage, case_type):
                         errs.append(_err(w, "land_rows", "invalid_type",
                                          f"{lf} phải là chuỗi/null"))
         row = {f: r.get(f) for f in ASSET_FIELDS}
-        row["so_serial"] = canon or row["so_serial"]
+        row["so_serial"] = serial
         row["land_rows"] = [
             {"loai_dat": x.get("loai_dat"),
              "dien_tich": x.get("dien_tich"),
@@ -1057,6 +1035,9 @@ def _validate_stage(stage, case_type):
 
 
 # ---------- commands ----------
+
+_STATUS_LABELS = {"draft": "Nháp", "done": "Đã lưu"}
+
 
 def _mock_case_row(cid, case):
     """Row shape parity voi notary_adapter._case_row — nguoi_chet = person
@@ -1096,9 +1077,10 @@ def _mock_case_row(cid, case):
         "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
         "loai_van_ban": case.get("document_type"),
         "trang_thai": case.get("status"),
+        "status_label": _STATUS_LABELS.get(case.get("status"),
+                                           case.get("status")),
         "noi_niem_yet": case.get("noi_niem_yet"),
         "ghi_chu": case.get("ghi_chu"),
-        "is_locked": bool(case.get("locked")),
         "tong_ty_le": case.get("tong_ty_le"),
     }
 
@@ -1190,6 +1172,17 @@ def _workspace_data(cid, case):
     if dom == CASE_TYPE_INHERITANCE:
         stage_out["owner_row_id"] = stage.get("owner_row_id")
     dg = case.get("diagram") or {}
+    persisted_state = copy.deepcopy(dg.get("state"))
+    if isinstance(persisted_state, dict) and dom == CASE_TYPE_INHERITANCE:
+        for node in persisted_state.get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            node.pop("spouseUndetermined", None)
+            spouse = node.get("spouseSlotId")
+            node.setdefault("spouseSlotIds", [spouse] if spouse else [])
+            node.setdefault("spouseSuggestionId", None)
+            node["spouseSlotId"] = (
+                node["spouseSlotIds"][-1] if node["spouseSlotIds"] else None)
     data = {
         "schema_version": SCHEMA_VERSION,
         "backend_mode": "mock",          # contract §4 — nhan 'Dữ liệu mô phỏng'
@@ -1198,7 +1191,6 @@ def _workspace_data(cid, case):
             "case_type": ct,
             "document_type": case.get("document_type"),
             "status": case.get("status"),
-            "locked": bool(case.get("locked")),
             "revision": case.get("revision"),
             "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
             "noi_niem_yet": case.get("noi_niem_yet"),
@@ -1210,7 +1202,7 @@ def _workspace_data(cid, case):
         "stage": stage_out,
         "diagram": {
             "domain": dg.get("domain", ct),
-            "state": copy.deepcopy(dg.get("state")),
+            "state": persisted_state,
             "render_model": copy.deepcopy(dg.get("render_model")),
             "warnings": copy.deepcopy(dg.get("warnings") or []),
         },
@@ -1225,6 +1217,184 @@ def _workspace_data(cid, case):
     return data
 
 
+def workspace_source_latest(job, payload):
+    """Mock parity §13.20 — chon case done theo moc luu, tra row_id moi.
+
+    Fixture mock khong seed `updated_at`; tie (ke ca cung null) giai bang
+    `id` DESC nhu backend that. Khong co done → nguon rong thanh cong."""
+    if not isinstance(payload, dict) or payload:
+        raise CommandError(
+            "validation_error",
+            "payload phai la object rong — khong nhan null/case_id/filter")
+    done = [(cid, c) for cid, c in _state().cases.items()
+            if c.get("status") == "done"]
+    stamped = [it for it in done if it[1].get("updated_at") is not None]
+    unstamped = [it for it in done if it[1].get("updated_at") is None]
+    stamped.sort(key=lambda it: (it[1]["updated_at"], it[0]), reverse=True)
+    unstamped.sort(key=lambda it: it[0], reverse=True)
+    ordered = stamped + unstamped
+    if not ordered:
+        job.check_cancel()
+        return _result("workspace_source_latest", {
+            "schema_version": SCHEMA_VERSION,
+            "backend_mode": "mock",
+            "source_case_id": None,
+            "source_status": None,
+            "stage": {"people": [], "assets": []},
+        })
+    cid, case = ordered[0]
+    ct = case.get("case_type")
+    if ct not in CASE_TYPES:
+        raise CommandError(
+            "case_type_unsupported",
+            f"Loại việc chưa hỗ trợ: {ct}",
+            details={"case_type": ct})
+    source_stage = case.get("stage") or {}
+    people = []
+    person_map = {}
+    for row in source_stage.get("people") or []:
+        new_row_id = str(uuid.uuid4())
+        person_map[row.get("row_id")] = new_row_id
+        people.append({**copy.deepcopy(row), "row_id": new_row_id})
+    assets = []
+    for row in source_stage.get("assets") or []:
+        assets.append({**copy.deepcopy(row),
+                       "row_id": str(uuid.uuid4())})
+    stage_out = {"people": people, "assets": assets}
+    if ct == CASE_TYPE_INHERITANCE:
+        stage_out = {
+            "owner_row_id": person_map.get(
+                source_stage.get("owner_row_id")),
+            **stage_out,
+        }
+    job.check_cancel()
+    return _result("workspace_source_latest", {
+        "schema_version": SCHEMA_VERSION,
+        "backend_mode": "mock",
+        "source_case_id": cid,
+        "source_status": "done",
+        "stage": stage_out,
+    })
+
+
+def workspace_duplicate(job, payload):
+    """Mock parity §13.21 — clone case da luu, draft/rev1, key/hash.
+
+    Khong dung mock lam proof DB; giu cung shape/error code voi real.
+    Row/owner/diagram personId duoc cap UUID moi + remap nhu backend."""
+    if not isinstance(payload, dict):
+        raise CommandError("validation_error", "payload phai la object")
+    extra = set(payload) - {"source_case_id", "idempotency_key"}
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload co key ngoai schema: {sorted(extra)}")
+    sid = payload.get("source_case_id")
+    if isinstance(sid, bool) or not isinstance(sid, int) or sid < 1:
+        raise CommandError("validation_error",
+                           "source_case_id phai la so nguyen >= 1")
+    key = payload.get("idempotency_key")
+    if not isinstance(key, str) or not UUID4_RX.match(key):
+        raise CommandError("validation_error",
+                           "idempotency_key phai la uuid4")
+    st = _state()
+    source = st.cases.get(sid)
+    if source is None:
+        raise CommandError(
+            "case_not_found", f"Không tìm thấy hồ sơ #{sid}",
+            details={"source_case_id": sid})
+    digest = hashlib.sha256(json.dumps(
+        {"command": "workspace_duplicate", "intent": "draft",
+         "source_case_id": sid},
+        sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")).hexdigest()
+
+    with st._lock:
+        existing = st._idempotency.get(key)
+        if existing is not None:
+            if st._idempotency_hashes.get(key) != digest:
+                raise CommandError(
+                    "idempotency_conflict",
+                    "idempotency_key da dung voi noi dung khac")
+            case = st.cases[existing]
+            data = _workspace_data(existing, case)
+            if case.get("docx_import") is not None:
+                data["docx_import"] = copy.deepcopy(case["docx_import"])
+            data["source_case_id"] = sid
+            data["created"] = False
+            job.check_cancel()
+            return _result("workspace_duplicate", data)
+
+        _check_supported(source)
+        ct = source.get("case_type")
+        person_map = {}
+        people = []
+        for row in source["stage"].get("people") or []:
+            new_row_id = str(uuid.uuid4())
+            person_map[row.get("row_id")] = new_row_id
+            people.append({**copy.deepcopy(row), "row_id": new_row_id})
+        assets = [{**copy.deepcopy(row), "row_id": str(uuid.uuid4())}
+                  for row in source["stage"].get("assets") or []]
+        stage = {"people": people, "assets": assets}
+        if ct == CASE_TYPE_INHERITANCE:
+            owner = source["stage"].get("owner_row_id")
+            if owner is not None and owner not in person_map:
+                raise CommandError(
+                    "diagram_reference_outside_stage",
+                    "owner_row_id nguon khong thuoc Stage",
+                    details={"personId": owner})
+            stage = {"owner_row_id": person_map.get(owner), **stage}
+        state = source["diagram"].get("state") or {}
+        nodes = []
+        for node in state.get("nodes") or []:
+            node = copy.deepcopy(node)
+            pid = node.get("personId")
+            if pid is not None:
+                if pid not in person_map:
+                    raise CommandError(
+                        "diagram_reference_outside_stage",
+                        "personId nguon khong thuoc Stage",
+                        details={"personId": pid})
+                node["personId"] = person_map[pid]
+            nodes.append(node)
+
+        new_id = (max(st.cases) + 1) if st.cases else 1
+        fresh = {
+            "id": new_id,
+            "case_type": ct,
+            "document_type": source.get("document_type"),
+            "status": "draft",
+            "revision": 1,
+            "ngay_lap_ho_so": source.get("ngay_lap_ho_so"),
+            "noi_niem_yet": source.get("noi_niem_yet"),
+            "nguoi_nhan_uy_quyen": source.get("nguoi_nhan_uy_quyen"),
+            "nguoi_nhan_uy_quyen_id":
+                source.get("nguoi_nhan_uy_quyen_id"),
+            "noi_dung_viec": source.get("noi_dung_viec"),
+            "ghi_chu": source.get("ghi_chu"),
+            "stage": stage,
+            "diagram": {
+                "domain": source["diagram"].get("domain", ct),
+                "state": {**copy.deepcopy(state), "nodes": nodes},
+                "render_model": copy.deepcopy(
+                    source["diagram"].get("render_model")),
+                "warnings": copy.deepcopy(
+                    source["diagram"].get("warnings") or []),
+            },
+        }
+        if source.get("docx_import") is not None:
+            fresh["docx_import"] = copy.deepcopy(source["docx_import"])
+        st.cases[new_id] = fresh
+        st._idempotency[key] = new_id
+        st._idempotency_hashes[key] = digest
+        data = _workspace_data(new_id, fresh)
+        if fresh.get("docx_import") is not None:
+            data["docx_import"] = copy.deepcopy(fresh["docx_import"])
+        data["source_case_id"] = sid
+        data["created"] = True
+        job.check_cancel()
+        return _result("workspace_duplicate", data)
+
+
 def workspace_get(job, payload):
     case = _case(payload)
     data = _workspace_data(int(payload["case_id"]), case)
@@ -1237,6 +1407,13 @@ _CASE_META_FIELDS = ("document_type", "ngay_lap_ho_so",
                      # đợt 3: meta moi trong payload.case create/commit
                      "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id",
                      "noi_dung_viec")
+
+
+def _entity_hint(value):
+    """`entity_id` wire là hint nội bộ: giá trị rác → bỏ (không chặn)."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return None
+    return value
 
 
 def _fold_canon(obj, canon, where):
@@ -1409,18 +1586,6 @@ def workspace_create(job, payload):
             errs.append(_err(
                 _det_uuid4("field_error:assets_empty"), "assets",
                 "required", "stage.assets phải có ít nhất một dòng"))
-        for i, r in enumerate(raw_people):
-            if isinstance(r, dict) and r.get("entity_id") is not None:
-                errs.append(_err(
-                    _err_row(r.get("row_id"), f"people[{i}]"),
-                    "entity_id", "invalid_format",
-                    "entity_id phải null — workspace_create tạo entity mới"))
-        for i, r in enumerate(raw_assets):
-            if isinstance(r, dict) and r.get("entity_id") is not None:
-                errs.append(_err(
-                    _err_row(r.get("row_id"), f"assets[{i}]"),
-                    "entity_id", "invalid_format",
-                    "entity_id phải null — workspace_create tạo entity mới"))
         if errs:
             raise CommandError("stage_validation_error",
                                f"{len(errs)} lỗi field trong Stage",
@@ -1469,7 +1634,8 @@ def workspace_create(job, payload):
                                  "node_personId": owner_pid})
 
         for row in people_norm + assets_norm:
-            row["entity_id"] = st.assign_entity_id()
+            if row.get("entity_id") is None:
+                row["entity_id"] = st.assign_entity_id()
         if provided_state is not None:
             state = _persisted_diagram_state(provided_state)
             render_model = (_unsupported_render()
@@ -1501,7 +1667,6 @@ def workspace_create(job, payload):
             "case_type": ct,
             "document_type": dt,
             "status": "draft",
-            "locked": False,
             "revision": 1,
             "ngay_lap_ho_so": nl,
             "noi_niem_yet": cm.get("noi_niem_yet"),
@@ -1525,15 +1690,279 @@ def workspace_create(job, payload):
         return _result("workspace_create", data)
 
 
+_SAVE_CASE_KEYS = {"case_id", "base_revision", "idempotency_key", "case",
+                   "stage", "diagram", "docx_import"}
+
+
+def _save_case_hash(payload):
+    canonical = {
+        "command": "workspace_save_case",
+        "intent": "done",
+        "case": payload.get("case"),
+        "stage": payload.get("stage"),
+        "diagram": payload.get("diagram"),
+        "docx_import": payload.get("docx_import"),
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False,
+                     separators=(",", ":"), default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _save_case_payload(payload):
+    """Validate phần dùng chung; trả (meta, stage, state).
+
+    Mock phải công khai đúng thứ tự real save_case: shape → meta → Stage
+    (owner/field/create) → Diagram wire/domain/refs/owner → atomically
+    thay case. Không mutate state trước khi validate xong."""
+    p = payload if isinstance(payload, dict) else {}
+    if set(p) - _SAVE_CASE_KEYS:
+        raise CommandError("validation_error",
+                           f"payload có key ngoài schema: "
+                           f"{sorted(set(p) - _SAVE_CASE_KEYS)}")
+    if "case_id" in p and p.get("case_id") is None:
+        raise CommandError("validation_error",
+                           "case_id null — bỏ key khi tạo mới")
+    cm = p.get("case")
+    if not isinstance(cm, dict):
+        raise CommandError("validation_error",
+                           "payload.case phải là object")
+    stage = p.get("stage")
+    if not isinstance(stage, dict):
+        raise CommandError("validation_error", "stage phải là object")
+    dg = p.get("diagram")
+    if not isinstance(dg, dict) or set(dg) != {"state"}:
+        raise CommandError("validation_error",
+                           "payload.diagram chỉ chứa 'state'")
+    return cm, stage, dg.get("state")
+
+
+def _validate_save_stage(stage, ct, *, is_new):
+    errs, people_norm, assets_norm = _validate_stage(stage, ct)
+    if is_new:
+        raw_people = stage.get("people") or []
+        raw_assets = stage.get("assets") or []
+        if not raw_people:
+            errs.append(_err(
+                _det_uuid4("field_error:people_empty"), "people",
+                "required", "stage.people phải có ít nhất một dòng"))
+        if not raw_assets:
+            errs.append(_err(
+                _det_uuid4("field_error:assets_empty"), "assets",
+                "required", "stage.assets phải có ít nhất một dòng"))
+    if errs:
+        raise CommandError("stage_validation_error",
+                           f"{len(errs)} lỗi field trong Stage",
+                           details={"field_errors": errs})
+    return people_norm, assets_norm
+
+
+def _validate_save_diagram(state, ct, stage, stage_ids):
+    _check_domain(state, ct)
+    errors = _validate_diagram_state(state)
+    if errors:
+        raise CommandError("diagram_invalid_state",
+                           "diagram state không hợp lệ",
+                           details={"errors": errors})
+    outside_pid = _outside_person(state, stage_ids)
+    if outside_pid is not None:
+        raise CommandError(
+            "diagram_reference_outside_stage",
+            f"personId {outside_pid} không thuộc Stage của payload",
+            details={"personId": outside_pid})
+    if ct == CASE_TYPE_INHERITANCE:
+        oid = stage.get("owner_row_id")
+        owner_pid = next(
+            (n.get("personId") for n in state["nodes"]
+             if isinstance(n, dict) and n.get("id") == "owner"
+             and n.get("deleted") is not True
+             and n.get("personId") is not None), None)
+        if owner_pid is not None and owner_pid != oid:
+            raise CommandError(
+                "diagram_owner_mismatch",
+                "node owner.personId phải khớp stage.owner_row_id",
+                details={"owner_row_id": oid, "node_personId": owner_pid})
+
+
+def workspace_save_case(job, payload):
+    """notary.workspace_save_case mock (§13.19) — Lưu hồ sơ nguyên tử:
+    Stage + meta + Diagram + done + revision trong một lần swap.
+
+    Tạo mới idempotent theo key/hash (`created` chỉ true lần đầu); case
+    cũ revision-guarded. Diagram incomplete vẫn done (render_model giữ
+    warning); invalid reject, không đổi case."""
+    p = payload if isinstance(payload, dict) else {}
+    is_new = "case_id" not in p
+    cm_raw, stage, state = _save_case_payload(p)
+    st = _state()
+
+    if is_new:
+        ik = p.get("idempotency_key")
+        if not (isinstance(ik, str) and UUID4_RX.match(ik)):
+            raise CommandError("validation_error",
+                               "idempotency_key phải là uuid4 khi tạo mới")
+        if p.get("base_revision") is not None:
+            raise CommandError("validation_error",
+                               "base_revision cấm khi tạo mới")
+        cm = _fold_canon(cm_raw, CASE_META_CANON, "payload.case")
+        extra = set(cm) - set(_CASE_META_FIELDS)
+        if extra:
+            raise CommandError("validation_error",
+                               f"payload.case key lạ: {sorted(extra)}")
+        ct = cm.get("case_type", CASE_TYPE_INHERITANCE)
+        if ct not in CASE_TYPES:
+            raise CommandError("validation_error",
+                               f"case_type={ct!r} ngoài enum")
+        dt = cm.get("document_type")
+        doc_types = (DOCUMENT_TYPES if ct == CASE_TYPE_INHERITANCE
+                     else DOCUMENT_TYPES_TWO_PARTY)
+        if dt not in doc_types:
+            raise CommandError("validation_error",
+                               f"document_type={dt!r} ngoài enum cho {ct}")
+        scratch = {"case_type": ct, "document_type": dt}
+        _apply_case_meta(scratch, cm)
+        scratch["ngay_lap_ho_so"] = cm.get("ngay_lap_ho_so")
+        people, assets = _validate_save_stage(stage, ct, is_new=True)
+        stage_ids = {r["row_id"] for r in people}
+        _validate_save_diagram(state, ct, stage, stage_ids)
+        clean_state = _persisted_diagram_state(state)
+        if ct == CASE_TYPE_TWO_PARTY:
+            render_model = _unsupported_render()
+            warnings = []
+        else:
+            pruned = _prune_positions_list(clean_state, len(assets))
+            render_model = _render(clean_state, {"people": people,
+                                                 "assets": assets})
+            if render_model.get("status") == "invalid":
+                raise CommandError(
+                    "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
+                    details={"errors": render_model.get("errors") or []})
+            warnings = ([{"code": "diagram.selection_pruned",
+                          "message": "Các lựa chọn vị trí vượt số tài sản "
+                                     "đã bị bỏ"}] if pruned else [])
+        creation_hash = _save_case_hash(p)
+        with st._lock:
+            prior = st._idempotency.get(ik)
+            if prior is not None:
+                if st._idempotency_hashes.get(ik) != creation_hash:
+                    raise CommandError(
+                        "idempotency_conflict",
+                        "idempotency_key đã dùng với nội dung khác")
+                data = _workspace_data(prior, st.cases[prior])
+                data["created"] = False
+                return _result("workspace_save_case", data)
+            for row in people + assets:
+                if row.get("entity_id") is None:
+                    row["entity_id"] = st.assign_entity_id()
+            new_id = (max(st.cases) + 1) if st.cases else 1
+            case = {
+                "id": new_id,
+                "case_type": ct,
+                "document_type": dt,
+                "status": "done",
+                "revision": 1,
+                "ngay_lap_ho_so": scratch.get("ngay_lap_ho_so"),
+                "noi_niem_yet": scratch.get("noi_niem_yet"),
+                "nguoi_nhan_uy_quyen": scratch.get("nguoi_nhan_uy_quyen"),
+                "nguoi_nhan_uy_quyen_id": scratch.get(
+                    "nguoi_nhan_uy_quyen_id"),
+                "noi_dung_viec": scratch.get("noi_dung_viec"),
+                "ghi_chu": scratch.get("ghi_chu"),
+                "stage": {"people": people, "assets": assets},
+                "diagram": {"domain": ct, "state": clean_state,
+                            "render_model": render_model,
+                            "warnings": warnings},
+            }
+            if ct == CASE_TYPE_INHERITANCE:
+                case["stage"]["owner_row_id"] = stage.get("owner_row_id")
+            st.cases[new_id] = case
+            st._idempotency[ik] = new_id
+            st._idempotency_hashes[ik] = creation_hash
+            data = _workspace_data(new_id, case)
+            data["created"] = True
+        job.check_cancel()
+        return _result("workspace_save_case", data)
+
+    ik = p.get("idempotency_key")
+    if ik is not None:
+        raise CommandError("validation_error",
+                           "idempotency_key cấm với hồ sơ đã có")
+    base = p.get("base_revision")
+    if not isinstance(base, int) or isinstance(base, bool) or base < 1:
+        raise CommandError("validation_error",
+                           f"base_revision={base!r} phải là int >= 1")
+    case = _case(p)
+    _check_supported(case)
+    _check_base_revision(case, p)
+    ct = case["case_type"]
+    cm = _fold_canon(cm_raw, CASE_META_CANON, "payload.case")
+    extra = set(cm) - set(_CASE_META_FIELDS)
+    if extra:
+        raise CommandError("validation_error",
+                           f"payload.case key lạ: {sorted(extra)}")
+    for f in ("case_type", "document_type"):
+        if cm.get(f) is not None and cm.get(f) != case.get(f):
+            raise CommandError("validation_error",
+                               f"payload.case.{f} không đổi qua Lưu hồ sơ")
+    people, assets = _validate_save_stage(stage, ct, is_new=False)
+    fresh = copy.deepcopy(case)
+    _apply_case_meta(fresh, cm)
+    fresh["ngay_lap_ho_so"] = cm.get("ngay_lap_ho_so")
+    for row in people + assets:
+        if row.get("entity_id") is None:
+            row["entity_id"] = st.assign_entity_id()
+    fresh["stage"] = {"people": people, "assets": assets}
+    if ct == CASE_TYPE_INHERITANCE:
+        fresh["stage"]["owner_row_id"] = stage.get("owner_row_id")
+    stage_ids = {r["row_id"] for r in people}
+    _validate_save_diagram(state, ct, fresh["stage"], stage_ids)
+    clean_state = _persisted_diagram_state(state)
+    warnings = []
+    if ct == CASE_TYPE_TWO_PARTY:
+        render_model = _unsupported_render()
+    else:
+        pruned = _prune_positions_list(clean_state, len(assets))
+        render_model = _render(clean_state, fresh["stage"])
+        if render_model.get("status") == "invalid":
+            raise CommandError(
+                "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
+                details={"errors": render_model.get("errors") or []})
+        if pruned:
+            warnings.append({
+                "code": "diagram.selection_pruned",
+                "message": "Các lựa chọn vị trí vượt số tài sản đã bị bỏ"})
+    fresh["diagram"] = {"domain": ct, "state": clean_state,
+                        "render_model": render_model,
+                        "warnings": warnings}
+    fresh["status"] = "done"
+    fresh["revision"] = case["revision"] + 1
+    with st._lock:
+        case.clear()
+        case.update(copy.deepcopy(fresh))
+        data = _workspace_data(case["id"], case)
+        data["created"] = False
+    job.check_cancel()
+    return _result("workspace_save_case", data)
+
+
+def _prune_positions_list(clean_state, asset_count):
+    """Mock parity `_prune_positions`: bỏ vị trí > số asset, trả bool."""
+    pruned = False
+    allowed = list(range(1, asset_count + 1))
+    for n in clean_state.get("nodes") or []:
+        for key in ("ownPositions", "receivePositions"):
+            arr = n.get(key) or []
+            kept = [x for x in arr if x in allowed]
+            if len(kept) != len(arr):
+                pruned = True
+                n[key] = kept
+    return pruned
+
+
 def intake_analyze(job, payload):
     # case_id absent = che do nhap (§2.1a) — bo qua kiem tra case.
     if "case_id" in (payload or {}):
         case = _case(payload)
-        # Real intake_analyze: case_type TRUOC locked (adapter §13.5).
         _check_supported(case)
-        if case.get("locked"):
-            raise CommandError("workspace_locked",
-                               f"hồ sơ #{case['id']} đã khóa")
     sources = (payload or {}).get("sources")
     if not isinstance(sources, list) or not sources:
         raise CommandError("validation_error", "sources phải là list 1..8")
@@ -1681,7 +2110,7 @@ def _canned_suggestion(src):
 
 def workspace_commit_stage(job, payload):
     case = _case(payload)
-    _check_writable(case)
+    _check_supported(case)
     _check_base_revision(case, payload)
     ct = case["case_type"]
     # đợt 3: payload.case optional — meta ghi cùng transaction (validate
@@ -1728,6 +2157,46 @@ def workspace_commit_stage(job, payload):
     })
 
 
+def workspace_convert_type(job, payload):
+    case = _case(payload)
+    _check_supported(case)
+    _check_base_revision(case, payload)
+    if set(payload) - {"case_id", "base_revision", "case_type", "document_type",
+                       "confirm_diagram_reset", "owner_row_id"}:
+        raise CommandError("validation_error", "payload có key ngoài schema")
+    target = payload.get("case_type")
+    docs = DOCUMENT_TYPES if target == CASE_TYPE_INHERITANCE else DOCUMENT_TYPES_TWO_PARTY
+    if (target not in CASE_TYPES or target == case["case_type"]
+            or payload.get("document_type") not in docs
+            or payload.get("confirm_diagram_reset") is not True):
+        raise CommandError("validation_error", "Phải chọn loại/văn bản mới và xác nhận")
+    owner = payload.get("owner_row_id")
+    if target == CASE_TYPE_TWO_PARTY and "owner_row_id" in payload:
+        raise CommandError("validation_error", "owner_row_id cấm với Hai bên")
+    if target == CASE_TYPE_INHERITANCE and owner not in _person_map(case):
+        raise CommandError("workspace_owner_required", "Phải chọn người từ Stage")
+    fresh = copy.deepcopy(case)
+    fresh["case_type"] = target
+    fresh["document_type"] = payload["document_type"]
+    fresh["revision"] += 1
+    if target == CASE_TYPE_INHERITANCE:
+        fresh["stage"]["owner_row_id"] = owner
+        nodes = [{"id": "owner", "personId": owner, "parentSlotIds": [],
+                  "spouseSlotId": None, "ownPositions": [], "receivePositions": [],
+                  "hidden": False, "deleted": False}]
+    else:
+        fresh["stage"].pop("owner_row_id", None)
+        nodes = _canonical_two_party([])
+    fresh["diagram"] = {"state": {"version": 3, "domain": target, "nodes": nodes},
+                        "render_model": None}
+    result = _result("workspace_convert_type", _workspace_data(payload["case_id"], fresh))
+    def apply():
+        case.clear()
+        case.update(fresh)
+        return result
+    return job.complete_atomic(apply)
+
+
 _WORKSPACE_UPDATE_META = ("ngay_lap_ho_so", "noi_niem_yet", "ghi_chu")
 
 
@@ -1741,12 +2210,9 @@ def workspace_update(job, payload):
     """notary.workspace_update mock (§6.2) — parity real: cap nhat meta
     case da luu (khong cham stage/diagram), revision+1. case_type/
     document_type la dinh danh — key la → validation_error.
-    Meta doc lap case_type: chi chan locked + conflict (real
+    Meta doc lap case_type: chi revision guard + validation (real
     update_meta khong _check_supported)."""
     case = _case(payload)
-    if case.get("locked"):
-        raise CommandError("workspace_locked",
-                           f"hồ sơ #{case['id']} đã khóa")
     _check_base_revision(case, payload)
     cm = (payload or {}).get("case")
     if not isinstance(cm, dict) or not cm:
@@ -1787,7 +2253,6 @@ def workspace_update(job, payload):
             "case_type": case.get("case_type"),
             "document_type": case.get("document_type"),
             "status": case.get("status"),
-            "locked": bool(case.get("locked")),
             "revision": case["revision"],
             "ngay_lap_ho_so": case.get("ngay_lap_ho_so"),
             "noi_niem_yet": case.get("noi_niem_yet"),
@@ -1800,7 +2265,7 @@ def workspace_update(job, payload):
 
 
 def diagram_evaluate(job, payload):
-    """Read-only — duoc phep tren case locked (§7.4); khong persist.
+    """Read-only — khong persist; khong chan theo trang thai case (§7.4).
 
     case_id absent = che do nhap: stage payload thay Stage DB,
     evaluated_revision=null. case_id + stage cung luc -> validation_error
@@ -1859,7 +2324,7 @@ def diagram_save(job, payload):
     """Thu tu real save_diagram: domain -> wire -> owner mirror ->
     person refs -> prune positions -> persist + render -> revision+1."""
     case = _case(payload)
-    _check_writable(case)
+    _check_supported(case)
     _check_base_revision(case, payload)
     state = _payload_diagram_state(payload)
     _validate_case_state(case, state)
@@ -1881,6 +2346,11 @@ def diagram_save(job, payload):
                 "code": "diagram.selection_pruned",
                 "message": "Các lựa chọn vị trí vượt số tài sản đã bị bỏ"})
         rm = _render(clean_state, case["stage"])
+        # Parity real (§6/§9.7): engine trả `invalid` → không persist.
+        if rm.get("status") == "invalid":
+            raise CommandError(
+                "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
+                details={"errors": rm.get("errors") or []})
     else:
         rm = _unsupported_render()
     case["diagram"]["state"] = clean_state
@@ -1903,65 +2373,38 @@ def diagram_save(job, payload):
 def _word_block_reason(case, document_key=None, *, static=False):
     """Readiness theo validation that (contract §8.1 mapping).
 
-    Folder mode static=True chi kiem dieu kien ky thuat; catalog cu giu
-    dieu kien chu dat/người nhan. Two_party khong ap dieu kien thua ke."""
+    Parity `word_engine.word_block_reason` sau phan W (owner 23/10/2026):
+    thieu du kien KHONG con la ly do chan — chi tran so luong. Folder
+    mode static=True chi kiem dieu kien ky thuat; catalog giu them tran
+    nguoi ky cua thua ke."""
     if document_key is not None and document_key in NO_TEMPLATE_KEYS:
         return "word.template_missing"
     assets = case["stage"]["assets"]
     nodes = [n for n in (case["diagram"].get("state") or {}).get("nodes")
              or [] if isinstance(n, dict) and not n.get("deleted")]
     stage_people = _person_map(case)
-    if static:
-        if not stage_people:
-            return "word.no_people"
-        if not assets:
-            return "word.no_assets"
-        if len(assets) > 5:
-            return "word.too_many_assets"
-        if len(stage_people) > (30 if case.get("case_type") == CASE_TYPE_TWO_PARTY else 20):
-            return "word.too_many_people"
-        state_nodes = (case["diagram"].get("state") or {}).get("nodes")
-        if case.get("case_type") == CASE_TYPE_TWO_PARTY and not state_nodes:
-            return "word.no_diagram"
-        return None
+    if len(assets) > 5:
+        return "word.too_many_assets"
     if case.get("case_type") == CASE_TYPE_TWO_PARTY:
-        if not stage_people:
-            return "word.no_people"
-        if not nodes:
-            return "word.no_diagram"
-        if not assets:
-            return "word.no_assets"
-        if len(assets) > 5:
-            return "word.too_many_assets"
         if len(stage_people) > 30:
             return "word.too_many_people"
         return None
-    if not assets:
-        return "word.no_assets"
-    if len(assets) > 5:
-        return "word.too_many_assets"
-    landowners = [n for n in nodes
-                  if n.get("ownPositions") and n.get("personId")]
-    if not landowners:
-        return "word.no_landowner"
-    deceased = [n for n in landowners
-                if (stage_people.get(n["personId"]) or {}).get("ngay_chet")]
-    if not deceased:
-        return "word.no_deceased_landowner"
-    receivers = [n for n in nodes
-                 if n.get("receivePositions") and n.get("personId")]
-    if not receivers:
-        return "word.no_receiver"
     if len(stage_people) > 20:
         return "word.too_many_people"
-    # signers = living landowners + receivers, dedupe personId — parity
-    # voi word_engine.word_block_reason (real, MIN-110 review).
-    living_landowners = [n for n in landowners if n not in deceased]
-    signer_ids = {n["personId"]
-                  for n in [*living_landowners, *receivers]
-                  if n.get("personId")}
-    if len(signer_ids) > 20:
-        return "word.too_many_signers"
+    if not static:
+        # signers = living landowners + receivers, dedupe personId —
+        # parity voi word_engine.word_block_reason (real, MIN-110 review).
+        receivers = [n for n in nodes
+                     if n.get("receivePositions") and n.get("personId")]
+        living_landowners = [
+            n for n in nodes
+            if n.get("ownPositions") and n.get("personId")
+            and not (stage_people.get(n["personId"]) or {}).get("ngay_chet")]
+        signer_ids = {n["personId"]
+                      for n in [*living_landowners, *receivers]
+                      if n.get("personId")}
+        if len(signer_ids) > 20:
+            return "word.too_many_signers"
     return None
 
 
@@ -2035,18 +2478,21 @@ def _word_template_dir(payload):
 
 
 def word_export_options(job, payload):
-    """Read-only — duoc phep tren locked (chi workspace_get quyet dinh
-    capability); block_reason theo validation that.
+    """Read-only — khong chan theo trang thai case (chi workspace_get
+    quyet dinh capability); block_reason theo validation that.
 
     NAIA-8: two_party mo (readiness word.no_people/no_diagram/...);
     template_dir → documents = .docx quet duoc thay vi catalog co dinh."""
-    case = _case(payload)
+    case = None
+    if (payload or {}).get("case_id") is not None:
+        case = _case(payload)
     template_root = _word_template_dir(payload)
     if template_root is not None:
         scanned = _scan_template_dir(template_root)
         docs = []
         for item in scanned:
-            reason = _word_block_reason(case, static=True)
+            reason = (_word_block_reason(case, static=True)
+                      if case is not None else None)
             docs.append({"document_key": item["document_key"],
                          "display_name": item["display_name"],
                          "ready": reason is None,
@@ -2057,7 +2503,8 @@ def word_export_options(job, payload):
                         "documents": docs})
     docs = []
     for key, meta in DOC_CATALOG.items():
-        reason = _word_block_reason(case, key)
+        reason = (_word_block_reason(case, key)
+                  if case is not None else None)
         docs.append({"document_key": key,
                      "display_name": meta["display_name"],
                      "ready": reason is None,
@@ -2149,7 +2596,7 @@ def word_export_batch(job, payload):
     case = _case(payload)
     # NAIA-8: bo chan case_type_unsupported rieng luong Word — readiness
     # chi tiet qua _word_block_reason (word.no_people/no_diagram/...).
-    _check_writable(case)
+    _check_supported(case)
     create_case_subdir = (payload or {}).get("create_case_subdir", False)
     if not isinstance(create_case_subdir, bool):
         raise CommandError("validation_error",
@@ -2286,7 +2733,8 @@ def word_export_batch(job, payload):
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": dest_error[0],
-                                   "message": dest_error[1]}})
+                                   "message": dest_error[1]},
+                         "missing": []})
             failed.append(key)
             job.report_progress(i + 1, len(keys),
                                 f"văn bản {i + 1}/{len(keys)}")
@@ -2306,7 +2754,8 @@ def word_export_batch(job, payload):
                          "status": "failed", "actual_filename": None,
                          "output_file": None,
                          "error": {"code": reason,
-                                   "message": _block_message(reason)}})
+                                   "message": _block_message(reason)},
+                         "missing": []})
             failed.append(key)
         else:
             time.sleep(WORD_DOC_DELAY)       # mo phong render docx
@@ -2332,7 +2781,8 @@ def word_export_batch(job, payload):
                              "status": "failed", "actual_filename": None,
                              "output_file": None,
                              "error": {"code": code,
-                                       "message": f"không ghi được file: {exc}"}})
+                                       "message": f"không ghi được file: {exc}"},
+                             "missing": []})
                 failed.append(key)
             else:
                 out_path = dest_dir / name
@@ -2341,7 +2791,7 @@ def word_export_batch(job, payload):
                              "status": "saved", "actual_filename": name,
                              "output_file": {"path": str(out_path),
                                              "scope": "machine_local"},
-                             "error": None})
+                             "error": None, "missing": []})
                 saved.append(key)
         job.report_progress(i + 1, len(keys),
                             f"văn bản {i + 1}/{len(keys)}")

@@ -76,7 +76,7 @@ thuộc riêng người gốc. Luật đang áp dụng:
   đúng cặp; mỗi thế hệ một hàng.
 - Ghi chú: thẻ chủ đất không tích `Chủ` vẫn giữ nguyên vị trí; trần tài sản vẫn 5.
 - WP-S ghi luật này vào `contracts/notary-case-drafting.md` §13.4 và
-  `docs/specs/notary_v2/diagram-rules.md` §9.2/§9.6/§9.7/§9.9/§11;
+  `_bmad-output/specs/notary_v2/diagram-rules.md` §9.2/§9.6/§9.7/§9.9/§11;
   engine spec duy nhất vẫn nằm trong archive nên luật engine viết tại §11.
 - Plan chọn state v4 `spouseSlotIds`, người cuối hợp pháp và migrate v3→v4
   ở gói sau. WP0 không đổi schema/fixture/wire v3 hiện có; không coi bản ghi
@@ -120,8 +120,8 @@ không sinh ô hàng 2/3. Giữ code hàng 2/3 sau cờ ở gói sau; test riên
 ## Nguồn hành vi và kiểm tra WP0
 
 Contract `contracts/notary-case-drafting.md` §13.4; spec
-`docs/specs/notary_v2/diagram-rules.md` §9; engine spec duy nhất đang
-nằm trong archive `specs-before-consolidation-20261015/notary_v2/diagram/inheritance/engine.md` (nhánh agent/omp/diagram-rules-v2; trong docs/ là `docs/specs/notary_v2/diagram/inheritance/engine.md`, chưa có đính chính v2 — luật engine hiện hành ở `diagram-rules.md` §11`
+`_bmad-output/specs/notary_v2/diagram-rules.md` §9; engine spec duy nhất đang
+nằm trong archive `specs-before-consolidation-20261015/notary_v2/diagram/inheritance/engine.md`
 được đính chính có giới hạn, không nâng toàn bộ bản Draft cũ thành đã duyệt.
 Đối chiếu đủ bảng năm trường hợp và các câu thay thế mục (b); kiểm tra ví dụ
 bằng `contracts/notary-case-drafting/validate_examples.py`. Validator chỉ

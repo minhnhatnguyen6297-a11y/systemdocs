@@ -52,7 +52,7 @@ thiếu dữ liệu. Áp đồng loạt:
 |---|---|
 | Vị trí vật lý hồ sơ giấy không sensor nào thấy | **Ngoài phạm vi** — người suy luận từ dấu vết cuối (reframe ở §1) |
 | "Im lặng" = hồ sơ đứng yên hay sensor mù? | Phải phân biệt hai trạng thái trong timeline, nếu không timeline nói dối |
-| A4 hỏi sai biến | Biến thật = "máy nào là của ai"; văn phòng nhỏ bàn cố định → `workstation_id` là proxy người. Windows bẻ khóa = không baseline cài đặt (quyền admin, log PrintService mặc định tắt) |
+| A4 hỏi sai biến | Biến thật = "máy nào là của ai"; văn phòng nhỏ bàn cố định → `workstation_id` là proxy người. Windows bẻ khóa = không baseline cài đặt (quyền admin) |
 | Local-first × remote-maintenance | **Đã giải (miệng, cần ghi spec):** vendor sở hữu phần mềm/logic, khách sở hữu DB, thuê server trong nước được. Cần: impact assessment ND13 + processor terms; sửa `intent.md` §2.4 và `TECH_STACK.md` §4. Vendor = chu vi bảo mật (breach đánh vào mọi khách) |
 | UI phức tạp giết người dùng nontech | Reframe §1 + fork G5: trả lời trong kênh quản lý đang sống (Zalo văn phòng — tài khoản đã được phép theo B2; module Zalo MIN-89 là hạt giống sẵn) |
 | "Nhét đại" vào folder khách | Là nhiễu thật của production; máy gom theo nội dung đôi khi đúng hơn cả con người xếp folder → chỗ máy ≠ folder cần người phân xử mẫu nhỏ |
@@ -85,7 +85,7 @@ G1 (agent) chạy song song, không chờ nhau.
 - **Must:** G0 giấy tờ · record-builder + đo offline · A1/A3 spike ·
   Sentinel shadow (file watcher + IFilter + buffer) · Hub + record-builder
   live · một bề mặt trả lời
-- **Should:** print spooler (mốc "đã in") · end-of-day review + gộp mảnh
+- **Should:** end-of-day review + gộp mảnh
 - **Could:** popup xác nhận + calibration · Zalo OCR intake ·
   scanner/downloads watcher
 - **Won't (lần này):** lớp AI/OpenClaw · đa khách thương mại ·

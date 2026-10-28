@@ -50,6 +50,7 @@ DRAFTING_COMMANDS = [
     "notary.intake_analyze",
     "notary.workspace_commit_stage",
     "notary.workspace_update",
+    "notary.workspace_convert_type",
     "notary.diagram_evaluate",
     "notary.diagram_save",
     "notary.word_export_options",
@@ -114,6 +115,10 @@ def _file_link(link, target):
         pytest.skip(f"không tạo được file symlink: {exc}")
 
 
+WINDOWS_ONLY = pytest.mark.skipif(
+    os.name != "nt", reason="file_ref yêu cầu path tuyệt đối Windows")
+
+
 def _call(fn_name, payload):
     """Di qua gateway dispatch (mock da bat qua autouse fixture)."""
     return gw.dispatch(fn_name, _job(f"notary.{fn_name}"), payload)
@@ -121,10 +126,12 @@ def _call(fn_name, payload):
 
 def _node(nid, person_id=None, parents=(), spouse=None,
           own=(), receive=(), hidden=False, deleted=False):
-    """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1,2,3}."""
+    """diagram node v3 (§13.4) — ownPositions/receivePositions ⊆ {1..5}."""
     return {
         "id": nid, "personId": person_id,
-        "parentSlotIds": list(parents), "spouseSlotId": spouse,
+        "parentSlotIds": list(parents),
+        "spouseSlotIds": [spouse] if spouse else [],
+        "spouseSlotId": spouse, "spouseSuggestionId": None,
         "ownPositions": list(own), "receivePositions": list(receive),
         "hidden": hidden, "deleted": deleted,
     }
@@ -256,7 +263,7 @@ class TestScaffolding:
         assert bad["data"]["status"] == "invalid_input"
 
     def test_fixtures_loadable_and_no_real_pii(self):
-        names = ["empty", "ready", "locked", "conflict", "intake-partial",
+        names = ["empty", "ready", "done", "conflict", "intake-partial",
                  "diagram-warning", "word-collision", "word-partial",
                  "word-all-failed", "word-canceled", "unsupported",
                  "ready-two-party"]
@@ -353,7 +360,7 @@ class TestWorkspaceGet:
         assert data["schema_version"] == SCHEMA
         assert data["backend_mode"] == "mock"
         assert data["case"]["revision"] == 1
-        assert data["case"]["locked"] is False
+        assert "locked" not in data["case"]
         assert data["stage"] == {"owner_row_id": None,
                                  "people": [], "assets": []}
         assert data["diagram"]["render_model"] is None
@@ -375,19 +382,15 @@ class TestWorkspaceGet:
         stage_ids = {p["row_id"] for p in data["stage"]["people"]}
         for n in data["diagram"]["state"]["nodes"]:
             assert set(n) <= {"id", "personId", "parentSlotIds",
-                              "spouseSlotId", "ownPositions",
-                              "receivePositions", "hidden", "deleted"}
+                              "spouseSlotIds", "spouseSlotId",
+                              "spouseSuggestionId",
+                              "ownPositions", "receivePositions",
+                              "hidden", "deleted"}
             if n["personId"] is not None:
                 assert n["personId"] in stage_ids
         _assert_contract(_job_doc(
             "notary.workspace_get", {"case_id": 42}, result=res,
             fixture_context={"stage_row_ids": sorted(stage_ids)}))
-
-    def test_locked_case(self):
-        mock.reset_backend(_load_fixture("locked.json"))
-        res = _call("workspace_get", {"case_id": 44})
-        assert res["data"]["case"]["locked"] is True
-        assert res["data"]["case"]["status"] == "locked"
 
     def test_unsupported_case_type(self):
         mock.reset_backend(_load_fixture("unsupported.json"))
@@ -433,6 +436,7 @@ def _mk_person(**kw):
         "ngay_sinh": "1950", "ngay_chet": "2020-01-15",
         "so_giay_to": None, "ngay_cap": None, "noi_cap": None,
         "dia_chi": None, "place_of_origin": None,
+        "loai_giay_to": None, "loai_dia_chi": None,
     }
     row.update(kw)
     return row
@@ -441,8 +445,8 @@ def _mk_person(**kw):
 def _mk_asset(**kw):
     row = {
         "row_id": str(uuid.uuid4()), "entity_id": None,
-        "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": None,
-        "so_to_ban_do": None, "dia_chi": "Địa chỉ mẫu tài sản 1",
+        "so_serial": "MM000001", "so_vao_so": None, "so_thua_dat": "123",
+        "so_to_ban_do": "45", "dia_chi": "Địa chỉ mẫu tài sản 1",
         "loai_so": None, "hinh_thuc_su_dung": None, "thoi_han": None,
         "nguon_goc": None, "ngay_cap": None, "co_quan_cap": None,
         "land_rows": None,
@@ -486,7 +490,8 @@ class TestWorkspaceCreate:
         assert data["created"] is True
         c = data["case"]
         assert c["case_type"] == "inheritance"
-        assert c["status"] == "draft" and c["locked"] is False
+        assert c["status"] == "draft"
+        assert "locked" not in c
         assert c["revision"] == 1
         assert c["ngay_lap_ho_so"] == "2026-09-26"
         assert c["noi_niem_yet"] == "xã Mẫu"
@@ -606,13 +611,13 @@ class TestWorkspaceCreate:
         assert exc.value.details["owner_row_id"] == \
             p["stage"]["owner_row_id"]
 
-    def test_entity_id_non_null_rejected(self):
+    def test_entity_hint_accepted_on_create(self):
+        """`entity_id` trên dòng mới là hint nội bộ — không chặn
+        (parity server thật, owner 23/10/2026)."""
         p = _create_payload()
         p["stage"]["people"][0]["entity_id"] = 5
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_create", p)
-        assert exc.value.code == "stage_validation_error"
-        assert exc.value.details["field_errors"]
+        res = _call("workspace_create", p)
+        assert res["data"]["stage"]["people"][0]["entity_id"] == 5
 
     def test_empty_stage(self):
         """create stage rong: assets la required (stage_validation_error);
@@ -644,7 +649,8 @@ class TestWorkspaceCreate:
     def test_asset_limit_create(self):
         p = _create_payload()
         p["stage"]["assets"] += [
-            _mk_asset(so_serial=f"MM{i + 1:06d}") for i in range(3)]
+            _mk_asset(so_serial=f"MM{i + 1:06d}")
+            for i in range(mock.MAX_ASSETS)]
         with pytest.raises(CommandError) as exc:
             _call("workspace_create", p)
         assert exc.value.code == "stage_validation_error"
@@ -692,6 +698,74 @@ class TestWorkspaceCreate:
 
 
 # ---------- workspace_commit_stage ----------
+
+# ---------- workspace_save_case (§13.19) ----------
+
+
+class TestWorkspaceSaveCase:
+    def test_new_done_replay_and_idempotency_conflict(self):
+        payload = _create_payload()
+        first = _call("workspace_save_case", payload)
+        assert first["data"]["created"] is True
+        assert first["data"]["case"]["status"] == "done"
+        assert first["data"]["case"]["revision"] == 1
+        assert first["data"]["diagram"]["render_model"] is not None
+
+        replay = _call("workspace_save_case", payload)
+        assert replay["data"]["created"] is False
+        assert replay["data"]["case"]["id"] == first["data"]["case"]["id"]
+        assert replay["data"]["case"]["revision"] == 1
+
+        other = copy.deepcopy(payload)
+        other["case"] = {"document_type": "khai_nhan", "ghi_chu": "khác"}
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_save_case", other)
+        assert exc.value.code == "idempotency_conflict"
+
+    def test_existing_done_and_revision_guard(self):
+        case_id = _call("workspace_get", {"case_id": 42})[
+            "data"]["case"]["id"]
+        payload = _create_payload(case_meta={"document_type": "khai_nhan"})
+        payload.pop("idempotency_key")
+        payload["case_id"] = case_id
+        payload["base_revision"] = 7
+        saved = _call("workspace_save_case", payload)
+        assert saved["data"]["created"] is False
+        assert saved["data"]["case"]["status"] == "done"
+        assert saved["data"]["case"]["revision"] == 8
+
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_save_case", payload)
+        assert exc.value.code == "workspace_conflict"
+        assert exc.value.details["server_revision"] == 8
+
+    def test_new_save_keeps_entity_hints_from_source(self):
+        """Dòng mới mang entity_id nguồn (source_latest/nhân bản) KHÔNG bị
+        chặn — parity server thật: entity_id là hint nội bộ (§4.1 mục 5)."""
+        payload = _create_payload()
+        for row, hint in zip(payload["stage"]["people"], (101, 102)):
+            row["entity_id"] = hint
+        payload["stage"]["assets"][0]["entity_id"] = 201
+
+        saved = _call("workspace_save_case", payload)
+
+        assert saved["data"]["created"] is True
+        assert [r["entity_id"] for r in saved["data"]["stage"]["people"]] == \
+            [101, 102]
+        assert saved["data"]["stage"]["assets"][0]["entity_id"] == 201
+
+    def test_new_save_drops_garbage_entity_hint(self):
+        """Hint rác (không phải int ≥ 1) bị bỏ và backend cấp ID mới."""
+        payload = _create_payload()
+        payload["stage"]["people"][0]["entity_id"] = "hint-rác"
+        payload["stage"]["assets"][0]["entity_id"] = 0
+
+        saved = _call("workspace_save_case", payload)
+
+        assert isinstance(
+            saved["data"]["stage"]["people"][0]["entity_id"], int)
+        assert saved["data"]["stage"]["assets"][0]["entity_id"] >= 1
+
 
 class TestCommitStage:
     def _payload(self, base_revision=1, people=None, assets=None,
@@ -833,17 +907,18 @@ class TestCommitStage:
         assert any(e["code"] == "duplicate_row_id"
                    for e in exc.value.details["field_errors"])
 
-    def test_duplicate_entity_id(self):
+    def test_duplicate_entity_id_allowed(self):
+        """Hai dòng cùng identity là hợp lệ (§4.2 step 6) — mock parity
+        server thật sau 23/10/2026."""
         mock.reset_backend(_load_fixture("empty.json"))
         a = self._person("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
                          entity_id=9)
         b = self._person("ffffffff-ffff-4fff-8fff-ffffffffffff",
                          entity_id=9)
         payload = self._payload(people=[a, b], owner_row_id=a["row_id"])
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", payload)
-        assert any(e["field"] == "entity_id"
-                   for e in exc.value.details["field_errors"])
+        res = _call("workspace_commit_stage", payload)
+        assert [r["entity_id"] for r in res["data"]["stage"]["people"]] \
+            == [9, 9]
 
     def test_duplicate_so_giay_to(self):
         mock.reset_backend(_load_fixture("empty.json"))
@@ -856,32 +931,40 @@ class TestCommitStage:
         assert any(e["field"] == "so_giay_to"
                    for e in exc.value.details["field_errors"])
 
-    def test_duplicate_serial(self):
+    def test_duplicate_serial_allowed_on_distinct_assets(self):
         mock.reset_backend(_load_fixture("empty.json"))
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        a1 = self._asset("aaaaaaa1-1111-4111-8111-111111111111")
-        a2 = self._asset("aaaaaaa2-2222-4222-8222-222222222222")
+        a1 = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
+                         serial="S-001")
+        a2 = self._asset("aaaaaaa2-2222-4222-8222-222222222222",
+                         serial="S-001")
+        a2["so_thua_dat"] = "10"
         payload = self._payload(people=[self._person(rid)],
                                 owner_row_id=rid, assets=[a1, a2])
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", payload)
-        assert any(e["field"] == "so_serial"
-                   for e in exc.value.details["field_errors"])
+        res = _call("workspace_commit_stage", payload)
+        assets = res["data"]["stage"]["assets"]
+        assert [a["so_serial"] for a in assets] == ["S-001", "S-001"]
+        assert assets[0]["entity_id"] != assets[1]["entity_id"]
 
     def test_asset_limit(self):
-        """§13.3: toi da 3 asset — dong thu 4 -> asset_limit field error
+        """§13.3: toi da 5 asset — dong thu 6 -> asset_limit field error
         gan row_id dong thua."""
         mock.reset_backend(_load_fixture("empty.json"))
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        assets = [self._asset(f"aaaaaaa{i}-1111-4111-8111-11111111111{i}",
-                              serial=f"MM{i:06d}") for i in range(1, 5)]
+        assets = [self._asset(
+            f"aaaaaaa{i}-1111-4111-8111-11111111111{i}",
+            serial=f"MM{i:06d}") for i in range(1, 7)]
         payload = self._payload(people=[self._person(rid)],
-                                owner_row_id=rid, assets=assets)
+                                owner_row_id=rid, assets=assets[:5])
+        saved = _call("workspace_commit_stage", payload)
+        assert len(saved["data"]["stage"]["assets"]) == 5
+        payload["base_revision"] = saved["data"]["revision"]
+        payload["stage"]["assets"] = assets
         with pytest.raises(CommandError) as exc:
             _call("workspace_commit_stage", payload)
         fe = exc.value.details["field_errors"]
         over = [e for e in fe if e["code"] == "asset_limit"]
-        assert over and over[0]["row_id"] == assets[3]["row_id"]
+        assert over and over[0]["row_id"] == assets[5]["row_id"]
 
     def test_is_primary_key_rejected(self):
         mock.reset_backend(_load_fixture("empty.json"))
@@ -894,17 +977,16 @@ class TestCommitStage:
             _call("workspace_commit_stage", payload)
         assert exc.value.code == "validation_error"
 
-    def test_serial_must_be_canonical(self):
-        mock.reset_backend(_load_fixture("empty.json"))
+    def test_serial_is_verbatim_and_may_be_empty(self):
         rid = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-        a = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
-                        serial="khong-canonical")
-        payload = self._payload(people=[self._person(rid)],
-                                owner_row_id=rid, assets=[a])
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", payload)
-        assert any(e["field"] == "so_serial" and e["code"] == "invalid_format"
-                   for e in exc.value.details["field_errors"])
+        for serial in ("khong-canonical", ""):
+            mock.reset_backend(_load_fixture("empty.json"))
+            a = self._asset("aaaaaaa1-1111-4111-8111-111111111111",
+                            serial=serial)
+            payload = self._payload(people=[self._person(rid)],
+                                    owner_row_id=rid, assets=[a])
+            res = _call("workspace_commit_stage", payload)
+            assert res["data"]["stage"]["assets"][0]["so_serial"] == serial
 
     def test_commit_prunes_diagram_refs(self):
         """Xoa nguoi khoi stage -> node tham chieu bi prune trong cung
@@ -955,14 +1037,6 @@ class TestCommitStage:
             with pytest.raises(CommandError) as exc:
                 _call("workspace_commit_stage", p)
             assert exc.value.code == "validation_error", bad_stage
-
-    def test_locked_case_rejected(self):
-        mock.reset_backend(_load_fixture("locked.json"))
-        p = {"case_id": 44, "base_revision": 3,
-             "stage": {"owner_row_id": None, "people": [], "assets": []}}
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_commit_stage", p)
-        assert exc.value.code == "workspace_locked"
 
     def test_unsupported_case_type(self):
         mock.reset_backend(_load_fixture("unsupported.json"))
@@ -1036,7 +1110,7 @@ class TestWorkspaceUpdate:
         # Stage/Diagram khong bi cham.
         assert len(got["data"]["stage"]["people"]) == 4
 
-    def test_conflict_and_locked(self):
+    def test_conflict(self):
         mock.reset_backend(_load_fixture("ready.json"))
         rev = _call("workspace_get", {"case_id": 42})[
             "data"]["case"]["revision"]
@@ -1046,14 +1120,6 @@ class TestWorkspaceUpdate:
                 "case": {"ghi_chu": "x"}})
         assert exc.value.code == "workspace_conflict"
         assert exc.value.details["server_revision"] == rev
-        mock.reset_backend(_load_fixture("locked.json"))
-        rev = _call("workspace_get", {"case_id": 44})[
-            "data"]["case"]["revision"]
-        with pytest.raises(CommandError) as exc:
-            _call("workspace_update", {
-                "case_id": 44, "base_revision": rev,
-                "case": {"ghi_chu": "x"}})
-        assert exc.value.code == "workspace_locked"
 
     def test_validation_errors(self):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -1192,13 +1258,6 @@ class TestIntakeAnalyze:
             _call("intake_analyze", {"case_id": 43, "sources": [s]})
         assert exc.value.code == "validation_error"
 
-    def test_locked_case_rejected(self):
-        mock.reset_backend(_load_fixture("locked.json"))
-        s = self._text_src("aaaaaaaa-0000-4000-8000-000000000001", "x")
-        with pytest.raises(CommandError) as exc:
-            _call("intake_analyze", {"case_id": 44, "sources": [s]})
-        assert exc.value.code == "workspace_locked"
-
     def test_draft_mode_no_case_id(self):
         """§2.1a — case_id absent = nhap moi; bo qua kiem tra case."""
         sid = "aaaaaaaa-0000-4000-8000-000000000009"
@@ -1281,7 +1340,7 @@ class TestDiagram:
     def test_evaluate_position_out_of_range(self):
         mock.reset_backend(_load_fixture("ready.json"))
         state = _ready_state()
-        state["nodes"][1]["receivePositions"] = [4]
+        state["nodes"][1]["receivePositions"] = [6]
         with pytest.raises(CommandError) as exc:
             _call("diagram_evaluate",
                   {"case_id": 42, "diagram": {"state": state}})
@@ -1426,14 +1485,13 @@ class TestDiagram:
                   {"case_id": 42, "diagram": {"state": state}})
         assert exc.value.code == "diagram_invalid_state"
 
-    def test_evaluate_allowed_on_locked_case(self):
-        """Read-only — evaluate duoc phep tren case locked (§7.4)."""
-        mock.reset_backend(_load_fixture("locked.json"))
+    def test_evaluate_read_only_on_done_case(self):
+        mock.reset_backend(_load_fixture("ready.json"))
         res = _call("diagram_evaluate", {
-            "case_id": 44,
-            "diagram": {"state": _load_fixture("locked.json")
-                        ["cases"]["44"]["diagram"]["state"]}})
-        assert res["data"]["evaluated_revision"] == 3
+            "case_id": 42,
+            "diagram": {"state": _load_fixture("ready.json")
+                        ["cases"]["42"]["diagram"]["state"]}})
+        assert res["data"]["evaluated_revision"] == 7
 
     def test_evaluate_two_party_unsupported(self):
         """two_party committed: evaluate tra unsupported render, khong
@@ -1512,6 +1570,37 @@ class TestDiagram:
         node = next(n for n in dg["state"]["nodes"] if n["id"] == "spouse")
         assert node["receivePositions"] == [1, 2]
 
+    def test_save_unassigned_pool_warning_parity(self):
+        """Save cũng giữ warning Pool + incomplete như evaluate (§6)."""
+        doc = _load_fixture("diagram-warning.json")
+        mock.reset_backend(doc)
+        state = doc["request"]["diagram_evaluate"]["diagram"]["state"]
+        res = _call("diagram_save", {
+            "case_id": 46, "base_revision": 5,
+            "diagram": {"state": state}})
+        rm = res["data"]["diagram"]["render_model"]
+        codes = [w["code"] for w in rm["warnings"]]
+        assert "diagram.unassigned_pool_person" in codes
+        assert rm["status"] == "incomplete"
+        assert res["data"]["revision"] == 6
+
+    def test_save_engine_invalid_missing_land_owner_rejected(self):
+        """Parity real: không ai giữ vị trí tài sản → engine từ chối,
+        không persist, revision giữ nguyên (§6/§9.7)."""
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _ready_state()
+        for n in state["nodes"]:
+            n["ownPositions"] = []
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_save", {
+                "case_id": 42, "base_revision": 7,
+                "diagram": {"state": state}})
+        assert exc.value.code == "diagram_invalid_state"
+        assert any(e["code"] == "missing_land_owner"
+                   for e in exc.value.details["errors"])
+        got = _call("workspace_get", {"case_id": 42})
+        assert got["data"]["case"]["revision"] == 7
+
     def test_save_two_party(self):
         mock.reset_backend(_load_fixture("ready-two-party.json"))
         res = _call("diagram_save", {
@@ -1543,15 +1632,12 @@ class TestDiagram:
         assert exc.value.code == "workspace_conflict"
         assert exc.value.details["server_revision"] == 7
 
-    def test_save_locked(self):
-        mock.reset_backend(_load_fixture("locked.json"))
-        with pytest.raises(CommandError) as exc:
-            _call("diagram_save", {
-                "case_id": 44, "base_revision": 3,
-                "diagram": {"state": {"version": 3,
-                                      "domain": "inheritance",
-                                      "nodes": []}}})
-        assert exc.value.code == "workspace_locked"
+    def test_save_done_case_allowed(self):
+        mock.reset_backend(_load_fixture("ready.json"))
+        res = _call("diagram_save", {
+            "case_id": 42, "base_revision": 7,
+            "diagram": {"state": _ready_state()}})
+        assert res["data"]["revision"] == 8
 
     def test_save_invalid_state_not_persisted(self):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -1573,15 +1659,16 @@ class TestWordExport:
                 "is_dir": True}
 
     @pytest.mark.parametrize("case_type,people,assets,has_diagram,expected", [
+        # Phần W (owner 23/10/2026): thiếu dữ kiện không còn là block.
         ("inheritance", 1, 1, False, None),
-        ("inheritance", 0, 0, False, "word.no_people"),
-        ("inheritance", 1, 0, False, "word.no_assets"),
+        ("inheritance", 0, 0, False, None),
+        ("inheritance", 1, 0, False, None),
         ("inheritance", 1, 6, False, "word.too_many_assets"),
         ("inheritance", 21, 1, False, "word.too_many_people"),
-        ("two_party", 1, 1, False, "word.no_diagram"),
+        ("two_party", 1, 1, False, None),
         ("two_party", 1, 1, True, None),
         ("two_party", 31, 1, True, "word.too_many_people"),
-        ("two_party", 1, 0, False, "word.no_assets"),
+        ("two_party", 1, 0, False, None),
     ])
     def test_folder_readiness_matches_real_technical_checks(
             self, case_type, people, assets, has_diagram, expected, monkeypatch):
@@ -1599,6 +1686,7 @@ class TestWordExport:
         assert mock._word_block_reason(case, static=True) == expected
         assert word_block_reason(context, static=True) == expected
 
+    @WINDOWS_ONLY
     def test_folder_options_and_export_allow_no_inheritance_owner_or_receiver(self, tmp_path):
         import docx
 
@@ -1615,10 +1703,10 @@ class TestWordExport:
         batch = _call("word_export_batch", {**payload,
             "document_keys": ["static.docx"], "destination": self._dest(dest)})
         assert batch["data"]["documents"][0]["status"] == "saved"
-        # Catalog callers still use the legacy checks.
+        # Catalog callers dùng cùng kiểm tra kỹ thuật: thiếu chủ đất không block.
         legacy = _call("word_export_options", {"case_id": 42})
         docs = {d["document_key"]: d for d in legacy["data"]["documents"]}
-        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_landowner"
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
 
     def test_options_ready_case(self):
         mock.reset_backend(_load_fixture("ready.json"))
@@ -1631,14 +1719,16 @@ class TestWordExport:
         _assert_contract(_job_doc(
             "notary.word_export_options", {"case_id": 42}, result=res))
 
-    def test_options_empty_case_blocked(self):
+    def test_options_empty_case_ready(self):
+        # W6: thiếu dữ kiện không chặn — readiness chỉ còn mức kỹ thuật/mẫu.
         mock.reset_backend(_load_fixture("empty.json"))
         res = _call("word_export_options", {"case_id": 43})
         docs = {d["document_key"]: d for d in res["data"]["documents"]}
-        assert docs["khai_nhan_di_san"]["ready"] is False
-        assert docs["khai_nhan_di_san"]["block_reason"] == "word.no_assets"
+        assert docs["khai_nhan_di_san"]["ready"] is True
+        assert docs["khai_nhan_di_san"]["block_reason"] is None
         assert docs["niem_yet"]["block_reason"] == "word.template_missing"
 
+    @WINDOWS_ONLY
     def test_two_party_word_allowed(self, tmp_path):
         """NAIA-8: word_export_* tren two_party khong con
         case_type_unsupported — fixture ready-two-party du dieu kien:
@@ -1656,6 +1746,7 @@ class TestWordExport:
         assert d["status"] == "saved"
         assert Path(d["output_file"]["path"]).is_file()
 
+    @WINDOWS_ONLY
     def test_batch_writes_real_docx(self, tmp_path):
         mock.reset_backend(_load_fixture("ready.json"))
         payload = {"case_id": 42,
@@ -1679,6 +1770,7 @@ class TestWordExport:
         _assert_contract(_job_doc(
             "notary.word_export_batch", payload, result=res))
 
+    @WINDOWS_ONLY
     def test_batch_collision_suffix(self, tmp_path):
         doc = _load_fixture("word-collision.json")
         mock.reset_backend(doc)
@@ -1694,6 +1786,7 @@ class TestWordExport:
         # file cu khong bi ghi de
         assert (tmp_path / doc["preexisting_files"][0]).read_bytes() == b"cu"
 
+    @WINDOWS_ONLY
     def test_batch_partial(self, tmp_path):
         doc = _load_fixture("word-partial.json")
         mock.reset_backend(doc)
@@ -1707,6 +1800,7 @@ class TestWordExport:
         assert docs["niem_yet"]["error"]["code"] == "word.template_missing"
         assert res["data"]["breakdown"]["failed"] == ["niem_yet"]
 
+    @WINDOWS_ONLY
     def test_batch_all_failed(self, tmp_path):
         doc = _load_fixture("word-all-failed.json")
         mock.reset_backend(doc)
@@ -1764,6 +1858,7 @@ class TestWordExport:
         assert exc.value.code == "word_unknown_document_key"
         assert list(tmp_path.iterdir()) == []
 
+    @WINDOWS_ONLY
     def test_batch_destination_rules(self, tmp_path):
         mock.reset_backend(_load_fixture("ready.json"))
         # is_dir false -> validation_error
@@ -1788,6 +1883,7 @@ class TestWordExport:
                                 "scope": "machine_local", "is_dir": True}})
         assert exc.value.code == "file_not_found"
 
+    @WINDOWS_ONLY
     def test_batch_dest_write_denied_file_locked(
             self, tmp_path, monkeypatch):
         """MIN-116 parity engine that: dest ACL deny-write -> probe fail
@@ -1819,14 +1915,6 @@ class TestWordExport:
             assert d["error"]["code"] == "file_locked"
         assert list(tmp_path.iterdir()) == []     # khong file nao sot lai
 
-    def test_batch_locked_case(self, tmp_path):
-        mock.reset_backend(_load_fixture("locked.json"))
-        with pytest.raises(CommandError) as exc:
-            _call("word_export_batch", {
-                "case_id": 44, "document_keys": ["khai_nhan_di_san"],
-                "destination": self._dest(tmp_path)})
-        assert exc.value.code == "workspace_locked"
-
     def test_batch_unsupported_case_type(self, tmp_path):
         mock.reset_backend(_load_fixture("unsupported.json"))
         with pytest.raises(CommandError) as exc:
@@ -1835,6 +1923,7 @@ class TestWordExport:
                 "destination": self._dest(tmp_path)})
         assert exc.value.code == "case_type_unsupported"
 
+    @WINDOWS_ONLY
     def test_batch_progress(self, tmp_path):
         mock.reset_backend(_load_fixture("ready.json"))
         job = _job("notary.word_export_batch")
@@ -1844,6 +1933,7 @@ class TestWordExport:
         assert job.progress["done"] == 1
         assert job.progress["total"] == 1
 
+    @WINDOWS_ONLY
     def test_batch_subdir_link_escape_rejected(self, tmp_path):
         """Parity engine that (review NAIA-8): destination/HS-<id> la
         junction/symlink tro ra ngoai -> mkdir(exist_ok) van pass; phai
@@ -1865,6 +1955,7 @@ class TestWordExport:
         assert list(outside.iterdir()) == []
         assert [p.name for p in dest.iterdir()] == ["HS-42"]
 
+    @WINDOWS_ONLY
     def test_batch_subdir_result_destination_is_granted_dir(
             self, tmp_path):
         """Contract §8.2: create_case_subdir=true -> ghi vao
@@ -1880,6 +1971,7 @@ class TestWordExport:
         assert (tmp_path / "HS-42"
                 / "Van_ban_khai_nhan_di_san_HS-42.docx").is_file()
 
+    @WINDOWS_ONLY
     def test_folder_mode_skips_link_to_outside(self, tmp_path):
         """Mau symlink tro ra ngoai thu muc mau: bi loai khoi scan ->
         options khong list, batch tu choi word_unknown_document_key,
@@ -1909,6 +2001,7 @@ class TestWordExport:
         assert exc.value.code == "word_unknown_document_key"
         assert list(dest.iterdir()) == []
 
+    @WINDOWS_ONLY
     def test_folder_template_swapped_for_link(self, tmp_path,
                                               monkeypatch):
         """Parity real: mau quet duoc bi doi thanh symlink ra ngoai
@@ -1997,6 +2090,7 @@ class TestJobLifecycle:
         finally:
             store.drain(2)
 
+    @WINDOWS_ONLY
     def test_idempotent_command_id_no_duplicate_files(self, tmp_path):
         """Retry cung command_id -> cung job -> khong tao them file."""
         mock.reset_backend(_load_fixture("ready.json"))
@@ -2020,6 +2114,7 @@ class TestJobLifecycle:
         finally:
             store.drain(2)
 
+    @WINDOWS_ONLY
     def test_word_export_canceled_mid_batch(self, tmp_path, monkeypatch):
         """Cancel giua batch: file da ghi giu nguyen, file chua bat dau
         khong duoc tao; job canceled{user_canceled} VAN mang
@@ -2085,6 +2180,8 @@ class TestContractInvariants:
                 "destination": {"path": str(tmp_path),
                                 "scope": "machine_local", "is_dir": True}},
         }
+        if os.name != "nt":
+            calls.pop("word_export_batch")   # destination FileRef Windows-only
         for name, payload in calls.items():
             res = _call(name, payload)
             assert res["kind"] == name
@@ -2094,10 +2191,10 @@ class TestContractInvariants:
         """workspace_get tra wire v2: khong is_primary/isLandOwner/
         willReceive o bat ky level nao."""
         for fixture in ("ready.json", "ready-two-party.json",
-                        "locked.json"):
+                        "done.json"):
             mock.reset_backend(_load_fixture(fixture))
             cid = 48 if fixture == "ready-two-party.json" else (
-                44 if fixture == "locked.json" else 42)
+                44 if fixture == "done.json" else 42)
             res = _call("workspace_get", {"case_id": cid})
             _no_legacy_keys(res["data"])
 
@@ -2138,7 +2235,7 @@ class TestCaseListMock:
         c42 = next(c for c in res["data"]["cases"] if c["id"] == 42)
         # shape parity voi notary_adapter._case_row
         for k in ("id", "nguoi_chet", "tai_san", "ngay_lap_ho_so",
-                  "loai_van_ban", "trang_thai", "is_locked"):
+                  "loai_van_ban", "trang_thai"):
             assert k in c42, f"thieu key {k}"
         assert c42["nguoi_chet"]["ho_ten"] == "Người Mẫu A"
         assert c42["tai_san"]["so_serial"] == "MM000001"
@@ -2361,3 +2458,170 @@ class TestCustomerCatalogMock:
         got = _call("workspace_get", {"case_id": 43})["data"]["case"]
         assert got["nguoi_nhan_uy_quyen"] == "Người Danh Bạ"
         assert got["nguoi_nhan_uy_quyen_id"] == 9
+
+
+def test_mock_saved_conversion_has_real_boundary_shape_and_preserves_stage():
+    mock.reset_backend(_load_fixture("ready.json"))
+    before = _call("workspace_get", {"case_id": 42})["data"]
+    result = _call("workspace_convert_type", {
+        "case_id": 42, "base_revision": before["case"]["revision"],
+        "case_type": "two_party", "document_type": "dat_coc",
+        "confirm_diagram_reset": True})["data"]
+    assert result["case"]["case_type"] == "two_party"
+    assert result["stage"]["people"] == before["stage"]["people"]
+    assert result["stage"]["assets"] == before["stage"]["assets"]
+    assert "owner_row_id" not in result["stage"]
+    assert len(result["diagram"]["state"]["nodes"]) == 30
+
+
+# ---------- workspace_source_latest (§13.20, vòng 2) ----------
+
+def test_workspace_source_latest_mock_parity():
+    res = _call("workspace_source_latest", {})
+    assert res["kind"] == "workspace_source_latest"
+    data = res["data"]
+    assert data["source_case_id"] == 44
+    assert data["source_status"] == "done"
+    stage = data["stage"]
+    ws = _call("workspace_get", {"case_id": 44})["data"]
+    assert stage["owner_row_id"] == stage["people"][0]["row_id"]
+    original = {row["row_id"]
+                for row in ws["stage"]["people"] + ws["stage"]["assets"]}
+    returned = [row["row_id"]
+                for row in stage["people"] + stage["assets"]]
+    assert returned and all(rid not in original for rid in returned)
+    assert [p["entity_id"] for p in stage["people"]] == [
+        p["entity_id"] for p in ws["stage"]["people"]]
+    assert [a["entity_id"] for a in stage["assets"]] == [
+        a["entity_id"] for a in ws["stage"]["assets"]]
+    assert set(data) == {"schema_version", "backend_mode",
+                         "source_case_id", "source_status", "stage"}
+    assert set(stage) == {"owner_row_id", "people", "assets"}
+
+
+def test_workspace_source_latest_mock_empty_and_payload_errors():
+    # Không có case Done (chỉ draft) → nguồn rỗng thành công.
+    mock.reset_backend({"cases": {
+        1: {"case_type": "inheritance", "status": "draft",
+            "stage": {"people": [], "assets": []}},
+    }})
+    data = _call("workspace_source_latest", {})["data"]
+    assert data["source_case_id"] is None
+    assert data["source_status"] is None
+    assert data["stage"] == {"people": [], "assets": []}
+    for payload in (None, {"case_id": 44}, {"filter": "x"}):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_source_latest", payload)
+        assert exc.value.code == "validation_error"
+
+
+def test_workspace_source_latest_mock_unsupported_and_saved_at_order():
+    stage = {"people": [], "assets": []}
+    mock.reset_backend({"cases": {
+        1: {"case_type": "gift", "status": "done", "stage": stage},
+    }})
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_source_latest", {})
+    assert exc.value.code == "case_type_unsupported"
+    assert exc.value.details["case_type"] == "gift"
+
+    mock.reset_backend({"cases": {
+        1: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:00.100001", "stage": stage},
+        2: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:00.100002", "stage": stage},
+    }})
+    assert _call("workspace_source_latest", {})["data"][
+        "source_case_id"] == 2
+    # Tie tuyệt đối → id cao thắng.
+    mock.reset_backend({"cases": {
+        1: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:01.000000", "stage": stage},
+        2: {"case_type": "inheritance", "status": "done",
+            "updated_at": "2026-10-22T08:00:01.000000", "stage": stage},
+    }})
+    assert _call("workspace_source_latest", {})["data"][
+        "source_case_id"] == 2
+
+
+# ---------- workspace_duplicate (§13.21, vòng 2) ----------
+
+def test_workspace_duplicate_mock_parity_and_replay():
+    mock.reset_backend(_load_fixture("ready.json"))
+    before = _call("workspace_get", {"case_id": 42})["data"]
+    key = str(uuid.uuid4())
+    data = _call("workspace_duplicate", {
+        "source_case_id": 42, "idempotency_key": key})["data"]
+    assert data["created"] is True
+    assert data["source_case_id"] == 42
+    assert data["backend_mode"] == "mock"
+    assert data["case"]["status"] == "draft"
+    assert data["case"]["revision"] == 1
+    copy_id = data["case"]["id"]
+    assert copy_id != 42
+    assert data["case"]["document_type"] == before["case"]["document_type"]
+
+    old_person = [row["row_id"] for row in before["stage"]["people"]]
+    new_person = [row["row_id"] for row in data["stage"]["people"]]
+    old_asset = [row["row_id"] for row in before["stage"]["assets"]]
+    new_asset = [row["row_id"] for row in data["stage"]["assets"]]
+    assert [uuid.UUID(rid).version for rid in new_person + new_asset] == \
+        [4] * (len(new_person) + len(new_asset))
+    assert not set(new_person) & set(old_person)
+    assert not set(new_asset) & set(old_asset)
+    assert [row["entity_id"] for row in data["stage"]["people"]] == \
+        [row["entity_id"] for row in before["stage"]["people"]]
+    person_map = dict(zip(old_person, new_person))
+    assert data["stage"]["owner_row_id"] == person_map[
+        before["stage"]["owner_row_id"]]
+    for old_node, new_node in zip(before["diagram"]["state"]["nodes"],
+                                  data["diagram"]["state"]["nodes"]):
+        assert old_node["id"] == new_node["id"]
+        assert new_node["personId"] == (
+            person_map.get(old_node["personId"])
+            if old_node["personId"] else None)
+        for field in ("parentSlotIds", "spouseSlotId", "ownPositions",
+                      "receivePositions", "hidden", "deleted"):
+            assert new_node[field] == old_node[field]
+    assert _call("workspace_get", {"case_id": 42})["data"] == before
+
+    replay = _call("workspace_duplicate", {
+        "source_case_id": 42, "idempotency_key": key})["data"]
+    assert replay["created"] is False
+    assert replay["case"]["id"] == copy_id
+    assert replay["case"]["revision"] == 1
+
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_duplicate", {
+            "source_case_id": 43, "idempotency_key": key})
+    assert exc.value.code == "idempotency_conflict"
+
+
+def test_workspace_duplicate_mock_payload_errors_and_unsupported():
+    mock.reset_backend(_load_fixture("ready.json"))
+    key = str(uuid.uuid4())
+    for payload in (
+            None,
+            {},
+            {"source_case_id": 42},
+            {"source_case_id": True, "idempotency_key": key},
+            {"source_case_id": 42, "idempotency_key": "no"},
+            {"source_case_id": 42, "idempotency_key": key, "case_id": 42},
+    ):
+        with pytest.raises(CommandError) as exc:
+            _call("workspace_duplicate", payload)
+        assert exc.value.code == "validation_error"
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_duplicate", {
+            "source_case_id": 987654, "idempotency_key": key})
+    assert exc.value.code == "case_not_found"
+    assert exc.value.details["source_case_id"] == 987654
+
+    mock.reset_backend({"cases": {
+        1: {"case_type": "gift", "status": "done",
+            "stage": {"people": [], "assets": []}},
+    }})
+    with pytest.raises(CommandError) as exc:
+        _call("workspace_duplicate", {
+            "source_case_id": 1, "idempotency_key": key})
+    assert exc.value.code == "case_type_unsupported"

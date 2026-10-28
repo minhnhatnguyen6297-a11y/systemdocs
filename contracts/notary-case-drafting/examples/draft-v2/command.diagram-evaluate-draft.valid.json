@@ -57,7 +57,11 @@
           "ngay_cap": null,
           "co_quan_cap": null,
           "land_rows": [
-            { "loai_dat": "ODT", "dien_tich": 85.5, "thoi_han": null }
+            {
+              "loai_dat": "ODT",
+              "dien_tich": 85.5,
+              "thoi_han": null
+            }
           ]
         }
       ]
@@ -77,7 +81,9 @@
             ],
             "receivePositions": [],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [],
+            "spouseSuggestionId": null
           },
           {
             "id": "child_1",
@@ -91,7 +97,9 @@
               1
             ],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [],
+            "spouseSuggestionId": null
           }
         ]
       }

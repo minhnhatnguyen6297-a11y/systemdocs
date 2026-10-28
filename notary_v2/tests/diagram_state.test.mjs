@@ -4,6 +4,23 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { createStore, normalizeSnapshot } = require("../frontend/static/diagram_state.js");
+const { createModel } = require("../../shell/src/renderer/notary/case-drafting-model.js");
+
+test("removing spouse prunes the one-way spouse slots", () => {
+  const model = createModel({ client: { run: async () => ({ ok: true }) } });
+  model.state.status = "ready";
+  model.state.diagram.nodes = [
+    { id: "anchor", spouseSlotIds: ["a", "b"], spouseSlotId: "b" },
+    { id: "a" },
+    { id: "b" },
+  ];
+
+  assert.equal(model.removeNode("b"), true);
+  assert.deepEqual(model.state.diagram.nodes[0].spouseSlotIds, ["a"]);
+  assert.equal(model.state.diagram.nodes[0].spouseSlotId, "a");
+  assert.equal(model.state.diagram.nodes[1].spouseSlotId, undefined);
+  assert.equal(model.state.diagram.nodes[1].spouseSlotIds, undefined);
+});
 
 test("normalizeSnapshot fills safe defaults", () => {
   const snapshot = normalizeSnapshot(null);

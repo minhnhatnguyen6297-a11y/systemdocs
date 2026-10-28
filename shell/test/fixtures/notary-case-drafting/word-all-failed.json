@@ -1,12 +1,69 @@
 {
   "scenario": "word-all-failed",
-  "description": "Case 43 empty (khong tai san -> word.no_assets); batch khai_nhan_di_san + niem_yet -> ca hai failed -> job failed{word_batch_failed, details.documents[]}. Khong file nao duoc tao.",
+  "description": "Case 43 có 6 tài sản (vượt trần 5 -> word.too_many_assets; phần W: thiếu dữ kiện không còn chặn nên không dùng case rỗng); batch khai_nhan_di_san + niem_yet (template_missing) -> cả hai failed -> job failed{word_batch_failed, details.documents[]}. Không file nào được tạo. Dữ liệu giả lập.",
   "cases": {
     "43": {
-      "$ref_scenario": "empty",
+      "case_type": "inheritance",
+      "document_type": "khai_nhan",
+      "status": "draft",
+      "revision": 1,
       "stage": {
         "people": [],
-        "assets": []
+        "assets": [
+          {
+            "row_id": "a0000000-0000-4000-8000-000000000001",
+            "so_serial": "MM900001",
+            "so_thua_dat": "101",
+            "so_to_ban_do": "9",
+            "dia_chi": "Địa chỉ mẫu tài sản 1"
+          },
+          {
+            "row_id": "a0000000-0000-4000-8000-000000000002",
+            "so_serial": "MM900002",
+            "so_thua_dat": "102",
+            "so_to_ban_do": "9",
+            "dia_chi": "Địa chỉ mẫu tài sản 2"
+          },
+          {
+            "row_id": "a0000000-0000-4000-8000-000000000003",
+            "so_serial": "MM900003",
+            "so_thua_dat": "103",
+            "so_to_ban_do": "9",
+            "dia_chi": "Địa chỉ mẫu tài sản 3"
+          },
+          {
+            "row_id": "a0000000-0000-4000-8000-000000000004",
+            "so_serial": "MM900004",
+            "so_thua_dat": "104",
+            "so_to_ban_do": "9",
+            "dia_chi": "Địa chỉ mẫu tài sản 4"
+          },
+          {
+            "row_id": "a0000000-0000-4000-8000-000000000005",
+            "so_serial": "MM900005",
+            "so_thua_dat": "105",
+            "so_to_ban_do": "9",
+            "dia_chi": "Địa chỉ mẫu tài sản 5"
+          },
+          {
+            "row_id": "a0000000-0000-4000-8000-000000000006",
+            "so_serial": "MM900006",
+            "so_thua_dat": "106",
+            "so_to_ban_do": "9",
+            "dia_chi": "Địa chỉ mẫu tài sản 6"
+          }
+        ],
+        "owner_row_id": null
+      },
+      "diagram": {
+        "state": {
+          "version": 3,
+          "domain": "inheritance",
+          "nodes": []
+        },
+        "render_model": null,
+        "warnings": [],
+        "domain": "inheritance"
       }
     }
   },

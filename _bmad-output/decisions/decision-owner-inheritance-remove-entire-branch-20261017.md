@@ -36,6 +36,6 @@ Lựa chọn trả lời ví dụ **ông/bà A → con B → cháu C**, B có v�
 ## Phạm vi và trạng thái
 
 - Spike #21 chỉ nhận đáp án/bằng chứng; giữ nguyên ba AC và `refined: false`, không triển khai hoặc tuyên bố built trong spike.
-- Implementation riêng **#21B**, story và plan (chỉ còn trong lịch sử Git: `git show f6705c8:docs/archive/backlog/story-inheritance-remove-entire-branch{,-plan}.md`). Chỉ đạo tiếp tục không xin duyệt từng plan vẫn áp dụng; parent đọc plan và Quick độc lập trước code là kiểm soát nội bộ, không phải gate owner mới.
+- Implementation riêng **#21B**, [story](../backlog/story-inheritance-remove-entire-branch.md) và [plan](../backlog/story-inheritance-remove-entire-branch-plan.md). Chỉ đạo tiếp tục không xin duyệt từng plan vẫn áp dụng; parent đọc plan và Quick độc lập trước code là kiểm soát nội bộ, không phải gate owner mới.
 - Spec/contract được đồng bộ trước code trong phiên 17/10/2026. Ghi quyết định không chứng minh runtime đã sửa. Bằng chứng nghiên cứu trước quyết định ở `../tmp/issue-21-middle-node-deletion/` giữ nguyên, không chạy lại để xác nhận lỗi đã quan sát.
 - #20 Danh sách hồ sơ, #19 Word authoring và Office/#14 vẫn DEFERRED; #18 REMOVED. Không mở lại, đổi config/initiative hoặc dùng Autoresearch.

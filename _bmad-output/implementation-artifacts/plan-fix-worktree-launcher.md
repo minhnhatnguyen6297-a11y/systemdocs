@@ -43,4 +43,4 @@ Phần spike có sẵn không nằm trong commit sửa launcher.
 - Kiểm tra ưu tiên runtime, override Python, đối số/đường dẫn có khoảng trắng và thiếu runtime bằng bản sao launcher trong thư mục tạm.
 - `rtk proxy node _bmad-output/tmp/launcher-fix/check-launcher.cjs`: PASS. Chính run.bat được gọi từ thư mục khác, Electron mở URL của worktree, sidecar ready, không bật spike; thoát mã 0. Dữ liệu/profile giả tách riêng. Biến ELECTRON_RUN_AS_NODE kế thừa đã được xóa; Python dùng kho chính.
 - `rtk proxy python -X utf8 _bmad-output/tmp/launcher-fix/check_edges.py`: PASS. Runtime tại chỗ, đường dẫn/đối số có khoảng trắng, mã thoát 7, override Python và trường hợp thiếu Git/runtime trả mã 1. Dùng Node đóng vai executable để quan sát đối số/môi trường; không thay thế kiểm tra Electron thật ở trên.
-- `rtk git diff --check`: PASS. Bằng chứng và ảnh tại [báo cáo](../tmp/launcher-fix/report.html).
+- `rtk git diff --check`: PASS. Link báo cáo/ảnh tạm cũ đã được bỏ ngày 15/10/2026 vì file không còn trong repo; phần ghi kết quả ở trên là lịch sử, chưa đọc lại được bằng chứng gốc.

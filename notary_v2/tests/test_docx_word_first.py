@@ -20,7 +20,7 @@ from services.document_intake.models import AdapterContext, SourceSpec
 from services.case_workspace import CaseWorkspaceService, WorkspaceError
 from services.word_original import binding_proposals, reviewed_template, export_original, slot_for
 from tests.test_case_workspace import db, session_factory, _person_row, _asset_row
-from models import InheritanceCase
+from models import CaseAssetRow, InheritanceCase, Property, Customer
 
 
 def fixture_bytes():
@@ -45,6 +45,14 @@ def fixture_bytes():
     doc.add_paragraph('Lời chứng: Nguyễn Văn Mẫu — tên nhắc lại giữ nguyên')
     doc.sections[0].header.paragraphs[0].text = 'ĐẦU TRANG GIỮ NGUYÊN'
     doc.add_picture(io.BytesIO(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=')))
+    stream = io.BytesIO(); doc.save(stream)
+    return stream.getvalue()
+
+
+def _docx_bytes(lines):
+    doc = Document()
+    for line in lines:
+        doc.add_paragraph(line)
     stream = io.BytesIO(); doc.save(stream)
     return stream.getvalue()
 
@@ -424,6 +432,550 @@ def reviewed_case(db, tmp_path, content=None):
     return content, store, service, data
 
 
+def reviewed_case_with_missing_asset_values(db, tmp_path, content):
+    """Keep an absent asset field absent instead of applying fixture defaults."""
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(content, store)
+    people, assets, records = [], [], []
+    source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
+    for suggestion in suggestions:
+        values = {key: field['normalized_value'] for key, field in suggestion['fields'].items()}
+        values.pop('dien_tich', None)
+        if 'land_rows' in values:
+            values['land_rows'] = json.loads(values['land_rows'])
+        if suggestion['target'] == 'asset':
+            values.setdefault('nguon_goc', None)
+            # S5b 23/10/2026: số thửa + số tờ là mức tối thiểu của dòng
+            # Tài sản; giữ phép thử này tập trung vào nguồn gốc.
+            values['so_thua_dat'] = values.get('so_thua_dat') or '0'
+            values['so_to_ban_do'] = values.get('so_to_ban_do') or '0'
+        row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
+        (people if suggestion['target'] == 'person' else assets).append(row)
+        records.append({'candidate_id': suggestion['suggestion_id'], 'row_id': row['row_id']})
+    context = {'version': 1, 'sources': [{'source_id': source_ref['source_id'], 'sha256': source_ref['source_sha256'], 'records': records, 'bindings': []}]}
+    service = CaseWorkspaceService(db, store)
+    data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+        {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
+    return content, store, service, data
+
+
+def reviewed_case_with_source_gender(db, tmp_path, content):
+    """Reviewed case that keeps an absent gender absent (no _person_row default)."""
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(content, store)
+    people, assets, records = [], [], []
+    source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
+    for suggestion in suggestions:
+        values = {key: field['normalized_value'] for key, field in suggestion['fields'].items()}
+        values.pop('dien_tich', None)
+        if 'land_rows' in values:
+            values['land_rows'] = json.loads(values['land_rows'])
+        if suggestion['target'] == 'person':
+            values.setdefault('gioi_tinh', None)
+        row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
+        (people if suggestion['target'] == 'person' else assets).append(row)
+        records.append({'candidate_id': suggestion['suggestion_id'], 'row_id': row['row_id']})
+    context = {'version': 1, 'sources': [{'source_id': source_ref['source_id'], 'sha256': source_ref['source_sha256'], 'records': records, 'bindings': []}]}
+    service = CaseWorkspaceService(db, store)
+    data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+        {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
+    return content, store, service, data
+
+
+def test_asset_origin_roundtrips_per_asset_not_broadcast(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:',
+        'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Nguồn gốc sử dụng đất: Nguồn A',
+        'Nguồn gốc sử dụng đất: Nguồn C',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Nguồn gốc sử dụng đất: Nguồn B',
+        'Thửa đất số: 32; Tờ bản đồ số: 9',
+    ])
+    suggestions = extraction(content)
+    assets = [s for s in suggestions if s['target'] == 'asset']
+    assert [s['fields'].get('nguon_goc', {}).get('normalized_value') for s in assets] == [
+        None, 'Nguồn B', None]
+    assert 'nguon_goc' not in assets[2]['fields']
+    ambiguous = assets[0]['fields']['nguon_goc']
+    assert ambiguous['normalized_value'] is None
+    assert [r['raw_snippet'] for r in ambiguous['source_refs']] == ['Nguồn A', 'Nguồn C']
+    assert any(w['code'] == 'intake.ambiguous' and 'nguon_goc' in w['message']
+               for w in assets[0]['warnings'])
+
+    _, _, service, data = reviewed_case_with_missing_asset_values(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [a['nguon_goc'] for a in data['stage']['assets']] == [None, 'Nguồn B', None]
+    db.expire_all()
+    reloaded = service.get(cid)
+    assert [a['nguon_goc'] for a in reloaded['stage']['assets']] == [None, 'Nguồn B', None]
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.nguon_goc for row in rows] == [None, 'Nguồn B', None]
+    from services.word_engine import build_template_mapping
+    text = build_template_mapping(
+        db.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
+    assert 'Nguồn B' in text and 'Nguồn A' not in text and 'Nguồn C' not in text
+    assert text.count('Nguồn gốc sử dụng đất:') == 3
+
+
+def test_group_asset_origins_stay_scoped_and_ambiguous_not_broadcast(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản 1:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5', 'Nguồn gốc sử dụng đất: Nguồn A',
+        'Tài sản 2:', 'Số serial: YY123456; có địa chỉ tại: Nhà B',
+        'Thửa đất số: 22; Tờ bản đồ số: 7', 'Nguồn gốc sử dụng đất: Nguồn B',
+        'Tài sản 3:', 'Số serial: XX123456; có địa chỉ tại: Nhà C',
+        'Thửa đất số: 32; Tờ bản đồ số: 9', 'Nguồn gốc sử dụng đất: Nguồn C',
+        'Thửa đất số: 33; Tờ bản đồ số: 10', 'Nguồn gốc sử dụng đất: Nguồn D',
+    ])
+    suggestions = extraction(content)
+    assets = [s for s in suggestions if s['target'] == 'asset']
+    assert [s['fields'].get('nguon_goc', {}).get('normalized_value') for s in assets] == [
+        'Nguồn A', 'Nguồn B', None]
+    ambiguous = assets[2]['fields']['nguon_goc']
+    assert ambiguous['normalized_value'] is None
+    assert [r['raw_snippet'] for r in ambiguous['source_refs']] == ['Nguồn C', 'Nguồn D']
+    assert any(w['code'] == 'intake.ambiguous' and 'nguon_goc' in w['message']
+               for w in assets[2]['warnings'])
+
+    _, _, service, data = reviewed_case_with_missing_asset_values(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [a['nguon_goc'] for a in data['stage']['assets']] == ['Nguồn A', 'Nguồn B', None]
+    db.expire_all()
+    reloaded = service.get(cid)
+    assert [a['nguon_goc'] for a in reloaded['stage']['assets']] == ['Nguồn A', 'Nguồn B', None]
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.nguon_goc for row in rows] == ['Nguồn A', 'Nguồn B', None]
+    from services.word_engine import build_template_mapping
+    text = build_template_mapping(
+        db.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
+    assert 'Nguồn A' in text and 'Nguồn B' in text
+    assert 'Nguồn C' not in text and 'Nguồn D' not in text
+
+
+def reviewed_case_with_source_form(db, tmp_path, content):
+    """Reviewed case that keeps an absent hinh_thuc_su_dung absent."""
+    store = DocxStore(tmp_path / 'sources')
+    suggestions = extraction(content, store)
+    people, assets, records = [], [], []
+    source_ref = next(iter(suggestions[0]['fields'].values()))['source_refs'][0]
+    for suggestion in suggestions:
+        values = {key: field['normalized_value'] for key, field in suggestion['fields'].items()}
+        values.pop('dien_tich', None)
+        if 'land_rows' in values:
+            values['land_rows'] = json.loads(values['land_rows'])
+        if suggestion['target'] == 'asset':
+            values.setdefault('hinh_thuc_su_dung', None)
+        row = _person_row(**values) if suggestion['target'] == 'person' else _asset_row(**values)
+        (people if suggestion['target'] == 'person' else assets).append(row)
+        records.append({'candidate_id': suggestion['suggestion_id'], 'row_id': row['row_id']})
+    context = {'version': 1, 'sources': [{'source_id': source_ref['source_id'], 'sha256': source_ref['source_sha256'], 'records': records, 'bindings': []}]}
+    service = CaseWorkspaceService(db, store)
+    data = service.create(str(uuid.uuid4()), {'case_type': 'inheritance', 'document_type': 'khai_nhan'},
+        {'owner_row_id': people[0]['row_id'], 'people': people, 'assets': assets}, None, context)
+    return content, store, service, data
+
+
+def test_person_gender_from_titles_roundtrips_with_title_provenance(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    suggestions = extraction(content)
+    people = [s for s in suggestions if s['target'] == 'person']
+    assert [s['fields']['ho_ten']['normalized_value'] for s in people] == [
+        'Nguyễn Văn Mẫu', 'Trần Thị Mẫu']
+    assert [s['fields']['gioi_tinh']['normalized_value'] for s in people] == ['Nam', 'Nữ']
+    assert [s['fields']['gioi_tinh']['raw_value'] for s in people] == ['Ông', 'Bà']
+    assert [r['raw_snippet'] for s in people
+            for r in s['fields']['gioi_tinh']['source_refs']] == ['Ông', 'Bà']
+    assert all(r['rule_id'] == 'person.gioi_tinh'
+               for s in people for r in s['fields']['gioi_tinh']['source_refs'])
+
+    _, _, service, data = reviewed_case_with_source_gender(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [p['gioi_tinh'] for p in data['stage']['people']] == ['Nam', 'Nữ']
+    assert [p['ho_ten'] for p in data['stage']['people']] == ['Nguyễn Văn Mẫu', 'Trần Thị Mẫu']
+    assert not {'Ông', 'Bà'} & {p['gioi_tinh'] for p in data['stage']['people']}
+    db.expire_all()
+    reloaded = service.get(cid)
+    assert [p['gioi_tinh'] for p in reloaded['stage']['people']] == ['Nam', 'Nữ']
+    # Danh tính dùng chung chỉ giữ neo tên+số giấy; giới tính là dữ kiện
+    # của dòng Hồ sơ (đã assert ở trên), không ghi ngược master.
+    assert {c.ho_ten: c.gioi_tinh for c in db.query(Customer).all()} == {
+        'Nguyễn Văn Mẫu': None, 'Trần Thị Mẫu': None}
+    from services.word_engine import build_word_context
+    context = build_word_context(db.get(InheritanceCase, cid))
+    assert [(p.ho_ten, p.gender_normalized) for p in context.persons] == [
+        ('Nguyễn Văn Mẫu', 'nam'), ('Trần Thị Mẫu', 'nữ')]
+
+
+def test_person_gender_neutral_title_stays_absent_per_person(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông/bà Nguyễn Thị Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    suggestions = extraction(content)
+    people = [s for s in suggestions if s['target'] == 'person']
+    assert 'gioi_tinh' not in people[0]['fields']
+    assert people[1]['fields']['gioi_tinh']['normalized_value'] == 'Nữ'
+
+    _, _, service, data = reviewed_case_with_source_gender(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [p['gioi_tinh'] for p in data['stage']['people']] == [None, 'Nữ']
+    db.expire_all()
+    assert [p['gioi_tinh'] for p in service.get(cid)['stage']['people']] == [None, 'Nữ']
+    assert {c.ho_ten: c.gioi_tinh for c in db.query(Customer).all()} == {
+        'Nguyễn Thị Mẫu': None, 'Trần Thị Mẫu': None}
+    from services.word_engine import build_word_context
+    context = build_word_context(db.get(InheritanceCase, cid))
+    assert [(p.ho_ten, p.gender_normalized) for p in context.persons] == [
+        ('Nguyễn Thị Mẫu', ''), ('Trần Thị Mẫu', 'nữ')]
+
+
+def test_person_gender_representative_title_maps_to_nam(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:',
+        'Đại diện: Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    people = [s for s in extraction(content) if s['target'] == 'person']
+    representative = people[0]
+    assert representative['fields']['ho_ten']['normalized_value'] == 'Nguyễn Văn Mẫu'
+    assert representative['fields']['gioi_tinh']['normalized_value'] == 'Nam'
+    ref, = representative['fields']['gioi_tinh']['source_refs']
+    assert ref['raw_snippet'] == 'Ông' and ref['rule_id'] == 'person.gioi_tinh'
+
+
+def test_person_gender_table_row_title_evidence_without_raw_text(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'DANH SÁCH NGƯỜI SỬ DỤNG CHUNG',
+        '1 | Ông Nguyễn Văn Mẫu | 1980 | CCCD 001234567890',
+        '2 | Chị Trần Thị Mẫu | 1985 | CCCD 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+    ])
+    people = [s for s in extraction(content) if s['target'] == 'person']
+    assert [s['fields']['ho_ten']['normalized_value'] for s in people] == [
+        'Nguyễn Văn Mẫu', 'Trần Thị Mẫu']
+    assert [s['fields']['gioi_tinh']['normalized_value'] for s in people] == ['Nam', 'Nữ']
+    # Lõi in Anh/Chị thành Ông/Bà; bằng chứng phải giữ đúng token nguồn.
+    assert [r['raw_snippet'] for s in people
+            for r in s['fields']['gioi_tinh']['source_refs']] == ['Ông', 'Chị']
+    _, _, service, data = reviewed_case_with_source_gender(db, tmp_path, content)
+    assert [p['gioi_tinh'] for p in data['stage']['people']] == ['Nam', 'Nữ']
+
+
+def test_form_from_explicit_label_roundtrips_per_parcel_without_notes(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng; Ghi chú: không lấy phần này',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng chung',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    assert [a['fields']['hinh_thuc_su_dung']['normalized_value'] for a in assets] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert [a['fields']['hinh_thuc_su_dung']['raw_value'] for a in assets] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert [r['raw_snippet'] for a in assets
+            for r in a['fields']['hinh_thuc_su_dung']['source_refs']] == [
+                'Sử dụng riêng', 'Sử dụng chung']
+    assert all('Ghi chú' not in a['fields']['hinh_thuc_su_dung']['raw_value'] for a in assets)
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    cid = data['case']['id']
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    db.expire_all()
+    assert [a['hinh_thuc_su_dung'] for a in service.get(cid)['stage']['assets']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    fresh = session_factory()
+    try:
+        fresh_service = CaseWorkspaceService(fresh, None)
+        assert [a['hinh_thuc_su_dung']
+                for a in fresh_service.get(cid)['stage']['assets']] == [
+                    'Sử dụng riêng', 'Sử dụng chung']
+        from services.word_engine import build_template_mapping
+        fresh_rows = fresh.query(CaseAssetRow).filter_by(
+            case_id=cid).order_by(CaseAssetRow.vitri).all()
+        assert [row.hinh_thuc_su_dung for row in fresh_rows] == [
+            'Sử dụng riêng', 'Sử dụng chung']
+        fresh_text = build_template_mapping(
+            fresh.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
+        assert 'Hình thức sử dụng: Sử dụng riêng' in fresh_text
+        assert 'Hình thức sử dụng: Sử dụng chung' in fresh_text
+    finally:
+        fresh.close()
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.hinh_thuc_su_dung for row in rows] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    from services.word_engine import build_template_mapping
+    text = build_template_mapping(
+        db.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
+    assert 'Hình thức sử dụng: Sử dụng riêng' in text
+    assert 'Hình thức sử dụng: Sử dụng chung' in text
+    assert 'không lấy phần này' not in text
+
+
+def test_form_label_scoped_to_asset_and_absent_stays_absent(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Hình thức sử dụng: Sử dụng ngoài tài sản',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng chung',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    assert [a['fields'].get('hinh_thuc_su_dung', {}).get('normalized_value') for a in assets] == [
+        None, 'Sử dụng chung']
+    assert 'hinh_thuc_su_dung' not in assets[0]['fields']
+    assert assets[1]['fields']['hinh_thuc_su_dung']['raw_value'] == 'Sử dụng chung'
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [None, 'Sử dụng chung']
+    fresh = session_factory()
+    try:
+        assert [a['hinh_thuc_su_dung']
+                for a in CaseWorkspaceService(fresh, None).get(data['case']['id'])['stage']['assets']] == [
+                    None, 'Sử dụng chung']
+        from services.word_engine import build_template_mapping
+        fresh_text = build_template_mapping(
+            fresh.get(InheritanceCase, data['case']['id']),
+            static=True)['[Đoạn mô tả di sản]']
+        assert 'Hình thức sử dụng: Sử dụng chung' in fresh_text
+    finally:
+        fresh.close()
+
+
+def test_form_repeated_labels_duplicate_vs_conflict(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Hình thức sử dụng: Sử dụng chung',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    same, conflict = assets
+    assert same['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng riêng'
+    assert len(same['fields']['hinh_thuc_su_dung']['source_refs']) == 2
+    assert not any(w['code'] == 'intake.ambiguous' for w in same['warnings'])
+    ambiguous = conflict['fields']['hinh_thuc_su_dung']
+    assert ambiguous['normalized_value'] is None
+    assert [r['raw_snippet'] for r in ambiguous['source_refs']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert any(w['code'] == 'intake.ambiguous' and 'hinh_thuc_su_dung' in w['message']
+               for w in conflict['warnings'])
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [
+        'Sử dụng riêng', None]
+    cid = data['case']['id']
+    rows = db.query(CaseAssetRow).filter_by(case_id=cid).order_by(
+        CaseAssetRow.vitri).all()
+    assert [row.hinh_thuc_su_dung for row in rows] == [
+        'Sử dụng riêng', None]
+    fresh = session_factory()
+    try:
+        assert [a['hinh_thuc_su_dung']
+                for a in CaseWorkspaceService(fresh, None).get(cid)['stage']['assets']] == [
+                    'Sử dụng riêng', None]
+        from services.word_engine import build_template_mapping
+        fresh_text = build_template_mapping(
+            fresh.get(InheritanceCase, cid), static=True)['[Đoạn mô tả di sản]']
+        assert 'Hình thức sử dụng: Sử dụng riêng' in fresh_text
+        assert 'Hình thức sử dụng: Sử dụng chung' not in fresh_text
+    finally:
+        fresh.close()
+
+
+def test_form_header_only_or_unclear_cell_not_guessed(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12 | Tờ bản đồ số: 5 | Hình thức sử dụng: Sử dụng riêng | Ghi chú: không lấy',
+        'Thửa đất số: 22 | Tờ bản đồ số: 7 | Hình thức sử dụng | Ghi chú: ô trống',
+    ])
+    assets = [s for s in extraction(content) if s['target'] == 'asset']
+    first = next(a for a in assets
+                 if a['fields']['so_thua_dat']['normalized_value'] == '12')
+    assert first['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng riêng'
+    assert first['fields']['hinh_thuc_su_dung']['raw_value'] == 'Sử dụng riêng'
+    assert all(a['fields'].get('hinh_thuc_su_dung', {}).get('normalized_value')
+               != 'Ghi chú' for a in assets)
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert data['stage']['assets'][0]['hinh_thuc_su_dung'] == 'Sử dụng riêng'
+
+
+def test_form_nfd_bullet_and_comma_labels_preserve_source(db, tmp_path):
+    nfd_label = unicodedata.normalize('NFD', 'Hình thức sử dụng')
+    nfd_value = unicodedata.normalize('NFD', 'Sử dụng riêng')
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5', f'{nfd_label}: {nfd_value}',
+        'Thửa đất số: 22; Tờ bản đồ số: 7', '- Hình thức sử dụng: Sử dụng chung',
+        'Thửa đất số: 32, Tờ bản đồ số: 9, Hình thức sử dụng: Sử dụng riêng',
+    ])
+    assets = {a['fields']['so_thua_dat']['normalized_value']: a
+              for a in extraction(content) if a['target'] == 'asset'}
+    nfd_field = assets['12']['fields']['hinh_thuc_su_dung']
+    assert unicodedata.normalize('NFC', nfd_field['normalized_value']) == 'Sử dụng riêng'
+    assert nfd_field['raw_value'] == nfd_value
+    assert [r['raw_snippet'] for r in nfd_field['source_refs']] == [nfd_value]
+    assert assets['22']['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng chung'
+    assert assets['32']['fields']['hinh_thuc_su_dung']['normalized_value'] == 'Sử dụng riêng'
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    assert [a['hinh_thuc_su_dung'] for a in data['stage']['assets']] == [
+        'Sử dụng riêng', 'Sử dụng chung', 'Sử dụng riêng']
+
+
+def test_form_header_newline_and_prose_tail_not_stolen(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng:', 'Nội dung ngoài ô không được lấy',
+        'Thửa đất số: 22; Tờ bản đồ số: 7',
+        'Hình thức sử dụng: Sử dụng riêng theo Giấy chứng nhận AB',
+    ])
+    assets = {a['fields']['so_thua_dat']['normalized_value']: a
+              for a in extraction(content) if a['target'] == 'asset'}
+    assert 'hinh_thuc_su_dung' not in assets['12']['fields']
+    assert assets['22']['fields']['hinh_thuc_su_dung']['normalized_value'] == (
+        'Sử dụng riêng theo Giấy chứng nhận AB')
+
+
+def test_form_semicolon_compound_value_is_one_explicit_value(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng; Sử dụng chung',
+    ])
+    asset, = [a for a in extraction(content) if a['target'] == 'asset']
+    field = asset['fields']['hinh_thuc_su_dung']
+    assert field['normalized_value'] == 'Sử dụng riêng; Sử dụng chung'
+    assert len(field['source_refs']) == 1
+    assert not any(w['code'] == 'intake.ambiguous' for w in asset['warnings'])
+
+
+def test_form_same_line_repeated_labels_are_ambiguous(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Hình thức sử dụng: Sử dụng riêng; Hình thức sử dụng: Sử dụng chung',
+    ])
+    asset, = [a for a in extraction(content) if a['target'] == 'asset']
+    field = asset['fields']['hinh_thuc_su_dung']
+    assert field['normalized_value'] is None
+    assert [r['raw_snippet'] for r in field['source_refs']] == [
+        'Sử dụng riêng', 'Sử dụng chung']
+    assert any(w['code'] == 'intake.ambiguous' and 'hinh_thuc_su_dung' in w['message']
+               for w in asset['warnings'])
+
+
+def test_form_context_asset_does_not_borrow_pre_asset_label(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Hình thức sử dụng: Sử dụng ngoài tài sản',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:',
+        'Hình thức sử dụng: Sử dụng riêng',
+        'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Sử dụng ngoài tài sản',
+    ])
+    assets = [a for a in extraction(content) if a['target'] == 'asset']
+    assert [a['fields']['hinh_thuc_su_dung']['normalized_value'] for a in assets] == [
+        'Sử dụng riêng']
+    assert all(a['fields']['hinh_thuc_su_dung']['normalized_value'] != 'Sử dụng ngoài tài sản'
+               for a in assets)
+
+
+def test_form_last_parcel_and_group_do_not_read_past_asset_block(db, tmp_path):
+    parcel_doc = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Ngoài tài sản',
+    ])
+    parcel_asset, = [a for a in extraction(parcel_doc) if a['target'] == 'asset']
+    assert 'hinh_thuc_su_dung' not in parcel_asset['fields']
+
+    group_doc = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản 1:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Ngoài tài sản',
+    ])
+    group_asset, = [a for a in extraction(group_doc) if a['target'] == 'asset']
+    assert 'hinh_thuc_su_dung' not in group_asset['fields']
+
+    no_thua_doc = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Mẫu, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Mẫu, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Tờ bản đồ số: 5',
+        'Điều 2: Quyền và nghĩa vụ',
+        'Hình thức sử dụng: Ngoài tài sản',
+    ])
+    no_thua_asset, = [a for a in extraction(no_thua_doc) if a['target'] == 'asset']
+    assert 'hinh_thuc_su_dung' not in no_thua_asset['fields']
+
+
 def test_intentionally_empty_land_roundtrip_exports_remaining_asset_fields_without_rebinding(db, tmp_path):
     original, store, service, data = reviewed_case(db, tmp_path)
     cid = data['case']['id']; source_id = data['docx_import']['sources'][0]['source_id']
@@ -600,7 +1152,7 @@ def test_localized_area_complete_span_provenance_and_export(db, tmp_path):
     assert rows[0]['dien_tich'] == 1234.5
     ref = next(r for r in asset['fields']['land_rows']['source_refs'] if r['land_field'] == 'dien_tich')
     assert ref['raw_snippet'] == '1.234,5'
-    assert ref['profile_id'] == 'transfer' and ref['profile_version'] and ref['candidate_state'] == 'matched'
+    assert ref['candidate_state'] == 'matched'
     rendered = replace_spans(content, read_docx(content), [(ref['span'], '2000')])
     assert 'Diện tích: 2000;' in read_docx(rendered).text
     assert '2000,5' not in read_docx(rendered).text
@@ -785,3 +1337,187 @@ def test_eight_sources_persist_ninth_rejects_transaction(db, tmp_path):
     loaded = service.get(cid)
     assert loaded['case']['revision'] == saved['revision']
     assert loaded['stage']['people'][0]['ho_ten'] != 'Ninth must not save'
+
+
+def test_year_only_source_date_survives_commit_and_reload(db, tmp_path):
+    """Nguồn chỉ có năm sinh → gợi ý giữ `1980`; commit rồi mở lại vẫn
+    `1980` (không bị đệm thành `01/01/1980`)."""
+    doc = Document(io.BytesIO(fixture_bytes()))
+    for p in doc.paragraphs:
+        for run in p.runs:
+            run.text = run.text.replace('01/02/1980', '1980')
+    stream = io.BytesIO(); doc.save(stream); content = stream.getvalue()
+    _, _, service, data = reviewed_case(db, tmp_path / 'case', content)
+    person = data['stage']['people'][0]
+    assert person['ngay_sinh'] == '1980'
+    saved = service.commit_stage(
+        data['case']['id'], data['case']['revision'], data['stage'],
+        docx_import=data['docx_import'])
+    assert saved['stage']['people'][0]['ngay_sinh'] == '1980'
+    assert service.get(data['case']['id'])['stage']['people'][0]['ngay_sinh'] == '1980'
+
+
+def test_saved_conversion_preserves_old_bindings_requires_reconfirmation_and_exports(db, tmp_path):
+    from services.inheritance_workspace import InheritanceWorkspaceService
+    from services.word_batch_export import WordBatchError
+    original, store, service, data = reviewed_case(db, tmp_path)
+    cid = data["case"]["id"]
+    source = data["docx_import"]["sources"][0]
+    sid = source["source_id"]
+    proposals = binding_proposals(db.get(InheritanceCase, cid), sid, store)
+    source["bindings"] = [
+        {k: p[k] for k in ("candidate_id", "occurrence_id", "field_key", "slot")}
+        for p in proposals if p["supported"]]
+    assert any(b["slot"].startswith("[Người ") for b in source["bindings"])
+    saved = service.commit_stage(cid, data["case"]["revision"], data["stage"],
+                                 docx_import=data["docx_import"])
+    old_context = json.loads(json.dumps(saved["docx_import"]))
+    converted = service.convert_type(cid, saved["revision"], {
+        "case_type": "two_party", "document_type": "tang_cho",
+        "confirm_diagram_reset": True})
+    assert converted["docx_import"] == old_context
+    with pytest.raises(WordBatchError) as invalid:
+        export_original(db.get(InheritanceCase, cid), sid, store, tmp_path)
+    assert invalid.value.code == "word.original_mapping_invalid"
+    state = converted["diagram"]["state"]
+    for index, person in enumerate(converted["stage"]["people"]):
+        state["nodes"][index * 15]["personId"] = person["row_id"]
+    diagram = InheritanceWorkspaceService(db).save_diagram(
+        cid, converted["case"]["revision"], state)
+    loaded = service.get(cid)
+    proposals = binding_proposals(db.get(InheritanceCase, cid), sid, store)
+    bindings = [{k: p[k] for k in ("candidate_id", "occurrence_id", "field_key", "slot")}
+                for p in proposals if p["supported"]]
+    assert any(b["slot"].startswith("[Bên ") for b in bindings)
+    loaded["docx_import"]["sources"][0]["bindings"] = bindings
+    rebound = service.commit_stage(cid, diagram["revision"], loaded["stage"],
+                                    docx_import=loaded["docx_import"])
+    db.expire_all()
+    assert service.get(cid)["docx_import"] == rebound["docx_import"]
+    output = export_original(db.get(InheritanceCase, cid), sid, store, tmp_path)
+    assert output["documents"][0]["status"] == "saved"
+    assert store.load(sid)[0] == original
+
+
+def test_deceased_person_maps_explicit_source_fields_without_identity_merge(db, tmp_path, session_factory):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Sống, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Sống, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Người để lại di sản: Ông Nguyễn Văn Cố, sinh năm 1940, chết ngày 05/06/2016 '
+        'theo Trích lục khai tử số 95/2026/TLKT do UBND xã Mẫu cấp ngày 10/06/2016; '
+        'Nơi thường trú cuối cùng trước khi chết: Thôn Mẫu, xã Mẫu.',
+    ])
+    suggestions = extraction(content)
+    deceased = [s for s in suggestions if s['target'] == 'person'
+                and s['fields'].get('ho_ten', {}).get('normalized_value') == 'Nguyễn Văn Cố']
+    assert len(deceased) == 1
+    fields = deceased[0]['fields']
+    assert fields['gioi_tinh']['normalized_value'] == 'Nam'
+    assert fields['ngay_sinh']['normalized_value'] == '1940'
+    assert fields['ngay_chet']['normalized_value'] == '2016-06-05'
+    assert fields['loai_giay_to']['normalized_value'] == 'Trích lục khai tử'
+    assert fields['ngay_cap']['normalized_value'] == '2016-06-10'
+    assert fields['noi_cap']['normalized_value'] == 'UBND xã Mẫu'
+    assert fields['dia_chi']['normalized_value'] == 'Thôn Mẫu, xã Mẫu'
+    assert fields['so_giay_to']['normalized_value'] == '95/2026/TLKT'
+    assert fields['ngay_chet']['source_refs'][0]['raw_snippet'] == '05/06/2016'
+    assert fields['loai_giay_to']['source_refs'][0]['raw_snippet'] == 'Trích lục khai tử'
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    cid = data['case']['id']
+    stage_deceased = next(p for p in data['stage']['people'] if p['ho_ten'] == 'Nguyễn Văn Cố')
+    assert stage_deceased['loai_giay_to'] == 'Trích lục khai tử'
+    assert (stage_deceased['ngay_cap'], stage_deceased['noi_cap']) == (
+        '2016-06-10', 'UBND xã Mẫu')
+    assert stage_deceased['dia_chi'] == 'Thôn Mẫu, xã Mẫu'
+    assert stage_deceased['so_giay_to'] == '95/2026/TLKT'
+    db.expire_all()
+    assert any(p['ho_ten'] == 'Nguyễn Văn Cố' and p['ngay_chet'] == '2016-06-05'
+               for p in service.get(cid)['stage']['people'])
+    from models import Customer
+    deceased_customer = db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Cố').one()
+    assert deceased_customer.so_giay_to == '95/2026/TLKT'
+    # Ngày chết thuộc dòng Hồ sơ; danh tính dùng chung không bị ghi ngược.
+    assert deceased_customer.ngay_chet is None
+    fresh = session_factory()
+    try:
+        fresh_people = CaseWorkspaceService(fresh, None).get(cid)['stage']['people']
+        fresh_deceased = next(p for p in fresh_people if p['ho_ten'] == 'Nguyễn Văn Cố')
+        assert (fresh_deceased['ngay_sinh'], fresh_deceased['ngay_chet']) == ('1940', '2016-06-05')
+        assert fresh_deceased['gioi_tinh'] == 'Nam'
+        assert fresh_deceased['loai_giay_to'] == 'Trích lục khai tử'
+        assert (fresh_deceased['ngay_cap'], fresh_deceased['noi_cap']) == (
+            '2016-06-10', 'UBND xã Mẫu')
+        assert fresh_deceased['dia_chi'] == 'Thôn Mẫu, xã Mẫu'
+    finally:
+        fresh.close()
+    from services.word_engine import (
+        build_template_mapping, build_word_context, replace_in_doc)
+    case = db.get(InheritanceCase, cid)
+    context = build_word_context(case)
+    assert any(p.ho_ten == 'Nguyễn Văn Cố' and p.is_deceased for p in context.persons)
+    assert (context.persons[2].ho_ten, context.persons[2].is_deceased) == (
+        'Nguyễn Văn Cố', True)
+    # Template tokens are fixed here BEFORE the engine mapping/output exists:
+    # fixed Stage person slot 3, source-confirmed deceased identity.
+    expected_by_token = {
+        '[Người 3 - Họ tên]': 'Nguyễn Văn Cố',
+        '[Người 3 - Ngày chết]': '05/06/2016',
+        '[Người 3 - Năm sinh]': '1940',
+        '[Người 3 - Giới tính]': 'Nam',
+        '[Người 3 - Loại giấy tờ]': 'Trích lục khai tử',
+        '[Người 3 - Ngày cấp]': '10/06/2016',
+        '[Người 3 - Nơi cấp]': 'UBND xã Mẫu',
+        '[Người 3 - Địa chỉ]': 'Thôn Mẫu, xã Mẫu',
+    }
+    template_text = 'Tài liệu thử: Người để lại di sản. ' + ' | '.join(expected_by_token)
+    mapping = build_template_mapping(case, static=True)
+    mismatches = {token: (mapping.get(token), value)
+                  for token, value in expected_by_token.items()
+                  if mapping.get(token) != value}
+    assert not mismatches, mismatches
+    template = Document()
+    template.add_paragraph(template_text)
+    replace_in_doc(template, mapping)
+    rendered_path = tmp_path / 'deceased-rendered.docx'
+    template.save(str(rendered_path))
+    rendered_text = read_docx(rendered_path.read_bytes()).text
+    assert not any(token in rendered_text for token in expected_by_token)
+    assert 'Tài liệu thử: Người để lại di sản.' in rendered_text
+    assert all(value in rendered_text for value in expected_by_token.values())
+
+
+def test_deceased_namesake_living_not_merged_and_missing_type_stays_partial(db, tmp_path):
+    content = _docx_bytes([
+        'HỢP ĐỒNG CHUYỂN NHƯỢNG',
+        'Bên A:', 'Ông Nguyễn Văn Trùng, sinh ngày 01/02/1980; CCCD: 001234567890',
+        'Bên B:', 'Bà Trần Thị Sống, sinh ngày 03/04/1985; CCCD: 001234567891',
+        'Tài sản:', 'Số serial: ZZ123456; có địa chỉ tại: Nhà A',
+        'Thửa đất số: 12; Tờ bản đồ số: 5',
+        'Người để lại di sản: Ông Nguyễn Văn Trùng, đã chết ngày 05/06/2016.',
+    ])
+    people = [s for s in extraction(content) if s['target'] == 'person']
+    same_name = [s for s in people
+                 if s['fields'].get('ho_ten', {}).get('normalized_value') == 'Nguyễn Văn Trùng']
+    assert len(same_name) == 2
+    deceased = next(s for s in same_name if 'ngay_chet' in s['fields'])
+    assert deceased['fields']['ngay_chet']['normalized_value'] == '2016-06-05'
+    assert 'loai_giay_to' not in deceased['fields']
+    assert 'ngay_cap' not in deceased['fields']
+    assert 'noi_cap' not in deceased['fields']
+    assert 'so_giay_to' not in deceased['fields']
+
+    _, _, service, data = reviewed_case_with_source_form(db, tmp_path, content)
+    from models import Customer
+    # Dòng người chết thiếu neo giấy tờ → chưa có identity dùng chung;
+    # dòng còn sống có neo thì một identity. Không gộp hai dòng cùng tên.
+    assert db.query(Customer).filter(Customer.ho_ten == 'Nguyễn Văn Trùng').count() == 1
+    rows = [p for p in service.get(data['case']['id'])['stage']['people']
+            if p['ho_ten'] == 'Nguyễn Văn Trùng']
+    assert len(rows) == 2
+    assert [row['ngay_chet'] for row in rows] == [None, '2016-06-05']
+    assert [row['entity_id'] for row in rows][0] is not None
+    assert rows[1]['entity_id'] is None

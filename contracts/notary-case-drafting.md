@@ -1,23 +1,31 @@
-# Contract: Notary Case Drafting `v1` (doc rev 1.1) + `v2` ở §13
+# Contract: Notary Case Drafting — v2, doc rev G4 single-save (23/10/2026)
 
-**Version:** `notary.case-drafting.v1` · **Status:** APPROVED — owner duyệt
-24/09/2026 (MIN-105); rev 1.1 mở rộng tương thích (MIN-121) ·
-**§13 chứa `notary.case-drafting.v2` (MIN-125) — APPROVED 27/09/2026,
-implement ở P5 (MIN-128)** ·
+**Version hiện hành:** `notary.case-drafting.v2` · **Doc revision:** G4 single-save,
+23/10/2026; Storage B **vòng 2 ĐÃ TRIỂN KHAI 22/10/2026, có proof** (chi tiết ở §13.20/§13.21). V1 APPROVED 24/09/2026 (MIN-105),
+rev 1.1 MIN-121 và v2 APPROVED 27/09/2026 (MIN-125/P5 MIN-128) là mốc lịch sử. ·
 **Owner:** `systemdocs` · **Published:** MIN-105 ·
 **Kênh mang:** `desktopcommand.v1` (`contracts/desktop-command.md`) ·
 **Domain data shape:** `g1.module.v1` (`contracts/g1-module-data.md`)
 
-Contract wire cho tab **Soạn hồ sơ** của module `notary_v2` trong shell
-Electron một máy: mười command `notary.*` phục vụ tạo/tải workspace, intake
-đa nguồn thành suggestion, commit Stage, cập nhật meta, đánh giá/lưu
-Diagram, xuất
-Word hàng loạt và tra cứu địa chỉ hành chính local (§14). Envelope `desktopcommand.v1` giữ nguyên — file này chỉ
-định nghĩa `payload`/`result.data`/error code của từng command.
-Rev 1.1 **additive** (MIN-121): thêm `notary.workspace_create` và chế độ
-nháp cho `intake_analyze`/`diagram_evaluate` — `schema_version` giữ
-`notary.case-drafting.v1`, mọi field mới tương thích ngược với consumer
-cũ (field `case` thêm key nullable; command mới chỉ client mới gọi).
+Contract wire cho tab **Soạn hồ sơ** của module `notary_v2` trên envelope
+`desktopcommand.v1`: payload, result và error của các command bên dưới.
+**Vòng 2 issue 13 ĐÃ TRIỂN KHAI 22/10/2026:** Storage B vòng 1 (rows case-owned + `draft|done` +
+`notary.workspace_save_case`, §13.19) đã có code chạy; vòng 2 bổ sung
+`notary.workspace_source_latest` (§13.20), `notary.workspace_duplicate` (§13.21) và
+đường tạo nháp ít dữ liệu trên `workspace_create` (§4.3/§13.6). Mọi hành vi vòng 2
+dưới đây **đã có proof** (`test_issue13_source_latest.py`,
+`test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`,
+`test_issue13_storage_b_proof.py`). Đây là contract cho cutover
+phối hợp renderer/backend tiền MVP, **không tương thích client cũ**.
+Giữ literal `notary.case-drafting.v2` và Diagram v3. V1/rev 1.1 là lịch sử;
+các shape v1 minh họa phần nền được §13 thay bằng v2. Không phát hành song song
+consumer v1. Các quy tắc Storage B ghi trực tiếp ở phần nền cũng áp cho v2.
+**G4 — quyết định owner 23/10:** renderer Soạn hồ sơ không còn nút **Cập nhật/
+Lưu nháp**; Stage, Pool và Diagram cùng đọc bản đang sửa. Chỉ **Lưu hồ sơ**
+gửi `workspace_save_case` để persist nội dung đang soạn (§13.2/§13.19).
+Các API ghi riêng vẫn hỗ trợ consumer khác; ngoại lệ meta trong dialog Word
+qua `saveCaseMeta`/`workspace_update` giữ nguyên (§6.2).
+
 
 SOT hành vi nghiệp vụ: `_bmad-output/specs/notary_v2/`; chi tiết đã duyệt MIN-104 để
 đối chiếu implementation nằm tại
@@ -38,13 +46,16 @@ job-level. Quyết định giữ nguyên sau review round 1.
 
 | Command | Mục đích | Tính chất | `result.kind` |
 |---|---|---|---|
-| `notary.workspace_create` | Tạo hồ sơ mới từ nháp Stage + Diagram trong một transaction | atomic write, idempotent | `workspace_create` |
+| `notary.workspace_create` | API tạo hồ sơ draft từ Stage + Diagram; giữ cho consumer khác, renderer Soạn hồ sơ không gọi để lưu nháp | atomic write, idempotent | `workspace_create` |
 | `notary.workspace_get` | Tải case + Stage (Người/Tài sản) + Diagram + revision + capabilities | read-only | `workspace_get` |
+| `notary.workspace_source_latest` | Đọc toàn bộ Người/Tài sản của case Done lưu gần nhất làm nguồn cho nháp mới | read-only, không ghi DB | `workspace_source_latest` |
+| `notary.workspace_duplicate` | Nhân bản toàn bộ nội dung đã lưu của một hồ sơ thành case mới | atomic write, idempotent | `workspace_duplicate` |
 | `notary.intake_analyze` | Phân tích file/text thành suggestion chờ review | long-running, không commit | `intake_analyze` |
-| `notary.workspace_commit_stage` | Commit toàn bộ Stage trong một transaction | atomic write | `workspace_commit_stage` |
+| `notary.workspace_commit_stage` | API commit toàn bộ Stage trong một transaction; server/adapter/REST giữ hỗ trợ, renderer Soạn hồ sơ không gọi | atomic write | `workspace_commit_stage` |
 | `notary.workspace_update` | Cập nhật meta hồ sơ đã lưu (`ngay_lap_ho_so`, `noi_niem_yet`, `ghi_chu`) — không đụng Stage/Diagram | atomic write | `workspace_update` |
 | `notary.diagram_evaluate` | Đánh giá/tính thử draft Diagram | read-only theo DB, không persist draft | `diagram_evaluate` |
 | `notary.diagram_save` | Lưu Diagram đã hợp lệ | atomic write | `diagram_save` |
+| `notary.workspace_save_case` | Đường Lưu hồ sơ duy nhất của renderer Soạn hồ sơ: toàn bộ Stage/meta/Diagram/ngữ cảnh Word đang sửa; chuyển draft→done | atomic write; tạo mới idempotent, case cũ revision-guarded | `workspace_save_case` |
 | `notary.word_export_options` | Liệt kê văn bản sẵn sàng/bị chặn | read-only | `word_export_options` |
 | `notary.word_export_batch` | Tạo nhiều DOCX vào một folder đích | long-running, per-item result | `word_export_batch` |
 | `notary.address_lookup` | Tra cứu tên xã/tỉnh hiện hành từ chuỗi người dùng gõ (ledger local, lõi dùng chung) | read-only, local-only | `address_lookup` |
@@ -52,11 +63,10 @@ job-level. Quyết định giữ nguyên sau review round 1.
 - `result.kind` = tên command bỏ namespace `notary.` (snake_case nguyên
   vẹn). `result` theo shape `g1-module-data.md` §2: `{kind, data,
   evidence?, warnings?, source_files?}`.
-- Mọi `result.data` của chín command **bắt buộc** mang
-  `schema_version: "notary.case-drafting.v1"` (literal). Đây là version
-  của domain data shape; version kênh vẫn là `contract_version` của
-  envelope — hai tầng độc lập. `notary.address_lookup` (§14) là ngoại
-  lệ có chủ đích: domain data riêng — `notary.address-lookup.v2`.
+- Mọi `result.data` Soạn hồ sơ hiện hành mang
+  `schema_version:"notary.case-drafting.v2"`; literal v1 trong ví dụ phần nền
+  chỉ mô tả lịch sử. `notary.address_lookup` (§14) dùng domain riêng
+  `notary.address-lookup.v2`. Version envelope độc lập với domain.
 - Request envelope theo `desktop-command.md` §3; `client_meta.module` =
   `document-review` (module id đã claim namespace `notary.*` trong
   `shell/src/main/registry.js:16-21`).
@@ -73,24 +83,25 @@ job-level. Quyết định giữ nguyên sau review round 1.
 | Khóa | Kiểu | Rule |
 |---|---|---|
 | `case.id` (`case_id`) | integer | ID hồ sơ trong DB |
-| `row_id` | string UUID v4 | Do UI tạo khi thêm dòng Stage; ổn định qua commit/reload; dùng gắn lỗi đúng dòng (`field_errors[].row_id`) |
-| `entity_id` | integer \| null | ID DB thật; `null` trước lần commit đầu của dòng; backend gán khi commit |
-| `revision` | integer ≥ 1 | Số phiên bản workspace của case; mọi write thành công (`workspace_commit_stage`, `workspace_update`, `diagram_save`) tăng đúng 1 |
-| `base_revision` | integer ≥ 1 | Revision client đang giữ khi ghi; bắt buộc trên mọi command **ghi** (`workspace_commit_stage`, `workspace_update`, `diagram_save`); khác server (`<` **hoặc** `>`) → `workspace_conflict` |
+| `row_id` | string UUID v4 | Định danh dòng case-owned do UI tạo; ổn định qua ghi/đọc, là khóa Diagram/participant/đất, không phải identity dùng chung. `workspace_source_latest` và `workspace_duplicate` trả **UUID v4 mới** cho mọi dòng, không tái dùng row_id nguồn |
+| `entity_id` | integer \| null | ID Customer/Property dùng chung do server resolve trong transaction ghi; có thể null kéo dài khi thiếu neo, không tạo identity giả. Đây là **trường nội bộ (wire echo)**, không có ô nhập: mọi `entity_id` client gửi chỉ là gợi ý và server tự quyết (§4.1 mục 5); không bao giờ phát `stage_validation_error` cho field này |
+| `revision` | integer ≥ 1 | Case mới revision=1; mọi write case đã có tăng đúng 1, kể cả lưu lại Done sạch |
+| `base_revision` | integer ≥ 1 | Bắt buộc với write case đã có, gồm save_case/convert_type; khác server (`<` hoặc `>`) → workspace_conflict trước ghi; cấm khi tạo mới |
 | `source_id`, `suggestion_id` | string UUID v4 | `source_id` do client sinh khi build request; `suggestion_id` do backend sinh |
 | `document_key` | string `^[a-z][a-z0-9_]*$` | Khóa ổn định của văn bản; không đổi khi đổi tên hiển thị/template; registry mở — backend được thêm key mới, không được đổi nghĩa key đã publish |
 | `node.id` (Diagram slot) | string non-empty | Định danh slot trên Diagram do UI đặt; khác namespace với `row_id`/`personId` |
-| `personId` (Diagram node) | string UUID v4 \| null | Tham chiếu `row_id` của một **dòng Người trong Stage đã commit**; `null` = slot trống. Trong `workspace_create` và `diagram_evaluate` chế độ nháp, tham chiếu `row_id` trong **`stage` của cùng payload** (chưa commit) |
-| `idempotency_key` | string UUID v4 | Bắt buộc trên `notary.workspace_create`; client sinh một lần cho mỗi nháp — retry gửi lại đúng key → backend trả cùng case (`created:false`), không tạo trùng |
+| `personId` (Diagram node) | string UUID v4 \| null | Trỏ row_id Người trong Stage của ngữ cảnh hiện tại: bản đang sửa ở renderer, Stage cùng payload với create/save_case/evaluate nháp, bản DB với get/diagram_save; null là slot trống (§13.2, §13.19 quy định prune refs pending) |
+| `idempotency_key` | string UUID v4 | Bắt buộc khi workspace_create, save_case mới hoặc `workspace_duplicate`; cùng key + creation hash trả workspace hiện tại created=false, không ghi; khác hash → idempotency_conflict (§13.19/§13.21). Duplicate dùng hash `{command, intent, source_case_id}`, không hash snapshot nguồn |
 
 ### 2.1a `case_id` — bắt buộc vs chế độ nháp
 
 - `case_id: <int ≥ 1>` **bắt buộc** trên `workspace_get`,
   `workspace_commit_stage`, `workspace_update`, `diagram_save`,
   `word_export_options`, `word_export_batch`.
-- **Chế độ nháp** (hồ sơ chưa từng lưu — spec UX §2, MIN-121):
+- **Chế độ nháp phiên** (không phụ thuộc hồ sơ đã có ID hay chưa):
   `intake_analyze` và `diagram_evaluate` cho phép **absent** `case_id`
-  = phân tích/đánh giá trên nháp phiên, không đụng DB case.
+  = phân tích/đánh giá trên nháp phiên, không đụng DB case. Renderer dùng
+  chế độ này để evaluate bản đang sửa cả khi đang mở hồ sơ đã lưu (§13.2).
   - `case_id` absent + `diagram_evaluate` → payload PHẢI kèm `stage`
     (§7.4); `personId` trong diagram được kiểm theo stage payload đó.
   - `case_id` absent + `intake_analyze` → chỉ phân tích nguồn thành
@@ -100,16 +111,42 @@ job-level. Quyết định giữ nguyên sau review round 1.
   - `case_id` present nhưng không phải int ≥ 1 → `validation_error`.
 - `notary.workspace_create` **không nhận** `case_id` (server gán id);
   payload có `case_id` → `validation_error`.
+- `notary.workspace_source_latest` **không nhận** `case_id` hay bất kỳ
+  key nào khác: payload bắt buộc `{}` (§13.20). Nguồn do server chọn,
+  không do client chỉ định.
+- `notary.workspace_duplicate` nhận `source_case_id` (không phải
+  `case_id`) + `idempotency_key`; **cấm** `case_id`/`base_revision`/
+  `case`/`stage`/`diagram`/`status`. Đây là tạo **case mới** từ nội dung
+  nguồn, nên luật "mọi write case đã có cần `base_revision`" không áp.
+  `source_case_id: null`/Boolean/sai kiểu → `validation_error`.
+- `workspace_save_case`: `case_id` **absent** → bắt buộc `idempotency_key`,
+  cấm `base_revision`; `case_id` **present** → int ≥1, bắt buộc
+  `base_revision`, cấm `idempotency_key`. Null/Boolean/sai kiểu là
+  `validation_error`. Stage và Diagram được kiểm tham chiếu theo cùng payload.
 
 Kiểu ID không được đổi giữa mock và real backend.
 
 ### 2.2 Ngày và thời điểm
 
 - Ngày không giờ (ngày sinh/chết/cấp): `YYYY-MM-DD` **hoặc** `YYYY`
-  (year-only — tương đương 01/01 năm đó, dùng khi chỉ biết năm) **hoặc**
+  (chỉ có năm — phải giữ đúng độ đầy đủ của dữ liệu nhập) **hoặc**
   `null`. Wire chỉ hai dạng đó: producer phải chuẩn hóa mọi format khác
   (hiện trạng web trộn `dd/mm/YYYY`, `yyyy`, ISO) trước khi emit.
-- Thời điểm (`updated_at`, `observed_at`): ISO-8601 có múi giờ.
+- Owner 15/10/2026: lưu và hiển thị đúng dữ liệu ngày đã nhập. `2010` phải
+  đọc lại/hiển thị là `2010`; `01/01/2010` thật vẫn là ngày đầy đủ. Quy ước
+  `01/01` cho dữ liệu chỉ có năm chỉ được dùng nội bộ khi cần tính toán;
+  không ghi đè dữ liệu nhập và không tạo bằng chứng về thứ tự sự kiện chưa biết.
+  Chuẩn hóa định dạng truyền không được làm mất độ đầy đủ. Cách lưu vật lý cần
+  được kiểm khi triển khai; lần cập nhật docs này không đổi schema/runtime.
+- Thời điểm wire (`observed_at`, `created_at`/`updated_at` của result):
+  ISO-8601 có múi giờ. **Không đồng nhất** với mốc lưu nội bộ: cột
+  `updated_at` của case lưu Python UTC-naive đủ **microsecond** và là khóa
+  chọn nguồn (§13.20); `Diagram.updatedAt` trong JSON chỉ tới giây.
+  Ngày nghiệp vụ (`ngay_lap_ho_so`, ngày cấp…) vẫn là ngày không giờ.
+- Mốc lưu: mọi writer case (create, save_case, commit, update_meta,
+  convert_type, diagram_save, participant add/edit/delete, legacy create)
+  đóng **cùng một** stamp microsecond trong transaction của nó; replay/
+  lỗi/đọc/evaluate/export không đóng stamp. Không backfill timestamp cũ.
 - `""` **không hợp lệ** thay `null` ở mọi field nullable — consumer
   reject bằng `validation_error` (g1-module-data §6).
 
@@ -120,7 +157,7 @@ Kiểu ID không được đổi giữa mock và real backend.
   `diagram_invalid_state` (bám rule engine `invalid_boolean`).
 - Suggestion/intake **không bao giờ** mang key `confirmed` ở bất kỳ cấp
   nào. Xác nhận duy nhất = người dùng đưa gợi ý vào Stage rồi
-  `Cập nhật`. Xuất hiện `confirmed` → `validation_error`.
+  **Lưu hồ sơ**. Xuất hiện `confirmed` → `validation_error`.
 - `Người không nhận` là nhãn derived phía sản phẩm (`Tất cả − Chủ đất −
   Nhận` — SOT ở drafting-tab §6 / workflow.md): **không** nằm trong
   contract, không phải engine output, không có field riêng.
@@ -199,8 +236,7 @@ result.data:
     id: <int>
     case_type: <string>            # v1 cam kết "inheritance"; giá trị khác → xem §2.4
     document_type: khai_nhan | thoa_thuan
-    status: draft | locked
-    locked: <bool>
+    status: draft | done          # Done vẫn sửa được; không có field locked
     revision: <int ≥ 1>
     ngay_lap_ho_so: <YYYY-MM-DD | null>   # ngày lập hồ sơ (rev 1.1)
     noi_niem_yet: <string | null>        # nơi niêm yết (rev 1.1)
@@ -211,7 +247,9 @@ result.data:
     noi_dung_viec: <string | null>       # cụm nội dung việc (đợt 3)
     ghi_chu: <string | null>             # ghi chú hồ sơ (rev 1.1)
   stage:
-    people: [<person_row>]         # §4.1
+    owner_row_id: <uuid4 | null>   # v2 inheritance: null khi nháp chưa gán;
+                                   # absent với two_party (§13.6)
+    people: [<person_row>]         # §4.1 — ho_ten có thể null khi nháp
     assets: [<asset_row>]          # §4.2
   diagram:
     domain: <string>               # v1: "inheritance"
@@ -229,10 +267,17 @@ result.data:
   gần nhất và **khớp `state` hiện tại** — `workspace_commit_stage`
   re-evaluate sau khi prune (§6.1) nên không có render_model cũ lệch
   state; `null` chỉ khi hồ sơ chưa từng được evaluate.
-- `case.locked:true` → mọi command **ghi** (`workspace_commit_stage`,
-  `workspace_update`, `diagram_save`, `word_export_batch`) →
-  `failed{code:workspace_locked}`; các command read-only — kể cả
-  `diagram_evaluate` — vẫn được phép (§7.4).
+- Chỉ `draft|done`; Done cho phép sửa Stage/meta/Diagram, chuyển loại và xuất
+  Word theo guard hiện hành, không read-only theo status. Không có
+  `case.locked` hoặc error `workspace_locked` trong luồng soạn.
+- GET đọc ordered case rows thuần, kể cả rỗng; không ghi DB, migrate-on-read,
+  tăng revision hoặc fallback Customer/Property. Hồ sơ nháp tạo bằng
+  `workspace_create` vòng 2 có thể đọc lại với `people`/`assets` rỗng, tên
+  `null` hoặc `owner_row_id=null`; đây là dữ liệu hợp lệ của **đọc**, không
+  nới validation của save_case/commit/convert. Nhãn hiển thị: `draft` = Nháp,
+  `done` = Đã lưu; `trang_thai` raw vẫn là giá trị cho máy.
+- Với wire v2, `stage` mang thêm `owner_row_id` (§13.6): inheritance luôn
+  emit key (UUID hoặc `null` cho nháp chưa gán); two_party không có key.
 - `case_id` không tồn tại → `failed{code:case_not_found}`.
 - `backend_mode` là field duy nhất phân biệt mock/real; renderer bắt
   buộc hiển thị nhãn khi `mock`.
@@ -243,18 +288,17 @@ result.data:
 person_row:
   row_id: <uuid4>
   entity_id: <int | null>
-  ho_ten: <string non-empty>         # bắt buộc
+  ho_ten: <string non-empty | null>    # output: null được với nháp chưa có tên
+                                       # input create partial/save_case: null/absent được
+                                       # input commit strict: bắt buộc non-empty
   gioi_tinh: Nam | Nữ | null
   ngay_sinh: <YYYY-MM-DD | YYYY | null>
-  ngay_chet: <YYYY-MM-DD | YYYY | null>   # null = còn sống/không rõ
-  so_giay_to: <string | null>        # CCCD/CMND/hộ chiếu — free text,
-                                     # không ép 12 số (không phải khóa)
+  ngay_chet: <YYYY-MM-DD | YYYY | null>   # null = không có thông tin ngày chết
+  so_giay_to: <string | null>        # free text, được trùng; thiếu → entity_id null
   ngay_cap: <YYYY-MM-DD | YYYY | null>
   noi_cap: <string | null>
   dia_chi: <string | null>
-  place_of_origin: <string | null>   # giữ để đọc snapshot cũ; intake/UI
-                                     # hiện hành không dùng — engine không
-                                     # điền (Owner 06/10/2026)
+  place_of_origin: <string | null>   # case row; intake/UI không nhập mới (Owner 06/10)
   loai_giay_to: <string | null>      # (đợt 3) loại giấy tờ ĐÃ XÁC NHẬN —
                                      # người chết: lựa chọn/OCR của user;
                                      # người sống: server suy theo mốc
@@ -265,8 +309,79 @@ person_row:
 ```
 
 Không thêm field ngoài danh sách này — producer strip field lạ (tiền lệ
-backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
-`stage_validation_error{field:ho_ten, code:required}`.
+backend hiện strip ngoài 10 key). `ho_ten` là **mức tối thiểu duy nhất**
+của dòng Người: rỗng/`""`/toàn khoảng trắng → `stage_validation_error
+{field:ho_ten, code:required}` trên save_case/commit; `null` chỉ hợp lệ ở
+**output đọc** và **input create partial** (vòng 2). Mọi field Người khác
+được để trống mà không chặn; sáu field chữ tùy chọn (`so_giay_to`,
+`noi_cap`, `dia_chi`, `place_of_origin`, `loai_giay_to`, `loai_dia_chi`)
+nhận `""`/toàn khoảng trắng và **chuẩn hóa thành null khi ghi** (S4d,
+owner 23/10/2026), không sinh lỗi. Ngày trống bỏ qua; ngày có nội dung
+nhưng sai lịch/không parse được → `invalid_date`; giới tính ngoài
+Nam/Nữ/null → `invalid_enum`.
+Ô chỉ có số giấy/ngày cấp mà chưa có tên chỉ được lưu qua `workspace_create`
+(partial) với `ho_ten=null`, không dùng chuỗi giả.
+
+**Owner 21/10/2026 — nghĩa trường đã chốt, đã giao runtime hẹp, không đổi wire/key:**
+- `dia_chi` là **một trường hiện có** dùng chung cho `Nơi chết` và nơi thường
+  trú/cư trú cuối cùng của người chết. Không tạo field mới hoặc chọn ngầm khi
+  giá trị mâu thuẫn. Địa chỉ chung ghi rõ trong cùng văn bản chỉ áp đúng nhóm.
+- Ba loại người chết: `Trích lục khai tử`, `Trích lục khai tử (bản sao)`,
+  `Giấy chứng tử`; `Giấy chứng tử (bản sao)` nguồn quy về `Giấy chứng tử`.
+  Số giữ nguyên giá trị gồm dấu phẩy/quyển, nhãn ngoài số. `ngay_cap` là ngày
+  cấp chính giấy; `noi_cap` giữ loại đơn vị xã/phường/thị trấn, không ép xã,
+  tên lịch sử theo ngày cấp giấy, không suy bằng lịch sử chưa xác nhận.
+- Mỗi văn bản độc lập: **không đề xuất bổ sung, không tự ghép giữa văn bản**
+  kể cả cùng bộ hồ sơ, không mượn trường thiếu hoặc chọn bản đầy nhất/mới
+  nhất. Không gợi ý sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`.
+  Đây không cấm gom ID theo điểm neo bên dưới; không được tự mượn trường
+  thiếu giữa văn bản hoặc cập nhật ngược Hồ sơ đã lưu.
+- `ngay_chet=null` chỉ là không có thông tin ngày chết, không tự kết luận
+  còn sống. Các trường hợp lệ khác được điền độc lập; thiếu ngày chết/giấy
+  không chặn Người. Không tạo ngày giả/01/01, Boolean hoặc status mới.
+  Không xóa raw/history, phá liên kết đã có hoặc đổi logic câu Word.
+
+**Storage B — vòng 1 có code, vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:** mỗi dòng thuộc đúng một Hồ sơ.
+`case_person_rows` lưu nguyên tên, số và toàn bộ dữ kiện §4.1; `entity_id`
+ánh xạ `customer_id` nullable, không dùng Customer làm SOT hoặc fallback.
+`row_id/case_id/vitri` là khóa dòng/quyền sở hữu/thứ tự; mọi field nghiệp vụ
+snake_case ở shape trên ánh xạ cột cùng tên. Ba ngày lưu String(10)
+`YYYY|YYYY-MM-DD|null`, không ghi ngày 01/01 quy ước. `place_of_origin`,
+loại giấy/nơi cấp/nhãn địa chỉ nằm trên row, không trong Stage JSON.
+
+**Resolve identity trong transaction ghi; ở renderer Soạn hồ sơ chỉ tại Lưu hồ sơ (`workspace_save_case`), không khi sửa ô/gán node. Các API create/commit cho consumer khác vẫn resolve theo cùng luật:**
+1. Khóa tên: Unicode NFD → bỏ category Mn → đ/Đ thành d/D → lower →
+   split/join whitespace bằng một space. Không bỏ dấu câu/đảo từ/fuzzy.
+2. Khóa số giấy: trim ngoài; chỉ khi toàn chuỗi gồm chữ số, dấu chấm,
+   whitespace và bỏ dấu phân cách được đúng 12 chữ số thì dùng 12 số đó.
+   Còn lại giữ nguyên sau trim, kể cả số 0 đầu, dấu phẩy/quyển/gạch/hoa thường.
+   Không lấy một CCCD nằm trong text, không đưa loại giấy vào match.
+3. Thiếu tên hoặc số → identity null, kể cả trước đã có ID; không xóa identity.
+   **Vòng 2:** row mới của `workspace_create` được phép `ho_ten=null` (nháp ít
+   dữ liệu); row đó có identity null cho tới khi bổ sung đủ neo. Save/commit
+   strict vẫn cần tên trước khi ghi.
+4. Row cũ có ID mà neo vẫn khớp khóa identity đó → giữ ID dù có ID trùng nhỏ hơn.
+   Neo đổi chỉ rebind row đang ghi, không sửa neo identity cũ hoặc Hồ sơ khác.
+   Row mới/đổi neo chọn ID nhỏ nhất trong các match; không có thì tạo identity
+   tối thiểu tên/số/khóa. Cache anchor trong transaction để dùng chung ID.
+5. **Gợi ý identity (`entity_id`) chỉ là gợi ý nội bộ — không chặn user:**
+   client có thể gửi `entity_id` trên mọi dòng như echo/gợi ý từ GET, nguồn
+   Done hoặc nhân bản. Server chuẩn hóa: chỉ giá trị int ≥ 1 mới là hint;
+   giá trị rác coi như không có hint. Hint không tồn tại, lệch identity đang
+   gắn dòng hoặc không khớp neo đều bị **bỏ** và identity được resolve lại
+   theo neo chuẩn: Người = (tên chuẩn hóa + số giấy tờ), Tài sản = serial.
+   Không có neo khớp → dòng lưu với `entity_id=null` như dòng mới; **không
+   bao giờ** phát `stage_validation_error` cho `entity_id`. Neo của payload
+   còn khớp identity nguồn → giữ đúng ID (kể cả ID cao khi có ID cũ trùng
+   neo); neo bị sửa → resolve lại theo neo mới, không sửa master. Không lấy
+   trường từ identity để lấp Stage, không upsert dữ kiện vào master.
+6. Hai row_id cùng identity vẫn hai dòng độc lập; không duplicate_entity,
+   không compact, UNIQUE neo hoặc merge/xóa/chuyển link Hồ sơ khác.
+
+Serial resolve theo §4.2. Chọn ID không phải chọn **bộ nguồn**: nguồn cho
+Hồ sơ mới là bộ của case Done lưu gần nhất (§13.20), không master ID nhỏ nhất;
+UI lấy nguồn, nhân bản toàn Hồ sơ (§13.21); copy/paste Excel vẫn ngoài vòng 2.
+Một Hồ sơ chỉ một snapshot hiện hành, không lịch sử mỗi ô/lần lưu; #41 OPEN/gate mẫu ĐÓNG, #42 riêng.
 
 - **Key canonical (MIN-141 đợt 3):** server đọc được cả key wire legacy
   trên và tên nghiệp vụ canonical liền không dấu (entities.md §9.1):
@@ -275,29 +390,17 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
   `noicap`↔`noi_cap`, `diachi`↔`dia_chi`, `loaigiayto`↔`loai_giay_to`,
   `loaidiachi`↔`loai_dia_chi`. Cùng trường ở cả hai spelling mà giá trị
   mâu thuẫn → `validation_error`. Wire emit giữ bộ legacy.
-- **Giá trị suy ra (đợt 3):** người sống thiếu `loai_giay_to`/`noi_cap`/
-  `loai_dia_chi` → server derive theo mốc `ngay_cap` 01/10/2024 và ghi
-  giá trị hiệu lực vào snapshot commit; thiếu `ngay_cap` → `null`
-  (chưa xác định, không suy). Người chết (`ngay_chet` ≠ null): server
-  KHÔNG tự suy — chỉ giữ giá trị người dùng xác nhận; `loai_dia_chi`
-  mặc định `"Nơi chết"`.
-- **Phân biệt bằng chứng xác nhận vs giá trị suy ra (MIN-141 fix
-  `eff4f12`):** giá trị suy ra đã ghi trong snapshot trước KHÔNG được
-  coi là bằng chứng người dùng xác nhận. Tại commit mới, server tính
-  lại giá trị suy ra trước đó từ input nguồn của **snapshot của chính
-  hồ sơ** (`ngay_chet`/`ngay_cap` đã lưu trong `case_state_json`), không
-  lấy master live — master dùng chung có thể đã bị hồ sơ khác sửa. Row
-  incoming echo đúng giá trị suy ra trước đó hoặc trống → tính lại theo
-  input nguồn mới; row incoming khác giá trị suy ra trước đó → đó là
-  bằng chứng đã xác nhận → giữ nguyên (kể cả giấy khai tử người chết).
-- **Word đọc bằng chứng Người từ snapshot (MIN-141 fix `eff4f12`):**
-  các slot Người trong Word (`[tenN]`…`[loaigiaytoN]`/`[noicapN]`/`[loaicutruN]`
-  và alias cũ) đọc từ phần tử `stage[]` đã commit trong
-  `case_state_json` của chính hồ sơ — đối chiếu theo `id` entity, giữ
-  nguyên thứ tự slot legacy. Ngữ nghĩa key-presence: key có trong
-  snapshot (kể cả `null`) → dùng snapshot; key vắng → fallback master
-  live cho hồ sơ cũ. Hai hồ sơ dùng chung một `Customer` xuất đúng
-  bằng chứng riêng đã commit, không bị sửa master kéo lệch nhau.
+- **Suy ra trên case row:** `derive_person_fields` và `_resolve_derived_field`
+  dùng input cũ của chính row trước ghi, input mới của payload. Incoming khác
+  stored → giữ ý định sửa kể cả null; stored khác prev_derived → giữ bằng
+  chứng xác nhận; còn lại derive theo input mới. Dòng mới như stored rỗng.
+  Giữ heuristic echo hiện có: explicit bằng đúng giá trị derive chưa phân biệt
+  được, không thêm flag. Context chết dùng ngày chết hoặc loại giấy/nhãn
+  Nơi chết có nguồn; không derive CCCD/cơ quan người sống trong context chết.
+  Thiếu ngày cấp không đoán cơ quan. Năm riêng chỉ parse quy ước khi tính toán.
+- **Word/GET dùng rows B duy nhất:** mọi slot Người, cả owner/participant,
+  đọc theo row_id và thứ tự case rows, kể cả null; không fallback master hoặc
+  Stage JSON thiếu key. `loaicutru` chỉ derived cho consumer, không thêm wire.
 
 ### 4.2 `asset_row` — dòng Tài sản Stage
 
@@ -305,20 +408,20 @@ backend hiện strip ngoài 10 key). `ho_ten` rỗng/`""` →
 asset_row:
   row_id: <uuid4>
   entity_id: <int | null>
-  is_primary: <bool>
+  is_primary: <bool>                # chỉ shape v1 lịch sử; v2 cấm
   so_serial: <string>                # nguyên văn tùy nguồn, có thể rỗng,
                                      # có thể trùng — entities.md §2
                                      # (Owner 06/10/2026: không ép format)
   so_vao_so: <string | null>
-  so_thua_dat: <string | null>
-  so_to_ban_do: <string | null>
-  dia_chi: <string non-empty>        # bắt buộc
+  so_thua_dat: <string>             # BẮT BUỘC có nội dung khi ghi dòng (S5b)
+  so_to_ban_do: <string>            # BẮT BUỘC có nội dung khi ghi dòng (S5b)
+  dia_chi: <string | null>           # nullable: thiếu dữ kiện vẫn lưu
   loai_so: <string | null>
   hinh_thuc_su_dung: <string | null>
   thoi_han: <string | null>          # lẻ cấp tài sản — CHỈ còn nghĩa trên
                                      # emit/legacy (xem ghi chú dưới)
   nguon_goc: <string | null>
-  ngay_cap: <YYYY-MM-DD | null>      # asset chỉ nhận dạng đầy đủ
+  ngay_cap: <YYYY-MM-DD | YYYY | null>  # nhận chỉ-năm như Người (S5c)
   co_quan_cap: <string | null>
   land_rows:
     - loai_dat: <string | null>
@@ -326,28 +429,51 @@ asset_row:
       thoi_han: <string | null>
 ```
 
-- `assets` non-empty → **đúng một** dòng `is_primary:true`; 0 hoặc ≥2 →
-  `stage_validation_error{code:primary_count}`.
-- `land_rows` null-safe: thiếu/`[]` hợp lệ; phần tử null-safe từng field.
+- Output (`workspace_get`/Stage result) luôn emit đủ field trên, kể cả
+  `thoi_han` lẻ nullable, `land_rows` null/[]/hàng trống và mọi cụm đất;
+  `dia_chi` nullable. `workspace_source_latest`/`workspace_duplicate` giữ
+  nguyên field/cụm/null của nguồn, chỉ đổi `row_id`; không mở nhập mới và
+  không phân bổ `thoi_han` lẻ xuống cụm.
+- **Mức tối thiểu khi ghi (S5b/S5c, owner 23/10/2026):** dòng Tài sản chỉ
+  bắt buộc `so_thua_dat` + `so_to_ban_do` có nội dung (rỗng/toàn khoảng
+  trắng → `stage_validation_error{code:"required"}`). Các field chữ còn lại
+  nhận `""`/khoảng trắng và chuẩn hóa null khi ghi, không lỗi. `so_serial`
+  vẫn phải là chuỗi khi có mặt (S5a). `ngay_cap` nhận `YYYY-MM-DD` hoặc
+  `YYYY`; ngày có nội dung sai lịch vẫn `invalid_date`. Không yêu cầu đủ
+  tài sản/địa chỉ để Lưu hồ sơ.
+- `land_rows` phân biệt null, [] và mảng có hàng trống; giữ thứ tự/vị trí.
 - **`thoi_han` lẻ cấp tài sản (MIN-141):** phía input (payload
-  `workspace_create`/`workspace_commit_stage`/`diagram_evaluate` nháp) KHÔNG
+  `workspace_create`/`workspace_commit_stage`/`workspace_save_case`/`diagram_evaluate` nháp) KHÔNG
   còn bắt buộc — schema `asset_row_input`. Client mới không gửi key này;
-  key vắng nghĩa là "giữ nguyên giá trị lịch sử trên master", server không
-  xóa. Client legacy vẫn được phép gửi key (giá trị sẽ ghi như cũ). Phía
+  key vắng nghĩa là giữ giá trị hiện hành của **case row**, không master;
+  key có giá trị/null ghi đúng ý định vào row, không phân bổ xuống cụm.
   emit (`workspace_get`/result.data.stage) server vẫn luôn trả key
   `thoi_han` (nullable) — schema `asset_row` — để đối chiếu lịch sử và báo
   `stage.orphan_thoi_han` khi giá trị lẻ không gắn cụm nào. Thời hạn mới
   chỉ thuộc `land_rows[].thoihan`; không tự đắp giá trị lẻ vào cụm.
-- **Key cụm đất (MIN-141 đợt 2):** tên nghiệp vụ canonical mới là
-  `loaidat` / `dientich` / `thoihan` (trùng cột bảng con
-  `property_land_rows` và tên placeholder Word `loaidat<M><N>`... —
+- **Key cụm đất (MIN-141 đợt 2; nới S6 23/10/2026):** tên nghiệp vụ
+  canonical mới là `loaidat` / `dientich` / `thoihan` (trùng cột bảng con
+  `case_asset_land_rows` và tên placeholder Word `loaidat<M><N>`... —
   entities.md §9.2). Server đọc được cả bộ legacy
   `loai_dat`/`dien_tich`/`thoi_han` để UI hiện hành không hỏng; wire
   emit tiếp tục dùng bộ legacy (shape trên không đổi). Trong một phần
-  tử, cặp cũ-mới của cùng trường mang giá trị **mâu thuẫn** →
-  `stage_validation_error` (`code:"conflict"`), không âm thầm chọn một.
+  tử, cặp cũ-mới của cùng trường mang giá trị **mâu thuẫn** → **không còn
+  lỗi**: ghi theo key canonical mới và bỏ giá trị key cũ. `dientich`
+  không parse được thành số hữu hạn (kể cả bool/kiểu lạ) → ghi `null`,
+  giữ các trường còn lại của cụm. Không còn trần 20 cụm/tài sản trên đường
+  Lưu; unknown key trong cụm vẫn bị chặn (S9).
   Vị trí cụm = index trong `land_rows` + 1 (cột `vitri`), kể cả dòng
   trống hoàn toàn — giữ nguyên vị trí trống.
+- Storage B: mọi field §4.2 (trừ is_primary v1) ánh xạ cột cùng tên trên
+  `case_asset_rows`; `entity_id` → property_id nullable. Đất thuộc row
+  `case_asset_land_rows(case_asset_row_id,vitri,loaidat,dientich,thoihan)`,
+  không PropertyLandRow/mirror JSON. land_rows_present phân biệt null và [].
+- Serial lookup exact/no-op, binary case-sensitive, không trim/uppercase/
+  gộp space; `"AB 001"` khác `"AB001"`, `"ab 001"`, `" AB 001 "`.
+  Rỗng/toàn whitespace là thiếu neo → entity_id null, giữ nguyên chuỗi.
+  Row cũ khớp neo identity giữ ID; row mới/đổi neo chọn ID nhỏ nhất hoặc tạo
+  Property tối thiểu serial trong transaction. Quy tắc echo ID như Người.
+  Cùng serial/identity khác thửa vẫn giữ nhiều row_id, nội dung và vị trí riêng.
 
 ### 4.3 `notary.workspace_create` — tạo hồ sơ từ nháp (rev 1.1)
 
@@ -368,11 +494,16 @@ payload:
     noi_dung_viec: <string | null>           # (đợt 3) cụm nội dung việc
     ghi_chu: <string | null>                 # optional, default null
   stage:
-    people: [<person_row>]          # ≥1; entity_id phải null
-    assets: [<asset_row>]           # ≥1; đúng một is_primary:true;
-                                    # entity_id phải null
+    owner_row_id: <uuid4 | null>    # v2 inheritance: được absent/null khi
+                                    # create nháp; non-null phải có trong
+                                    # people; two_party cấm key (§13.6)
+    people: [<person_row>]          # v2: ≥0; ho_ten có thể null; v1 lịch sử ≥1
+                                    # entity_id: null hoặc gợi ý dương có kiểm neo
+    assets: [<asset_row_v2>]        # v2: ≥0, ≤5; entity_id như trên;
+                                    # v1 lịch sử ≥1 + is_primary
   diagram:
-    state: <diagram_state>          # §7.1 — personId tham chiếu row_id
+    state: <diagram_state>          # v2 OPTIONAL — absent thì server seed
+                                    # theo domain; personId tham chiếu row_id
                                     # trong stage của payload này
 ```
 
@@ -383,7 +514,7 @@ result.data:
   created: <bool>                   # true = vừa tạo; false = idempotent
                                     # replay trả case đã có
   case: <case>                      # shape §4 — revision: 1
-  stage: {people, assets}           # snapshot sau tạo — entity_id đã gán
+  stage: {people, assets}           # rows sau tạo; identity có thể null khi thiếu neo
   diagram:
     domain: "inheritance"
     state: <diagram_state>          # state đã persist
@@ -397,30 +528,36 @@ result.data:
 
 Semantics:
 
-- **Một transaction:** validate → tạo case + person + asset + link +
-  persist stage/diagram + `revision=1` → commit. Một phần sai → rollback
-  trọn vẹn, không ghi nửa vời. Lỗi field Stage → `stage_validation_error`
-  (đủ `{row_id, field, code, message}`); diagram sai →
-  `diagram_invalid_state` / `diagram_reference_outside_stage`.
-- **Owner bắt buộc:** node `id == "owner"` (chính xác một, không
-  `deleted`) phải có `personId` trỏ tới đúng một `person_row` trong
-  payload → người để lại di sản của case. Thiếu/`null` →
-  `failed{code:workspace_owner_required}`. Cờ `isLandOwner` là nghiệp vụ
-  engine riêng — **không** thay thế được yêu cầu owner này.
-- **Đúng một `is_primary:true`** trong `assets` — rule `primary_count`
-  của §4.2 áp dụng và `assets` rỗng → `stage_validation_error`
-  (`primary_count=0`). `assets` rỗng/people rỗng → `stage_validation_error`.
-- **Idempotent:** `idempotency_key` được persist; request lặp cùng key —
-  kể cả sau retry mạng/timeout — trả cùng case với `created:false`,
-  không tạo bản ghi trùng. Key khác nhau = nháp khác nhau → case mới.
-  Không suy ra giống-nhau-về-nội-dung.
-- `case_type` luôn `"inheritance"` (V1); `status:draft`, `locked:false`,
-  `revision:1`.
-- `case` trong payload chỉ chứa meta cho phép: `document_type`,
-  `ngay_lap_ho_so`, `noi_niem_yet`, `ghi_chu` — field khác →
-  `validation_error` (additionalProperties false).
-- `notary.case_create` legacy giữ nguyên — command này là đường tạo hồ sơ
-  duy nhất của tab Soạn hồ sơ.
+- **Một transaction:** validate → tạo case + resolve identity + ghi case rows,
+  đất/projection + Diagram/meta → revision=1, status=draft → commit duy nhất.
+  Lỗi bất kỳ rollback cả identity mới/key/hash; field Stage trả
+  `stage_validation_error`, Diagram sai trả mã tương ứng, không partial.
+- **Owner khi tạo (S2 23/10/2026):** v1 lịch sử dùng node owner có
+  personId; v2 dùng stage.owner_row_id trong people (§13.6), diagram
+  optional khi create. **Create nháp và Lưu hồ sơ** đều được
+  absent/null owner (chưa gán Chủ đất); owner **non-null** sai/ngoài Stage
+  → `workspace_owner_required`; two_party vẫn cấm key. Chỉ định này không
+  là chudat và không được thay bằng ownPositions/isLandOwner.
+- **Validation theo ý định, không dùng chung một guard:** `workspace_create`
+  (partial-create vòng 2) cho ≥0 Người, ≥0 Tài sản, `ho_ten=null`, owner
+  `null`. `workspace_save_case` (S1/S2 23/10/2026) cũng cho ≥0 Người/≥0
+  Tài sản và owner null; mức tối thiểu mỗi dòng là họ tên (Người) và số
+  thửa + số tờ (Tài sản). `workspace_commit_stage` và `convert_type` cho
+  consumer khác vẫn strict: tên non-empty, owner inheritance hợp lệ.
+  Không biến incomplete thành invalid và không thêm cờ partial.
+- Địa chỉ tài sản nullable ở mọi đường ghi (thiếu dữ kiện vẫn lưu; chuỗi
+  rỗng ghi null); không còn rule "địa chỉ không rỗng". `is_primary` chỉ là
+  rule v1 lịch sử. Không tạo tên/identity giả.
+- Thiếu số giấy hoặc serial rỗng/toàn whitespace vẫn lưu row với entity_id null;
+  ô chỉ số/ngày mà chưa có tên lưu `ho_ten=null`, không lưu chuỗi rỗng.
+- Idempotency: cùng key **và hash payload/ý định draft** → workspace hiện tại,
+  created=false, không ghi/tăng revision; khác hash → idempotency_conflict.
+- Case mới status=draft, revision=1; không locked. Lưu thẳng Done dùng save_case.
+- Meta allowlist theo schema hiện hành: case_type/document_type và các trường
+  Hồ sơ §6.1/§13.6/§13.17; key ngoài allowlist → validation_error.
+- `workspace_create` vẫn là API tạo draft cho consumer khác; renderer Soạn
+  hồ sơ không gọi để lưu nháp. **Lưu hồ sơ** mới hoặc đã có đều dùng
+  `workspace_save_case`. Không dùng legacy case_create cho tab này.
 
 ## 5. `notary.intake_analyze` — payload + result
 
@@ -493,13 +630,16 @@ result.data:
   trên Diagram (`spouseSlotId`), không qua suggestion. Adapter gặp loại
   không map được có thể ghi `errors[]` với data-code
   `intake.unsupported_target`.
-- `case_id` present nhưng không tồn tại/`locked`/case_type khác →
-  `case_not_found`/`workspace_locked`/`case_type_unsupported`. Engine
-  OCR thiếu → `engine_not_installed` (reuse envelope §8).
+- `case_id` không tồn tại/case_type chưa hỗ trợ →
+  `case_not_found`/`case_type_unsupported`; Done không chặn intake.
+  Engine OCR thiếu → `engine_not_installed` (reuse envelope §8).
   Chế độ nháp (`case_id` absent) bỏ qua các kiểm tra case — suggestion
   không gắn hồ sơ nào.
 
 ## 6. `notary.workspace_commit_stage` — payload + result
+
+API này giữ nguyên trên server/adapter/REST cho consumer khác. Renderer Soạn
+hồ sơ không gọi, không có nút Cập nhật/Lưu nháp hoặc commit ngầm trước Lưu hồ sơ.
 
 ```yaml
 payload:
@@ -507,7 +647,7 @@ payload:
   base_revision: <int ≥ 1>
   case:                             # (đợt 3) OPTIONAL — metadata hồ sơ
                                     # ghi cùng Stage trong một transaction
-    ngay_lap_ho_so: <YYYY-MM-DD | null>    # null = giữ nguyên (NOT NULL)
+    ngay_lap_ho_so: <YYYY-MM-DD | null>    # null = ghi null; absent = giữ nguyên
     noi_niem_yet: <string | null>          # canonical `noiniemyet` cũng OK
     nguoi_nhan_uy_quyen: <string | null>   # `nguoinhanuyquyen`
     nguoi_nhan_uy_quyen_id: <int | null>   # `nguoinhanuyquyenid`
@@ -523,8 +663,8 @@ result.data:
   schema_version: "notary.case-drafting.v1"
   revision: <int>                  # revision mới sau commit
   stage:
-    people: [<person_row>]         # snapshot sau commit — entity_id
-    assets: [<asset_row>]          #   đã gán cho dòng mới
+    people: [<person_row>]         # rows sau commit; entity_id vẫn null nếu thiếu neo
+    assets: [<asset_row>]
   diagram:
     state: <diagram_state>         # state sau prune — §6.1
     render_model: <render_model>   # non-null — kết quả re-evaluate
@@ -533,20 +673,35 @@ result.data:
 
 ### 6.1 Semantics
 
-- **Atomic:** validate → upsert/link → prune Diagram → **re-evaluate
-  Diagram đã prune** → `revision+1` → commit, trong **một
-  transaction**. Một dòng sai → Stage không đổi. `render_model` mới được
-  lưu cùng state để `workspace_get` luôn trả model khớp state hiện tại.
+- **Atomic diff rows:** validate → resolve identity + diff case rows/đất/
+  projection → prune/re-evaluate Diagram đã lưu → revision+1 → commit duy nhất.
+  Full payload là ý định tập dòng, không delete/insert lại toàn tập hoặc upsert
+  master. Chỉ UPDATE field/vitri đổi, INSERT row mới, DELETE row bị bỏ và
+  phụ thuộc của chính case. Đất diff parent row_id+vitri, giữ hàng trống.
+  `commit_stage` trên draft giữ draft, trên Done giữ done; Word đọc snapshot DB mới.
+- **Strict của API:** `commit_stage` và `convert_type` giữ validation
+  strict hiện hành cho consumer khác — tên non-empty, owner inheritance hợp
+  lệ trong Stage. `workspace_save_case` từ 23/10/2026 đi theo đường Soạn
+  hồ sơ điền dần: không bắt ≥1 Người/≥1 Tài sản và không bắt Chủ đất
+  (S1/S2); mức tối thiểu field dùng chung là họ tên + số thửa/số tờ. Nháp
+  thiếu dữ liệu mở/sửa/Lưu được; không có cờ partial hay API bypass.
 - **`payload.case` (đợt 3):** metadata hồ sơ ghi cùng transaction —
   validate fail hoặc stage fail → không cái nào ghi. `case_type`/
   `document_type` gửi kèm phải khớp giá trị đã lưu (immutable qua
-  commit) — khác → `validation_error`. `nguoi_nhan_uy_quyen_id` phải
+  commit — **trừ đường chuyển loại đã duyệt**, §13.18) — khác →
+  `validation_error`. `nguoi_nhan_uy_quyen_id` phải
   tồn tại trong `customers`; kèm `nguoi_nhan_uy_quyen` lệch tên master →
-  `validation_error`. Snapshot `case_state_json` đóng băng meta dưới
-  block `payload.case` với key **canonical**
-  (`noiniemyet`,`nguoinhanuyquyen:{id,ten}`,`noidungviec`,
-  `ngaylaphoso`,`ghichu`) — Word đọc meta từ block này trước, cột
-  `inheritance_cases` chỉ là fallback cho hồ sơ cũ.
+  `validation_error`. Meta có cột lưu đúng cột case làm SOT; bảy scalar
+  metadata Upload còn lại trong JSON case (§13.19). Null ghi null,
+  absent giữ giá trị cũ; không fallback meta master hoặc nhân đôi SOT.
+- **Metadata Case Upload (owner 19/10, phạm vi Case):** create/commit nhận thêm
+  `tenvanban`, `nhomhopdong`, `loaivanbannhandien`, `socongchung`,
+  `ngaycongchung`, `congchungvien`, `thuky` theo entities §9.4; key không gửi
+  khi commit giữ snapshot cũ, `null` là xóa giá trị. `workspace_get/create`
+  emit cùng key và `chudat` chỉ đọc, derived từ Diagram đã lưu + tên Stage.
+  `chudat` không là input tự do; slot owner/người chết không tự là chủ đất.
+  Lựa chọn Chủ phải trỏ tài sản hiện có, không hidden/deleted. Metadata mới
+  không thay enum Notary, không tự nối Upload với DB Notary hoặc khép #41.
 - `base_revision` khác `revision` hiện server — **nhỏ hơn HOẶC lớn
   hơn** — → `failed{code:workspace_conflict,
   details:{server_revision}}`. Không có ghi đè cưỡng bức — client tải
@@ -559,9 +714,7 @@ result.data:
 - Lỗi field → `failed{code:stage_validation_error,
   details.field_errors:[{row_id, field, code, message}]}`. `code` nội
   bộ gợi ý: `required, invalid_type, invalid_enum, invalid_date,
-  invalid_format, duplicate_row_id, primary_count, duplicate_entity`
-  (rev 1.1 — `duplicate_entity` khi row gắn `entity_id` trùng một entity
-  đã thuộc Stage/cùng payload).
+  invalid_format, duplicate_row_id`; hai row_id cùng entity không là lỗi.
 - `so_serial` nhận chuỗi bất kỳ kể cả rỗng — không ép format
   (entities.md §2, Owner 06/10/2026); `so_giay_to` không ép format.
 - Stage Người trùng tên/tài sản trùng là quyền người dùng — backend
@@ -595,16 +748,15 @@ result.data:
   hoặc `null`; `ngay_lap_ho_so`: `YYYY-MM-DD` hoặc `null`).
 - **Không** đụng Stage/Diagram: `people`/`assets`/`state` giữ nguyên;
   `revision` tăng đúng 1 như mọi write khác; `base_revision` khác server
-  → `workspace_conflict`; case locked → `workspace_locked`; `case_id`
-  không tồn tại → `case_not_found`.
-- Dùng cho ô meta trong dialog Xuất Word (Nơi niêm yết) và các chỉnh sửa
-  meta tương lai — không tạo nguồn lưu meta thứ hai ngoài case DB.
-- Tích hợp MIN-141 (04/10/2026): cập nhật đúng key canonical trong
-  `case_state_json.case` cùng cột hồ sơ, trong cùng transaction/revision.
-  Không thay các key metadata khác, Stage, tài sản hoặc Diagram. Hồ sơ legacy
-  chưa có snapshot giữ đường đọc legacy, không tạo snapshot thiếu Stage.
-  Result giữ đủ `nguoi_nhan_uy_quyen`, `nguoi_nhan_uy_quyen_id`, `noi_dung_viec`
-  theo case shape MIN-141; schema `workspace-update.schema.json` đã đối chiếu.
+  → `workspace_conflict`; Done vẫn cập nhật được; `case_id`
+  không tồn tại → `case_not_found`. Status được giữ nguyên.
+- Dùng cho ô meta trong dialog Xuất Word (Nơi niêm yết):
+  `saveCaseMeta` → `workspace_update` vẫn là ngoại lệ ghi meta trực tiếp.
+  Không ghi kèm Stage/Diagram/ngữ cảnh Word đang sửa và không đánh dấu chúng
+  đã lưu; không tạo nguồn lưu meta thứ hai ngoài case DB.
+- Ghi cột metadata làm SOT, không lặp vào JSON; giữ các scalar khác và
+  Stage/Diagram. Không đường legacy fallback/migrate-on-read cho case B.
+  Result giữ đầy đủ case shape; null ghi null, không `new or old`.
 
 ## 7. `notary.diagram_evaluate` + `notary.diagram_save`
 
@@ -616,8 +768,8 @@ diagram_state:
   nodes:
     - id: <string non-empty>        # slot id — vd father, mother,
                                     #   spouse, owner, child_1, sibling_1
-      personId: <uuid4 | null>      # row_id dòng Người trong Stage
-                                    #   ĐÃ COMMIT; null = slot trống
+      personId: <uuid4 | null>      # row_id dòng Người trong Stage cùng
+                                    # ngữ cảnh (§13.2); null = slot trống
       parentSlotIds: [<node.id>]    # 0..2 — tham chiếu slot cha/mẹ
       spouseSlotId: <node.id | null>
       isLandOwner: <bool>
@@ -626,16 +778,18 @@ diagram_state:
       deleted: <bool>
 ```
 
-- `personId` PHẢI là `row_id` tồn tại trong `stage.people` đã commit →
-  vi phạm → `failed{code:diagram_reference_outside_stage}`. Áp dụng cả
-  `workspace_get` result (server emit tham chiếu ngoài Stage = vi phạm
-  contract).
+- `personId` PHẢI là `row_id` tồn tại trong Stage dùng cho thao tác: Stage DB
+  với get/diagram_save, Stage cùng payload với create/save_case/evaluate nháp.
+  Vi phạm → `failed{code:diagram_reference_outside_stage}` (refs đã lưu bị
+  xóa trong save_case được prune theo §13.19). `workspace_get` không được emit
+  tham chiếu ngoài Stage DB.
 - `parentSlotIds`/`spouseSlotId` tham chiếu `node.id` trong cùng
   `nodes`; dangling/self/>2/cycle → `diagram_invalid_state` với
   `details.errors[]` mang engine code (§7.3).
 - `assignments` **không** tồn tại như dữ liệu persist riêng — suy ra từ
-  `nodes[].personId`. `hidden`/`deleted` giữ trong state (engine bỏ qua
-  node `deleted`).
+  `nodes[].personId` trên node **active** (`deleted:false`); `personId`
+  giữ trên tombstone không giữ người ngoài Pool. `hidden`/`deleted` giữ
+  trong state (engine bỏ qua node `deleted`).
 - `version` literal `2` (engine `ENGINE_VERSION=2`); legacy JS shape
   (`parentSlotId`, `parentPersonId`, `familyGroupId`, `role`,
   `relationType`, `person` embedded) **không** thuộc wire này.
@@ -663,9 +817,11 @@ render_model:                       # null = chưa từng evaluate
           viaBranchPersonIds: [<uuid4>]
   requiredSlots:
     - anchorSlotId: <node.id>
-      reason: active_estate | representation_branch
+      reason: active_estate | representation_branch | living_owner
       slotTypes: [father | mother | spouse | child]
-      minimumEmptyChildSlots: <int>
+      minimumEmptyChildSlots: <int>   # 1 khi có child, ngược lại 0
+      minimumEmptySpouseSlots: <int>  # 1 khi có spouse, ngược lại 0
+      slots: [{id: <stable slot id>, role: <slotType>, ordinal: <int>}]
   warnings: [{code, message}]
   errors: [{code, message, ...details}]
   unresolvedEstates:
@@ -679,11 +835,23 @@ render_model:                       # null = chưa từng evaluate
     total: <fraction>
 ```
 
-- `status:unsupported` **reserved** cho trường hợp engine chưa hỗ trợ
-  (code hiện chưa sinh trạng thái này — spec.md §8 DRAFT). Candidate
-  error code khi unsupported: `second_order_required`,
-  `representation_depth_exceeded`. Không trình bày `unsupported` như
-  kết quả đã tính.
+WP2: `slots` là tập ô đích theo từng anchor; ID UUIDv5 từ
+`(anchorSlotId, role, ordinal)` (ordinal bắt đầu 0), không phụ thuộc lượt tính.
+Cha/Mẹ mỗi vai trò một ô; Vợ/chồng và Con có tối thiểu hai ô (ô đầu +
+ô dự phòng), hoặc số ô có người + một ô trống, lấy số lớn hơn.
+Chủ đất sống chỉ Vợ/chồng; chủ đất chết và người chuyển tiếp có Cha, Mẹ,
+Vợ/chồng, Con; thế vị chỉ Con và không sinh tiếp từ chắt. Người sống khác
+và vợ/chồng chết trước chủ đất không sinh ô. Ngày mất thiếu hoặc các
+khoảng ngày một phần chồng nhau nên không so được: không sinh ô cho người
+đó, trả warning `missing_death_date` kèm `personId`, `anchorSlotId`
+để UI ghi “thiếu ngày mất”. Năm riêng khác nhau vẫn so được trước/sau;
+không tự đệm ngày nhập thành dữ kiện đầy đủ.
+
+- `status:unsupported`: `second_order_required` khi không có người thừa kế
+  hàng 1 và `ENABLE_LATER_LINES=False`; không tính/sinh ô hàng 2/3.
+  Giữ yêu cầu ô hàng 1 để người dùng điền tiếp và phần di sản chưa chia
+  trong `unresolvedEstates`. `representation_depth_exceeded` khi thế vị
+  vượt chắt (D-012). Không trình bày `unsupported` như kết quả đã tính.
 - `allocations` phủ mọi active person (kể cả share `0`); `breakdowns`
   chỉ người có `finalShare > 0`. `unresolvedEstates[].reason` v1 chỉ
   `no_valid_heir`.
@@ -703,11 +871,11 @@ invalid_input, invalid_version, invalid_nodes, invalid_node,
 missing_node_id, duplicate_node_id, invalid_parent_slots,
 invalid_boolean, duplicate_person, unknown_person, too_many_parents,
 dangling_parent, self_parent, dangling_spouse, self_spouse,
-spouse_conflict, ancestry_cycle, invalid_death_date, missing_land_owner,
+ancestry_cycle, invalid_death_date, missing_land_owner,
 conservation_failed
 ```
 
-Reserved cho `unsupported`: `second_order_required`,
+Code cho `unsupported`: `second_order_required`,
 `representation_depth_exceeded`.
 
 ### 7.4 `notary.diagram_evaluate` — payload + result
@@ -733,17 +901,22 @@ result.data:
   render_model: <render_model>
 ```
 
-- Read-only theo DB: evaluate **không** ghi state, không đổi Stage,
-  không đổi revision. Vì read-only, evaluate **được phép trên case
-  `locked`** (chỉ các command ghi bị `workspace_locked`).
+- Read-only theo DB: evaluate không ghi state/Stage/revision; áp dụng
+  cho cả draft và done, không có khóa nghiệp vụ.
 - `personId` ngoài Stage → `diagram_reference_outside_stage` — Stage của
   case khi `case_id` present; Stage trong payload khi chế độ nháp.
   State sai cấu trúc → `diagram_invalid_state`.
 - Chế độ nháp (`case_id` absent): `stage` trong payload thay thế Stage
   DB; `diagram` được đánh giá trên đó; `evaluated_revision: null`;
-  `personId` trỏ `row_id` của stage payload (§2.1). `stage` vẫn phải qua
-  validation của `person_row`/`asset_row` (sai → `stage_validation_error`,
-  không phải `validation_error`).
+  `personId` trỏ `row_id` của stage payload (§2.1). Lỗi field Stage không
+  chặn evaluate (S19, owner 23/10/2026): engine vẫn chạy theo cấu trúc sơ
+  đồ và `render_model.status` trả `incomplete` kèm warning
+  `stage.incomplete_fields`; không còn `stage_validation_error` chỉ vì
+  field tùy chọn. Lỗi cấu trúc wire/reference/domain vẫn raise như §7.
+- Renderer Soạn hồ sơ dùng chế độ nháp với Stage + Diagram đang sửa, cả
+  khi hồ sơ đã có `case_id`; không gửi `case_id` trong request evaluate này.
+  Nhãn/cảnh báo/tính thử không được đọc baseline đã lưu thay cho dữ liệu
+  đang hiển thị. Evaluate không lưu nháp hay thay revision.
 
 ### 7.5 `notary.diagram_save` — payload + result
 
@@ -766,10 +939,15 @@ result.data:
 ```
 
 - Atomic write: validate state → evaluate → persist → `revision+1` →
-  commit. State invalid → không persist (`diagram_invalid_state`).
-- Save **không** đổi `stage.people`/`stage.assets` (drafting-tab §6).
-- `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) →
-  `workspace_conflict`; case locked → `workspace_locked`.
+  commit. State sai CẤU TRÚC → không persist (`diagram_invalid_state`).
+  Lỗi engine chỉ vì THIẾU DỮ KIỆN (`missing_land_owner`,
+  `invalid_death_date`) không chặn ghi: `render_model.status=incomplete`
+  giữ nguyên `errors` (S3, owner 23/10/2026); đường evaluate vẫn trả
+  nguyên trạng thái chưa tính được của engine.
+- Chỉ lưu Diagram trên rows đã commit, không Stage/meta và không đổi status.
+  Nút **Lưu hồ sơ** dùng workspace_save_case, không gọi đường này.
+  Incomplete hợp lệ giữ warnings/requiredSlots/Pool; lỗi cấu trúc reject và rollback.
+- base_revision khác server → workspace_conflict; Done vẫn lưu Diagram được.
 
 ## 8. `notary.word_export_options` + `notary.word_export_batch`
 
@@ -777,9 +955,13 @@ result.data:
 
 ```yaml
 payload:
-  case_id: <int>
+  case_id: <int | null>                  # null = hồ sơ chưa lưu (phần W)
   template_dir: <file_ref is_dir:true>   # optional (NAIA-8) — folder mode
 ```
+
+`case_id` null/absent chỉ quét nguồn mẫu (readiness mức mẫu); lượt xuất mới
+là lúc renderer tự tạo + lưu hồ sơ. `original_source_id` (nhánh hợp đồng
+gốc) đòi hồ sơ đã lưu.
 
 ```yaml
 result.data:
@@ -791,40 +973,39 @@ result.data:
       block_reason: <null | code>   # chỉ khi ready:false
 ```
 
-`block_reason` code hóa (v1 — data-code dạng `word.*`, §2.5):
+`block_reason` code hóa (v1 — data-code dạng `word.*`, §2.5). Owner
+23/10/2026 (phần W): **thiếu dữ kiện không còn là lý do chặn** — Người/Tài
+sản/sơ đồ Hai bên/chủ đất/chủ đất đã mất/người nhận thiếu chỉ làm
+placeholder tương ứng rỗng và được ghi vào `missing` của kết quả từng file.
+Chỉ còn gate **kỹ thuật**:
 
 ```
-word.no_people              # Stage chưa có người nào (NAIA-8)
-word.no_diagram             # hồ sơ chưa lưu diagram state (NAIA-8)
-word.no_assets              # hồ sơ chưa có tài sản
-word.no_landowner           # chưa có chủ đất trên Diagram (inheritance)
-word.no_deceased_landowner  # không có chủ đất đã chết (inheritance)
-word.no_receiver            # chưa có người nhận (inheritance)
 word.too_many_assets        # > 5 tài sản
 word.too_many_people        # Stage: > 20 người (inheritance) / > 30 (two_party)
 word.too_many_signers       # > 20 người ký (inheritance)
 word.template_missing       # văn bản chưa có template
 ```
 
-Mapping từ validation thật của `word_engine`: Stage rỗng → `no_people`;
-chưa có diagram state → `no_diagram`; không tài sản → `no_assets`; >5 tài
-sản → `too_many_assets`. Riêng `inheritance`: không chủ đất →
-`no_landowner`; không chủ đất đã chết → `no_deceased_landowner`; không
-người nhận → `no_receiver`; >20 người trên **Stage** → `too_many_people`
-(`[Người N]` lấy theo Stage đã lưu, không phải node Diagram); >20 người
-ký → `too_many_signers`. `two_party` **không** áp điều kiện chủ đất/người
-nhận; >30 người trên Stage → `too_many_people` (placeholder `[Người
-N]`/`[Bên A N]`/`[Bên B N]` phủ 30 slot); >30 người ký → lỗi render
-per-file (§8.4), `block_reason` không liệt kê riêng.
-Các code này là kiểm tra **kỹ thuật** xuất file — không phải kiểm định
-pháp lý (§13.5).
+`word.no_people`, `word.no_diagram`, `word.no_assets`, `word.no_landowner`,
+`word.no_deceased_landowner`, `word.no_receiver` đã nghỉ hưu (reserved —
+không producer nào trả nữa).
 
-NAIA-8 phase thư mục mẫu (owner 02–03/10/2026): khi có `template_dir`,
-readiness chỉ chặn thiếu Stage/tài sản, giới hạn số lượng, thiếu sơ đồ hai bên
-và lỗi mẫu/đường dẫn. Không chặn inheritance vì thiếu dấu chủ đất/chủ đất đã
-chết/người nhận; nhóm chưa có dữ liệu render rỗng. Các lý do ba điều kiện này
-chỉ giữ trên catalog legacy không có `template_dir`. Token không hỗ trợ hoặc
-thiếu slot đại diện mẫu yêu cầu vẫn làm riêng file đó lỗi.
+Mapping từ validation thật của `word_engine`: chỉ vượt trần số lượng mới
+chặn (`too_many_assets`, `too_many_people`, `too_many_signers`); `two_party`
+không áp điều kiện chủ đất/người nhận và dùng trần 30 người. `[Người N]`
+lấy theo Stage đã lưu, không phải node Diagram. Các code này là kiểm tra
+**kỹ thuật** xuất file — không phải kiểm định pháp lý (§13.5).
+
+Readiness theo **dữ liệu mẫu thực sự cần** (owner 15/10/2026) chỉ còn dùng
+để quyết định ghi chú `missing` nào vào kết quả file (nhóm `Chủ đất
+sống`/`Chủ đất chết`/`Người nhận`, ghế `Bên A`/`Bên B` nhận diện theo đúng
+registry key engine sinh sau chuẩn hoá không dấu, không theo chuỗi con).
+Nhóm thiếu luôn render rỗng. Token không hỗ trợ/không xác minh, slot chưa
+giải quyết và thiếu người được ủy quyền mà mẫu cần **không còn làm file
+lỗi**: DOCX vẫn ra với chỗ trống và kết quả liệt kê trong `missing`.
+Mẫu hiện diện nhưng không mở/parse được: readiness trả đúng data-code
+per-file mà batch sẽ trả (`word.render_failed`, `file_locked`,
+`file_not_found`) thay vì fallback gate cũ.
 
 Catalog `document_key` v1 (registry mở — backend được thêm):
 
@@ -852,6 +1033,9 @@ payload:
   create_case_subdir: <bool>        # optional — default false (NAIA-8)
 ```
 
+- `case_id` là hồ sơ **đã lưu**: renderer tự lưu bản đang sửa (hoặc tạo mới)
+  trong cùng hành động xuất trước khi gọi batch; lỗi lưu thật dừng hành
+  động, không xuất bản cũ thay thế (phần W, owner 23/10/2026).
 - `document_keys` rỗng → `word_no_documents_selected`; trùng →
   `word_duplicate_document_key`; key ngoài tập mẫu đã quét (catalog
   hoặc đúng `template_dir`) → `word_unknown_document_key`; key sai
@@ -862,10 +1046,9 @@ payload:
 - `create_case_subdir:true` → ghi vào `<destination>/HS-<case_id>/`
   (tạo nếu thiếu); `data.destination` trong result vẫn là thư mục
   người dùng chọn.
-- Validate **trước khi tạo file đầu tiên**: mọi lỗi trên + destination
-  + `workspace_locked` → `failed`, không file nào được tạo. File mẫu
-  biến mất sau khi quét → per-file `failed{code:word.template_missing}`
-  (§8.4).
+- Validate trước file đầu tiên: các lỗi trên + destination → failed, không
+  tạo file nào. Không chặn theo status done. File mẫu biến mất sau quét →
+  per-file failed{code:word.template_missing} (§8.4).
 
 ### 8.3 Naming và không-ghi-đè
 
@@ -899,6 +1082,7 @@ result.data:
       actual_filename: <string | null>   # tên file thật khi saved
       output_file: <file_ref | null>     # path tuyệt đối file đã ghi
       error: {code, message} | null      # per-file — data-code (§2.5)
+      missing: [<string>]                # dữ kiện còn thiếu của file đã xuất
   breakdown:
     succeeded: [<document_key>]
     failed: [<document_key>]
@@ -915,9 +1099,19 @@ result.data:
   `status:skipped` và vào `breakdown.skipped`; job
   `canceled{code:user_canceled}`; file đang ghi dở được dọn theo chính
   sách engine (không để file nửa vời nếu tránh được).
-- Per-file `error.code` là **data-code** `<ns>.<snake>` (§2.5): registry
-  v1 gồm `word.template_missing`, `word.unresolved_placeholders` và mã
-  envelope reuse (`file_locked`, `file_not_found`). Producer được thêm
+- `missing` là **kết quả**, không phải lỗi: file vẫn `saved` với chỗ đó để
+  trống. Ví dụ: `tài sản`, `chủ đất`, `chủ đất đã mất`, `người nhận`,
+  `người được ủy quyền <slot>`, `1 trường chưa hỗ trợ: [token]`. Producer
+  luôn emit (có thể `[]`); consumer coi vắng mặt = không có ghi chú.
+- Per-file `error.code` là **data-code** `<ns>.<snake>` (§2.5) và chỉ dành
+  cho lỗi kỹ thuật thật. Từ phần W (23/10/2026), thiếu dữ kiện/token chưa hỗ
+  trợ **không** còn sinh `word.unresolved_placeholders` hay
+  `word.missing_authorized_person` per-file; các mã đó giữ reserved.
+  `word.missing_authorized_person` và `word.unresolved_placeholders` không
+  còn producer. Registry còn dùng: `word.template_missing`,
+  `word.too_many_assets`, `word.too_many_people`, `word.too_many_signers`,
+  `word_path_traversal`, `word.invalid_filename`, `word.render_failed` và
+  mã envelope reuse (`file_locked`, `file_not_found`). Producer được thêm
   data-code mới.
 
 ## 9. Bảng error code
@@ -926,18 +1120,19 @@ Namespace `notary.*` (snake_case không chấm):
 
 | Code | Khi nào | `details` |
 |---|---|---|
-| `case_not_found` | `case_id` không tồn tại | — |
-| `case_type_unsupported` | `case_type` engine chưa hỗ trợ trên command ghi/evaluate/export; word_export chấp nhận `inheritance` + `two_party` (NAIA-8) | `{case_type}` |
-| `workspace_locked` | write trên case `locked` | — |
+| `case_not_found` | `case_id` không tồn tại; `workspace_duplicate` với `source_case_id` không tồn tại (khi chưa replay) | `{source_case_id}` cho duplicate |
+| `case_type_unsupported` | `case_type` engine chưa hỗ trợ trên command ghi/evaluate/export; `workspace_source_latest` chọn case Done có loại ngoài `inheritance`/`two_party` (không lùi sang case khác); word_export chấp nhận `inheritance` + `two_party` (NAIA-8) | `{case_type}` |
+| `idempotency_conflict` | Key tạo đã dùng với creation hash khác (command/ý định draft hoặc done cũng thuộc hash); duplicate dùng cùng key cho source khác hoặc command khác | — |
 | `workspace_conflict` | `base_revision` khác revision server (cả nhỏ hơn lẫn lớn hơn) | `{server_revision}` |
-| `workspace_owner_required` | `workspace_create` thiếu node `owner` đã gán person (rev 1.1) | — |
+| `workspace_owner_required` | Owner inheritance **non-null** sai/ngoài Stage ở create/save_case/diagram_evaluate; chuyển vào inheritance không chọn owner hợp lệ. Chưa gán owner (absent/null) hợp lệ trên create/save_case/evaluate; commit/convert vẫn bắt buộc | — |
 | `stage_validation_error` | field Stage vi phạm | `{field_errors:[{row_id,field,code,message}]}` |
+| `workspace_storage_error` | Ràng buộc integrity khi ghi không ánh xạ được sang ô user thấy (row_id/vitri/entity_id là wire nội bộ). Dữ liệu chưa đổi | `{constraint, retryable:false}` — không field_errors, không row giả |
 | `intake_unsupported_source` | `kind` ngoài enum | `{source_id, kind}` |
 | `intake_source_too_large` | file > 20MB / PDF > 50 trang | `{source_id, limit}` |
 | `intake_too_many_sources` | sources > 8 | `{count, limit}` |
 | `intake_text_too_long` | text > 100.000 ký tự | `{source_id, length, limit}` |
-| `diagram_reference_outside_stage` | `personId` không thuộc Stage đã commit | `{personId}` |
-| `diagram_invalid_state` | state sai cấu trúc/engine reject | `{errors:[{code,message,...}]}` |
+| `diagram_reference_outside_stage` | `personId` không thuộc Stage của thao tác (DB hoặc cùng payload); prune refs pending khi save_case theo §13.19 | `{personId}` |
+| `diagram_invalid_state` | state sai cấu trúc; engine reject vì lỗi quan hệ/wire. Trên đường Lưu, engine `invalid` chỉ vì `missing_land_owner`/`invalid_death_date` → render_model `incomplete`, không lỗi | `{errors:[{code,message,...}]}` |
 | `word_no_documents_selected` | `document_keys` rỗng | — |
 | `word_duplicate_document_key` | key lặp | `{document_key}` |
 | `word_unknown_document_key` | key ngoài catalog/sai pattern | `{document_key}` |
@@ -966,11 +1161,11 @@ Producer (sidecar/backend) PHẢI:
       `row_id`+field; prune **và re-evaluate** Diagram trong cùng
       transaction; `revision+1`; `render_model` trả về khớp state mới.
 - [ ] Reject `base_revision` khác server (`<` hoặc `>`) bằng
-      `workspace_conflict` trên mọi command ghi; reject write trên case
-      locked/unsupported — `diagram_evaluate` vẫn cho phép khi locked.
-- [ ] Reject `personId` ngoài Stage đã commit
-      (`diagram_reference_outside_stage`); chỉ emit `diagram_state`
-      version 2.
+      `workspace_conflict` với case đã có; reject loại chưa hỗ trợ,
+      không chặn Done hoặc dùng workspace_locked.
+- [ ] Reject personId ngoài Stage (cùng payload khi create/save_case/evaluate
+      nháp); diagram_reference_outside_stage. Wire hiện hành Diagram v3;
+      shape version 2 phần nền chỉ là lịch sử.
 - [ ] Enforce giới hạn intake §5.2; `partial` kèm breakdown source_id.
 - [ ] Destination FileRef: `is_dir:true`, absolute, `machine_local`,
       không UNC, folder tồn tại — kiểm trước khi tạo file đầu tiên.
@@ -979,10 +1174,22 @@ Producer (sidecar/backend) PHẢI:
 - [ ] `word_export_batch`: tất cả lỗi → `word_batch_failed`; cancel →
       file chưa bắt đầu `status:skipped` + vào `breakdown.skipped`,
       giữ file đã lưu; `breakdown` luôn đủ ba list.
-- [ ] `workspace_create`: một transaction; owner bắt buộc (node `owner`
-      có personId ∈ payload stage); đúng một `is_primary`; idempotent
-      theo `idempotency_key` (`created:false` khi replay); result mang
-      workspace shape §4 + `created`.
+- [ ] `workspace_create` (partial-create vòng 2): cho ≥0 Người/Tài sản,
+      `ho_ten=null`, owner inheritance absent/null; vẫn kiểm kiểu/ngày/
+      giới hạn; owner non-null sai → workspace_owner_required.
+      `workspace_save_case` từ 23/10/2026 cho ≥0 Người/≥0 Tài sản và owner
+      null; tối thiểu họ tên + số thửa/số tờ. Địa chỉ tài sản nullable.
+      Key+hash replay không ghi, hash khác idempotency_conflict.
+      Case mới revision=1; workspace_save_case ghi nguyên tử và done.
+- [ ] `workspace_source_latest`: payload `{}` strict, chỉ đọc case Done
+      lưu gần nhất (updated_at DESC, id DESC, null-last); trả UUID v4 mới,
+      owner remap, identity giữ; không trả meta/Diagram, không ghi DB.
+      Không có Done → kết quả rỗng thành công, không lỗi.
+- [ ] `workspace_duplicate`: copy toàn bộ nội dung đã lưu trong một
+      transaction; UUID/land PK/participant PK mới, identity giữ, owner/
+      participant/Diagram personId/records.row_id remap; key+hash
+      `{command,intent,source_case_id}` replay trả workspace hiện tại
+      created=false; lỗi rollback toàn bộ, nguồn không đổi.
 - [ ] `intake_analyze`/`diagram_evaluate`: chấp nhận `case_id` absent
       (nháp); reject `case_id:null` và `case_id` present-not-int ≥1
       bằng `validation_error`; evaluate nháp yêu cầu `stage` payload và
@@ -993,7 +1200,7 @@ Producer (sidecar/backend) PHẢI:
 Consumer (Electron main/renderer) PHẢI:
 
 - [ ] `row_id`/`source_id` UUID v4 do client sinh; giữ ổn định qua
-      commit/reload; gửi `base_revision` trên mọi write.
+      lưu/reload; gửi `base_revision` trên mọi write case đã có.
 - [ ] Không tự tính tỷ lệ/quan hệ — `Xem cách tính` chỉ đọc
       `render_model`; không suy `Người từ chối` từ `Nhận`.
 - [ ] Reject result chứa `confirmed`, `""`-as-null, output ngoài
@@ -1006,10 +1213,16 @@ Consumer (Electron main/renderer) PHẢI:
 
 ## 11. Examples & validator
 
-- Examples: `contracts/notary-case-drafting/examples/{valid,invalid}/`.
+- Examples: `contracts/notary-case-drafting/examples/{valid,invalid}/`
+  (và corpus v2 trong `examples/draft-v2/`).
 - Validator: `contracts/notary-case-drafting/validate_examples.py`
-  (stdlib-only). Gate: mọi `*.valid.json` pass hết rule; mọi
+  (stdlib + jsonschema). Gate: mọi `*.valid.json` pass hết rule; mọi
   `*.invalid.json` bị reject với `expected_error` khớp bảng §9.
+- Schema cho vòng 2: `workspace-source-latest.schema.json`,
+  `workspace-duplicate.schema.json`; `draft-v2.schema.json` tách
+  person/stage **output**, **create partial** và **strict input**;
+  `workspace.schema.json` có definition workspace result v2 dùng chung.
+  Schema v1 vẫn chỉ mô tả corpus lịch sử, không là quyền nới case hiện hành.
 - Fixture được phép mang `fixture_context` (object, top-level) mô tả
   trạng thái server giả định — vd `{"server_revision":7,
   "stage_row_ids":[...]}` — để validator kiểm rule ngữ cảnh
@@ -1027,20 +1240,27 @@ Consumer (Electron main/renderer) PHẢI:
 | v1.1 | 26/09/2026 | MIN-121 (additive, tương thích ngược): `notary.workspace_create` + `idempotency_key`; chế độ nháp (`case_id` absent) cho `intake_analyze`/`diagram_evaluate` (evaluate nháp kèm `stage` payload, `evaluated_revision:null`); `case` +`ngay_lap_ho_so`/`noi_niem_yet`/`ghi_chu`; field_error +`duplicate_entity`; error +`workspace_owner_required` |
 | v2 MIN-141 | 03/10/2026 | Owner xác nhận hành vi cuối 14 commit worker và yêu cầu gộp vào nhánh chính; thay các quy tắc MIN-140 mâu thuẫn, đồng bộ dữ liệu Người/cụm đất/Hồ sơ. Xem §13.16 |
 | v2 (APPROVED) | 27/09/2026 | Owner duyệt §13 (MIN-125, toàn bộ Q1–Q12): `schema_version` bump `notary.case-drafting.v2`; Stage draft/committed + create nguyên khối; `owner_row_id`; asset theo vị trí 1..3, bỏ `is_primary`; `ownPositions`/`receivePositions`; domain `two_party` 30 slot `p1..p30`; `case_type` immutable; error codes §13.9. Implement ở P5 (MIN-128). C1–C4 xử lý theo §13.13 |
+| v2 + conversion (owner) | 16/10/2026 | Owner duyệt chuyển loại hồ sơ **đã lưu** (#3): ngoại lệ `case_type`/`document_type` immutable (§6.1, §13.5) — giữ Người/Tài sản Stage, reset Diagram, buộc chọn `document_type` mới kèm xác nhận, `owner_row_id` theo loại đích; §13.18. [Decision](../_bmad-output/decisions/decision-owner-saved-case-type-conversion-20261016.md) |
+| v2 + branch removal (#21B) | 17/10/2026 | **BUILT — retained Quick CODE t3 No actionable findings; parent accepted AC1–4**. Owner “B - gỡ cả nhánh” semantics §7.1/§13.4 unchanged; no new wire/API/store. Node full 198 before test-only wording-assert deletion, affected file 25 after; service 106 (24 existing warnings), Source Electron real IPC/isolated SQLite proof. Not packaged/Word acceptance. |
 | additive NAIA-9 | 04/10/2026 | Thêm command thứ mười `notary.address_lookup` (§14): tra cứu đơn vị hành chính đích theo địa chỉ nguồn + `source_date`/`target_date` đầy đủ; read-only, local-only trên ledger Bando đóng gói; `result.data.schema_version` = `notary.address-lookup.v1` — ngoại lệ rule §1 |
 | address-lookup v2 (APPROVED, triển khai TASK-3) | 05/10/2026 | TASK-2, Owner duyệt 05/10: thay v1 bằng `notary.address-lookup.v2` (§14) — payload `query`+`presentation`, bỏ ngày/tách xã-tỉnh/`coverage`/`partial`; result `found\|not_found\|too_many\|invalid_input\|reload_failed`. **Breaking**; runtime và schema v1 đã chuyển/xóa tại TASK-3. |
+| v2 Storage B vòng 1 (đang triển khai) | 22/10/2026 | Cutover tiền MVP không tương thích client cũ: rows case-owned là SOT, identity nullable khi thiếu neo, draft/done không khóa; thêm workspace_save_case nguyên tử (§13.19). Giữ validation create vòng 1; nới tên/tập rỗng/owner null thuộc vòng 2. Không proof BUILT. |
+| v2 Storage B vòng 2 (ĐÃ TRIỂN KHAI 22/10/2026) | 22/10/2026 | Thêm `workspace_source_latest` (§13.20: chọn case Done theo updated_at microsecond/id, Stage UUID mới + identity hint) và `workspace_duplicate` (§13.21: copy toàn bộ đã lưu, hash command+intent+source, draft/rev1 là chốt kỹ thuật chờ owner). Nới `workspace_create` cho nháp ít dữ liệu; save_case/commit/convert giữ strict (save_case nới tiếp 23/10/2026 — §13.19). Proof: `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`, `test_issue13_storage_b_proof.py`. |
+| v2 gate inventory S1–S7/S19 (owner) | 23/10/2026 | Đường Lưu phía server đi theo triết lý điền dần: save_case không bắt ≥1 Người/≥1 Tài sản (S1) và không bắt Chủ đất (S2); engine `invalid` chỉ vì thiếu dữ kiện (`missing_land_owner`/`invalid_death_date`) → `incomplete` trên đường Lưu (S3); Người chỉ bắt buộc họ tên, chuỗi rỗng → null (S4/S4d); Tài sản bắt buộc số thửa + số tờ, `ngay_cap` nhận chỉ-năm (S5b/S5c); cụm đất bỏ trần 20, alias mâu thuẫn ghi theo key mới, diện tích không parse → null (S6); trần 5 tài sản (S7); evaluate nháp không chặn field tùy chọn (S19). §4.1/§4.2/§4.3/§7.4/§7.5/§13.2/§13.3/§13.6/§13.16/§13.19. |
+| v2 G4 single-save (owner) | 23/10/2026 | Bỏ Cập nhật/Lưu nháp ở renderer; Stage/Pool/Diagram dùng chung bản đang sửa, baseline chỉ là lần lưu gần nhất; chỉ Lưu hồ sơ persist qua workspace_save_case. Không lưu ngầm khi rời/đóng, giữ canLeave/window-close và revision/conflict. API commit/create/diagram_save vẫn hỗ trợ consumer khác; Word saveCaseMeta giữ workspace_update. §13.2/§13.17–§13.19. |
 
 ---
 
 # PHẦN II — `notary.case-drafting.v2` (MIN-125, APPROVED 27/09/2026)
 
-> **TRẠNG THÁI: APPROVED — owner duyệt toàn bộ đề xuất Q1–Q12 ngày
-> 27/09/2026.** §13 là wire contract v2; runtime implement ở
-> **P5 (MIN-128)**. Phần I (`v1`, §1–§12) vẫn hiệu lực cho consumer v1;
-> backend emit `v2` thống nhất theo §13.1.
+> §13 là contract v2 hiện hành. **Storage B đang triển khai vòng 1**, chưa
+> chứng minh runtime hoàn tất. V1/ánh xạ persisted cũ là lịch sử, không còn
+> nghĩa vụ client compatibility hoặc migration dữ liệu test. Cutover renderer
+> và backend cùng bản; giữ literal v2, Diagram v3, envelope desktopcommand.v1.
 >
-> Các câu hỏi C1–C4 (§13.13) vẫn mở — xử lý theo ghi chú từng mục,
-> không chặn implement phần đã duyệt.
+> **Bổ sung 16/10/2026 (owner):** hồ sơ **đã lưu** được chuyển loại
+> (`inheritance` ↔ `two_party`) — ngoại lệ `case_type`/`document_type`
+> immutable, xem §13.18.
 >
 > Mọi mục dưới đây gắn mã `Q#` ↔ bảng quyết định tại
 > `_bmad-output/archive/linear-tasks/MIN-125/decisions.md` (đề xuất + phương án thay thế).
@@ -1057,7 +1277,7 @@ Rev 1.1 additive được vì chỉ thêm field nullable / command mới. §13
 `stage.owner_row_id`, thêm `domain` bắt buộc trong `diagram_state`, thêm
 `case_type` thứ hai. Consumer v1 đọc payload v2 sẽ hiểu sai → bắt buộc
 `schema_version` mới: `notary.case-drafting.v2`. Envelope vẫn
-`desktopcommand.v1`, giữ đúng 8 command `notary.*` — chỉ đổi shape
+`desktopcommand.v1`; danh mục command theo §1 và §13.18–13.19; đổi shape
 `payload`/`result.data` và ngữ nghĩa vòng đời. Shell desktop ship
 sidecar + renderer trong cùng bản → không cần negotiate version trên
 wire; backend P5 emit `v2` thống nhất.
@@ -1069,67 +1289,71 @@ wire; backend P5 emit `v2` thống nhất.
 | `case.case_type` | cam kết `inheritance` | `inheritance` \| `two_party` |
 | `asset_row.is_primary` | bắt buộc, đúng 1 `true` | **bỏ** — primary = vị trí 1 |
 | `stage.owner_row_id` | không có | bắt buộc với `inheritance`, cấm với `two_party` |
-| node cờ thừa kế | `isLandOwner`, `willReceive` bool | `ownPositions`, `receivePositions` ⊆ {1,2,3} |
+| node cờ thừa kế | `isLandOwner`, `willReceive` bool | `ownPositions`, `receivePositions` ⊆ {1..5} |
 | `diagram` trong `workspace_create` | bắt buộc, phải có owner node | **optional** — server tự seed |
-| Pool của hồ sơ mới | đòi owner/primary trước khi gán | `Cập nhật` đầu = `workspace_create` (Q1) |
+| Pool của hồ sơ mới | đòi owner/primary trước khi gán | Đọc Stage đang sửa, gán ngay trước lần Lưu hồ sơ đầu (§13.2; thay Q1 lịch sử) |
 
-### 13.2 Vòng đời Stage: draft / committed / Cập nhật / Hủy
+### 13.2 Vòng đời: một bản đang sửa / baseline đã lưu / Lưu hồ sơ / bỏ nháp
 
-Contract chỉ định nghĩa trạng thái **committed** (server persist, trả
-qua `workspace_get`/result của write) và payload `stage` trên wire. Phần
-này chốt nghĩa vụ hai phía về **vòng đời** — buffer draft là khái niệm
-client nhưng contract phải nói rõ khi nào server thấy thay đổi.
+Stage, Pool và Diagram ở renderer dùng **một trạng thái soạn hiện tại**:
+Stage Người/Tài sản/meta, Diagram và `docx_import` đang sửa trong phiên.
+Thay đổi hiển thị ngay giữa các vùng, không có nhánh hiển thị draft/committed
+theo việc hồ sơ đã có ID hay chưa.
 
-```text
-stage draft buffer (client, không wire)          committed stage (server)
-        │  Cập nhật ──► workspace_commit_stage ──►│  (hoặc workspace_create
-        │            payload.stage = snapshot      │   với hồ sơ mới — Q1)
-        │                                          │
-        │  Hủy (client-only, KHÔNG có command) ◄── │
-        ◄──────── restore buffer := snapshot ──────┘
-            committed mới nhất
-```
+- **Bản đang sửa** sống trong bộ nhớ phiên; gõ ô, thêm/xóa dòng, reorder,
+  gán/gỡ node, sửa dấu Chủ/Nhận hoặc ngữ cảnh Word không tự ghi DB.
+- **Baseline `committed`** chỉ là snapshot **đã lưu gần nhất** của chính hồ
+  sơ (draft hoặc done), nạp từ GET/result ghi thành công. Dùng cho dirty,
+  đối chiếu/revision và ý định wire/identity; **không** là nguồn hiển thị
+  Pool/nhãn Diagram hoặc tập Người có thể gán. Baseline của nháp mới rỗng;
+  case draft trong DB vẫn mở lại được, khác buffer chưa lưu.
+- **Không có Cập nhật/Lưu nháp** trong renderer. Không gọi `workspace_create`,
+  `workspace_commit_stage` hoặc `diagram_save` để persist nội dung soạn,
+  kể cả khi điều hướng, đổi loại hoặc chuẩn bị xuất Word. Server/adapter/REST
+  vẫn giữ các API này cho consumer khác. Ngoại lệ Word `saveCaseMeta` →
+  `workspace_update` chỉ ghi meta theo §6.2.
+- **Lưu hồ sơ** dùng `workspace_save_case`: flush cả ô đang focus, đồng bộ
+  mặc định vị trí chưa touched (§13.4), chụp Stage/meta/Diagram/`docx_import`
+  hiện tại trong một payload; một transaction → done. Hồ sơ mới dùng
+  `draftId` của phiên làm `idempotency_key`, không cần tạo draft trung gian;
+  revision=1. Case đã có gửi `base_revision`, revision+1 kể cả Done sạch;
+  không đòi diagramDirty. Lỗi giữ nguyên bản đang sửa/dirty.
+- **Pool** = `stage.people` **đang sửa** trừ những `personId` đang gán
+  trên node active của Diagram **đang sửa**. Tập Người có thể gán, tên,
+  ngày sinh/mất và nhãn node đều từ Stage hiện tại. Thêm Người xuất hiện
+  ngay; sửa Người cập nhật Pool/node ngay; node trỏ dòng đã xóa không được
+  mượn dữ kiện baseline. Hồ sơ mới cũng gán được trước lần lưu đầu.
+- **Xóa row trong bản đang sửa:** dòng Người biến mất khỏi Stage/Pool ngay;
+  client đồng thời xóa `personId` ấy khỏi mọi node Diagram, kể cả node owner,
+  và xóa `owner_row_id` nếu đang trỏ dòng bị xóa. Không lấy tên/nhãn từ
+  baseline để hiển thị lại Người đã xóa. Xóa Tài sản cập nhật Stage ngay;
+  dấu chọn vị trí pending được normalize/prune khi Lưu hồ sơ theo Stage
+  cùng payload (§13.19); vị trí vẫn theo số, không theo row_id.
+- **Rời/đóng hồ sơ thực sự** (mở hồ sơ khác, tạo nháp khác hoặc đóng cửa
+  sổ): giữ dirty + guard `canLeave` và window-close. Hủy rời → giữ bản
+  đang sửa; xác nhận bỏ → bỏ buffer, **không command ghi**, không tự lưu
+  nháp. Mở lại đọc bản đã lưu gần nhất qua `workspace_get`, revision DB
+  không đổi. Chuyển sidebar/module/tab chỉ tạm ẩn view theo chính sách cache
+  buffer trong RAM (`_bmad-output/specs/ui/README.md`), không tự bỏ bản đang
+  sửa hoặc coi như đã lưu; quay lại trong cùng phiên vẫn có buffer. Cache
+  ấy không bền vững khi đóng app hay mở hồ sơ khác. Không persist PII trong
+  localStorage/log/diagnostics để khôi phục. Nút `Hủy thay đổi` Stage và
+  cơ chế khôi phục riêng đã bỏ; ví dụ §13.12.2.
+- **API partial-create vẫn hỗ trợ:** consumer khác có thể gọi
+  `workspace_create` với tập rỗng/tên null/owner null, status draft/rev1.
+  Đây không phải một thao tác lưu của renderer Soạn hồ sơ. Mở draft ấy
+  dùng chung bản đang sửa như mọi case khác; Lưu hồ sơ chỉ đòi mức tối
+  thiểu (họ tên mỗi dòng Người, số thửa + số tờ mỗi dòng Tài sản) — không
+  còn ≥1 Người/≥1 Tài sản hay Chủ đất bắt buộc (S1/S2 23/10/2026).
+  Không có cờ partial cho save_case/commit/convert; `diagram_save` riêng
+  không chuyển Done.
+- **Tính thử:** renderer dùng `diagram_evaluate` chế độ nháp (`case_id`
+  absent) với Stage + Diagram đang sửa, kể cả case đã có ID (§7.4).
+  Payload Stage là `stage_v2`, có `owner_row_id` với inheritance; không
+  persist, không tăng revision, `evaluated_revision:null`. Thiếu dữ kiện
+  vẫn theo incomplete của engine, không tự chặn thành invalid.
 
-- **`stage draft buffer`** — bản đang sửa trong phiên (thêm/xóa/sửa
-  row, reorder tài sản). Server **không** biết buffer này.
-- **`stage committed`** — snapshot sau lần `workspace_commit_stage` /
-  `workspace_create` thành công gần nhất; `workspace_get` trả đúng bản
-  này. Mọi `personId` trên diagram chỉ được trỏ row của stage committed
-  (hoặc `stage` trong cùng payload ở chế độ nháp — §2.1a).
-- **Cập nhật (Update) nguyên khối** — semantics §6.1 giữ nguyên: một
-  transaction, `base_revision` chống conflict, prune + re-evaluate trong
-  cùng transaction, `revision+1`.
-- **Xóa row trong draft KHÔNG prune diagram ngay** (sửa hành vi hiện
-  trạng `removeStageRow` — `case-drafting-model.js`): xóa dòng Người
-  hay Tài sản trong buffer chỉ đánh dấu pending; `personId`/dấu chọn
-  `ownPositions`/`receivePositions` trên diagram buffer giữ nguyên cho
-  tới khi `Cập nhật` thành công — lúc đó server prune theo §6.1 và trả
-  `diagram.state` đã prune. UI được đánh dấu "sẽ gỡ khi Cập nhật" trên
-  node (quyết định hiển thị của P6, không phải field wire).
-- **Hủy (Cancel)** — *client-only, không command mới*: discard buffer và
-  restore **cả** stage lẫn diagram buffer về committed snapshot mới
-  nhất (Q2). Sau Hủy: `row_id`, thứ tự asset, `personId`, positions —
-  tất cả đúng như bản committed; `revision` không đổi vì không có write.
-  Ví dụ "xóa asset rồi Hủy" ở §13.12.2.
-- **Pool** = `stage.people` **committed** trừ những `personId` đang gán
-  trên diagram committed (giữ nguyên nghĩa §7/SOT). Pool **không** đọc
-  draft buffer — tránh bug `caseId=null` hiện trạng (model đọc buffer
-  chưa commit làm Pool). Hồ sơ mới (chưa từng commit) ⇒ committed stage
-  rỗng ⇒ **Pool rỗng** → người dùng phải `Cập nhật` trước khi gán sơ
-  đồ, đúng yêu cầu MIN-125.
-- **Chu trình hồ sơ mới (Q1):** mở nháp → nhập Người/Tài sản + đánh dấu
-  `owner_row_id` → `Cập nhật` = **`workspace_create`** (một transaction,
-  case persist, `revision=1`) → Pool lấy từ stage vừa committed → gán sơ
-  đồ → `diagram_save` (mang `base_revision` như thường). Như vậy vòng
-  phụ thuộc "tạo hồ sơ đòi owner trên diagram trước khi có Pool" bị phá:
-  owner trở thành **con trỏ trong stage** (§13.6), không còn là điều
-  kiện của việc được gán diagram.
-- `diagram_evaluate` chế độ nháp (`case_id` absent) giữ semantics v1 —
-  evaluate trên `stage` payload (snapshot buffer tại thời điểm gửi).
-  Trong v2 payload stage của evaluate nháp là `stage_v2` (§13.3, kể cả
-  `owner_row_id` với inheritance).
-
-### 13.3 Tài sản: tối đa 3, vị trí = thứ tự mảng (Q3, Q4)
+### 13.3 Tài sản: tối đa 5, vị trí = thứ tự mảng (Q3, Q4; S7 23/10/2026)
 
 ```yaml
 asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
@@ -1137,8 +1361,7 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   entity_id: <int | null>
   so_serial: <string>   # nguyên văn tùy nguồn — entities.md §2
   ...                       # mọi field còn lại giữ nguyên §4.2; `thoi_han`
-                            # lẻ OPTIONAL ở input (key vắng = giữ lịch sử
-                            # master) — quy tắc tách input/emit ở §4.2
+                            # lẻ OPTIONAL input (absent giữ case row), không master
   land_rows:                # giữ nguyên shape v1 — hàng cấu trúc
     - loai_dat: <string | null>   #   (mục đích sử dụng)
       dien_tich: <number | null>  #   diện tích
@@ -1152,9 +1375,10 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
 - **`is_primary` bị loại khỏi wire v2** — producer không emit; consumer
   thấy key này → `validation_error` (trường lạ, cùng rule strip-field
   hiện trạng). `primary_count` không còn áp dụng ở v2.
-- **Tối đa 3 asset** trong `stage.assets` của payload
-  `workspace_create`/`workspace_commit_stage`/`diagram_evaluate` nháp;
-  phần tử thứ 4 trở lên → `stage_validation_error` với
+- **Tối đa 5 asset** trong `stage.assets` của payload
+  `workspace_create`/`workspace_commit_stage`/`workspace_save_case`/`diagram_evaluate` nháp
+  (owner 23/10/2026 — trần 5 thống nhất mọi tầng; client + Word cập nhật ở
+  lát riêng); phần tử thứ 6 trở lên → `stage_validation_error` với
   `field_errors[].code:"asset_limit"` (gắn `row_id` của dòng thừa).
 - **Reorder đổi nghĩa vị trí, không đổi identity:** kéo asset từ vị trí
   1 xuống 2 nghĩa là *dữ liệu tại vị trí 1 đổi*; `row_id` của asset đi
@@ -1162,36 +1386,25 @@ asset_row_v2:               # giống §4.2, TRỪ is_primary (bị loại)
   tự chuyển theo `row_id`** — số vị trí giữ nguyên, nghĩa là "người đó
   vẫn sở hữu/nhận *tài sản đang ở vị trí đó*". Đây là hành vi có chủ
   đích của MIN-125 — xem ví dụ §13.12.1.
-- **Xóa asset:** xóa ở draft = pending (§13.2). Tại commit thành công,
+- **Xóa asset:** xóa ở bản đang sửa = pending (§13.2). Khi Lưu hồ sơ thành công,
   vị trí đánh lại dày (dense): asset đứng sau dịch lên; mọi dấu chọn
   giữ nguyên số vị trí (không bám `row_id` cũ); dấu chọn tới vị trí
   `> len(assets)` mới bị server prune trong cùng transaction. UI PHẢI
   cảnh báo khi xóa asset làm trôi nghĩa vị trí (ghi chú cho P6 —
   không phải field wire).
-- **Hồ sơ cũ >3 asset:** `workspace_get` được emit đủ (không cắt dữ
-  liệu) kèm `result.data.warnings[]` data-code
-  `stage.legacy_asset_overflow`; `workspace_commit_stage` từ chối tới
-  khi người dùng giảm còn ≤3 (`asset_limit`). §13.8.
-- **Cụm đất tối đa 20/tài sản** (entities.md §9.2): phần tử
-  `land_rows[20]` trở đi → `stage_validation_error` với
-  `field_errors[].code:"land_row_limit"`. Persist là bảng con
-  `property_land_rows(property_id, vitri)` UNIQUE; commit ghi master +
-  cụm đất + `case_state_json` snapshot + revision trong **một**
-  transaction — rollback lỗi bất kỳ không để lại nửa ghi.
-- **Snapshot asset trong `case_state_json` (MIN-141 đợt 2):** mỗi phần
-  tử `assets[]` đã commit mang đủ field §4.2 + `land_rows` key canonical
-  + `loai_dat`/`dien_tich` tổng hợp. Word export đọc snapshot này → mỗi
-  hồ sơ xuất đúng bản đã commit, không đổi theo master `properties` khi
-  hai hồ sơ dùng chung tài sản. `properties.land_rows_json` giữ mirror
-  tương thích; data cũ được migrate-on-startup, JSON lỗi không bị ghi
-  đè.
-- **Thời hạn thuộc từng cụm** (MIN-141 đợt 2): xuất Word không tự lấy
-  `properties.thoi_han` lẻ đắp vào cụm. Dữ liệu cũ chỉ có thời hạn lẻ
-  không xác định được cụm tương ứng → `workspace_get` emit
-  `result.data.warnings[]` code `stage.orphan_thoi_han`, giữ nguyên bản
-  gốc, không tự đoán; `land_rows_json` lỗi/không parse được →
-  `stage.legacy_land_rows_invalid`; JSON >20 cụm →
-  `stage.legacy_land_rows_overflow`.
+- Không migrate/đọc legacy test data trong cutover B; mô tả overflow/mirror
+  lịch sử ở §13.8 không còn yêu cầu runtime.
+- **Cụm đất (S6 23/10/2026):** đường Lưu không còn trần 20 cụm/tài sản.
+  Alias cũ-mới mâu thuẫn ghi theo key canonical mới; `dientich` không parse
+  được thành số → null (không chặn). Unknown key vẫn bị chặn.
+  Lưu case_asset_land_rows theo parent row_id + vitri, không master/mirror
+  JSON. Null → land_rows_present=false, không con; [] → true, không con;
+  mảng → true, giữ cả hàng trống. Diff từng vị trí, không clear collection.
+- **Word đọc case rows duy nhất**, không assets[] persisted JSON hay tổng
+  loại_dat/diện_tích master fallback khi mảng trống. Có thể dựng view RAM cho
+  consumer; không persist thêm Stage/assets.
+- Thời hạn thuộc từng cụm. thoi_han lẻ hiện hành chỉ giữ để đối chiếu/cảnh báo
+  stage.orphan_thoi_han, không tự đắp xuống đất.
 - **`result.data.warnings`** (optional, array `{code, message}`) là mở
   rộng v2 cho cảnh báo cấp-stage (không thuộc `diagram.warnings`).
 
@@ -1203,35 +1416,73 @@ diagram_state v3 (domain inheritance):
   domain: "inheritance"             # BẮT BUỘC trong state (§13.5)
   nodes:
     - id: <string non-empty>        # slot id — giữ namespace v1
-      personId: <uuid4 | null>      # row_id dòng Người stage committed
-      parentSlotIds: [<node.id>]    # giữ nguyên 0..2
-      spouseSlotId: <node.id | null>
-      ownPositions: [<int 1..3>]    # vị trí tài sản người này SỞ HỮU
-      receivePositions: [<int 1..3>]# vị trí tài sản người này ĐƯỢC NHẬN
+      personId: <uuid4 | null>      # row_id Người trong Stage cùng ngữ cảnh (§13.2)
+      parentSlotIds: [<node.id>]    # 0..2 — cặp cha/mẹ: người gốc + vợ/chồng của cặp
+      spouseSlotIds: [<node.id>]   # theo thứ tự kéo; cuối là hợp pháp
+      spouseSlotId: <node.id | null> # mirror cuối của spouseSlotIds
+      spouseSuggestionId: <node.id | null> # migration living spouse link
+      ownPositions: [<int 1..5>]    # vị trí tài sản người này SỞ HỮU
+      receivePositions: [<int 1..5>]# vị trí tài sản người này ĐƯỢC NHẬN
       hidden: <bool>
       deleted: <bool>
 ```
-
+- `spouseSlotIds` giữ nguyên thứ tự thao tác; chỉ phần tử cuối nhận phần
+  thừa kế với vai trò vợ/chồng hợp pháp. Link ngược không có ngữ nghĩa.
+  `spouseSlotId` là mirror tương thích với consumer cũ.
+  Gỡ hoặc di chuyển thẻ không ngắt quan hệ của ô vợ/chồng còn tồn tại:
+  ô vừa trống đứng trước các ô có thẻ để người đặt sau cùng còn lại là
+  hợp pháp; thả lại vào ô trống đưa ô đó về cuối danh sách.
+- `spouseSuggestionId` chỉ giữ gợi ý migration của người còn sống;
+  engine bỏ qua trường này. Khi migrate schemaVersion 3, link legacy của
+  node được đưa đầu tiên; các link ngược theo thứ tự node nguồn được nối
+  sau.
+- **Con thuộc cặp (người gốc + ô vợ/chồng), không tách cạnh cha/mẹ riêng.**
+  `parentSlotIds` của một ô Con là cặp cha/mẹ của nó: node người gốc và node
+  vợ/chồng của cặp (vẫn 0..2). Con thả vào ô Con của cặp được ghi nhận cả hai
+  cha/mẹ; nếu ô vợ/chồng của cặp còn trống lúc thả thì thả người vào ô đó sẽ
+  điền cha/mẹ còn thiếu. Nút `Con riêng` trên thẻ con xóa cha/mẹ được điền
+  tự động. Mỗi vợ/chồng tiếp theo thả vào ô dự phòng có ô Con riêng của cặp
+  mình; mỗi ô Con được thả thì sinh lại một ô dự phòng.
+- **Không sinh node cho quan hệ đã có trên sơ đồ.** Con chết sau chủ đất
+  (chuyển tiếp) gắn vào cặp đang có, không sinh Cha/Mẹ mới; vợ/chồng chết sau
+  chủ đất gắn vào chủ đất đang có, không sinh ô vợ/chồng mới và con chung đã
+  nằm dưới cặp không sinh lại. Vi phạm điều này từng tạo ba cha/mẹ và làm lưu
+  báo `Quan hệ cha/mẹ không hợp lệ`.
+- **Ngày chỉ có năm = 01/01 của năm đó** khi so trước/sau giữa các thẻ; dữ
+  liệu lưu và hiển thị vẫn đúng như người dùng nhập.
+- **Ngày không hợp lệ/thiếu phần** (`06/2001`, `31/02/2001`): lỗi tại field
+  ngày; thẻ có ngày không hợp lệ không thả được (Stage hoặc Pool). Sửa một
+  thẻ đã đặt thành ngày không hợp lệ không được xóa sơ đồ: đánh giá không
+  fail toàn cục, giữ trạng thái hợp lệ cuối của những thẻ khác.
+- **Nhãn ô không chứa UUID/ID thô**: `Cha của …`, `Mẹ của …`,
+  `Vợ/chồng của …`, `Con của … và …`.
+- **Hoàn tác:** sau khi khôi phục, engine chạy lại trên dữ liệu hiện tại và
+  bỏ ô vừa khôi phục mà luật hiện hành không cho phép.
+- **Con sinh sau khi người chết:** không luật, không cảnh báo.
+- Luật đầy đủ và bố cục: `_bmad-output/specs/notary_v2/diagram-rules.md`
+  §9.2/§9.6/§9.7/§11.
 - `isLandOwner`/`willReceive` **cấm** trên wire v2 →
   `diagram_invalid_state` (`invalid_node` — trường lạ trên node).
 - `ownPositions`/`receivePositions`: array không trùng phần tử ⊆
-  {1,2,3}; phần tử ngoài khoảng / trùng / không phải int →
+  {1..5}; phần tử ngoài khoảng / trùng / không phải int →
   `diagram_invalid_state{errors:[{code:"invalid_position"}]}`.
   `null`/thiếu → `diagram_invalid_state` (`invalid_node`).
 - Hai mảng **độc lập**: một người vừa sở hữu vừa nhận, vừa chọn nhiều
   vị trí, đều hợp lệ. **Nhiều node cùng chọn một vị trí** = đồng sở
   hữu / nhận chung — hợp lệ (Q10).
 - Dấu chọn tới vị trí `> len(stage.assets)` hiện tại (asset chưa tạo
-  hoặc vừa bị prune): cho phép tồn tại trong draft buffer; server prune
-  tại commit/save (cùng cơ chế prune `personId` §6.1) — ghi vào commit
-  result qua `diagram.warnings` data-code `diagram.selection_pruned`;
-  UI được disable chip tài sản chưa tồn tại (quyết định hiển thị của
-  P6). Không reject cả commit.
-- **Mặc định khi gán (Q5):** node `owner` → `ownPositions` mặc định =
-  tất cả vị trí đang có ({1..len(assets)}); person gán vào slot thừa
-  kế → `receivePositions` mặc định = tất cả vị trí đang có. Đây là
-  tiện ích **client-side** — wire luôn mang mảng explicit; thêm asset
-  sau đó **không** tự mở rộng mảng đã chọn.
+  hoặc vừa bị prune): cho phép tồn tại trong bản đang sửa; server prune
+  tại save_case (hoặc API commit cho consumer khác), cùng cơ chế prune
+  `personId` §13.19 — trả `diagram.warnings` data-code
+  `diagram.selection_pruned`; UI được disable chip tài sản chưa tồn tại.
+  Không reject cả lần ghi chỉ vì dấu chọn pending này.
+- **Mặc định khi gán (Q5, owner 27/10/2026):** ô chủ đất → `ownPositions`
+  = mọi vị trí tài sản hiện có, `receivePositions = []`. Mọi ô khác:
+  `ownPositions = []`, `receivePositions = []` (= từ chối trong văn bản).
+  Không tự tích Nhận. Khi thêm tài sản, chỉ người đã tích Chủ/Nhận mới
+  được nối thêm vị trí mới vào đúng loại đã tích; người chưa tích không
+  được tự điền. Lựa chọn đã lưu, kể cả `receivePositions`, giữ nguyên khi
+  mở hồ sơ cũ; mặc định mới chỉ áp dụng người mới thả. Wire mang mảng explicit.
 - **Slot `owner` (mirror):** node `id:"owner"` tồn tại như v1 nhưng
   `personId` của nó do server căn theo `stage.owner_row_id` (§13.6).
   `diagram_save` gửi `owner.personId` khác `owner_row_id` →
@@ -1243,9 +1494,24 @@ diagram_state v3 (domain inheritance):
   đã biết:* engine coi di sản là một khối — ownership theo từng vị trí
   được lưu cho văn bản/Word (tương lai) nhưng **chưa** ảnh hưởng công
   thức chia; cần task engine riêng nếu muốn tính theo từng tài sản.
-- Quan hệ (`parentSlotIds`, `spouseSlotId`), `duplicate_person` (1
-  người / 1 node active — A3), `hidden`/`deleted`, auto-seed slot theo
-  `requiredSlots` — **giữ nguyên** semantics §7.1.
+- Quan hệ và dấu chọn của ô còn cần được giữ nguyên; một người chỉ được
+  gán vào một ô active. **Ô do engine sở hữu**, ID ổn định theo
+  (người gốc, vai trò, thứ tự). Người dùng chỉ thả/di chuyển/gỡ thẻ và
+  tích Chủ/Nhận; không tạo/xóa ô hoặc nối quan hệ bằng tay.
+- **Gỡ thẻ (owner 27/10/2026, thay quyết định 17/10):** đưa người về Pool,
+  không xóa Người trong Stage. Sau mỗi thay đổi, kể cả sửa ngày mất/còn sống
+  ở Stage, engine chạy tới ổn định và quyết định tập ô theo spec Sơ đồ §9.6.
+  Ô thừa trống bỏ im lặng; ô thừa có thẻ thì thẻ về Pool. Gỡ chủ đất trả
+  mọi người trong ô sinh ra từ chủ đất về Pool, **kể cả vợ/chồng**.
+  Không hộp xác nhận. Chỉ khi có người khác bị đẩy về Pool mới hiện
+  `Đã đưa N người về Pool · Hoàn tác` khoảng 5 giây; Hoàn tác khôi phục
+  nguyên trạng trước thay đổi. Công tắc thông báo trong cài đặt mặc định
+  bật, tắt thì hoàn toàn im lặng. Một lượt thay đổi chỉ vẽ lại một lần,
+  không tự lưu; Lưu hồ sơ giữ atomic/revision/errors hiện có.
+  Tombstone `deleted:true` cũ bỏ qua khi đọc, dọn khi lưu lại; không tạo
+  tombstone mới để biểu diễn thao tác gỡ thẻ.
+  Quy tắc đầy đủ: `_bmad-output/specs/notary_v2/diagram-rules.md` §9.9;
+  quyết định: `decision-owner-diagram-rules-v2-20261027.md`.
 
 ### 13.5 Domain `two_party` — sơ đồ hai bên 30 vị trí (Q7, Q8)
 
@@ -1277,7 +1543,7 @@ diagram_state v3 (domain two_party):
   inheritance (đề xuất giữ A3 — 1 người chỉ ngồi 1 ô).
 - **Stage:** `stage.people` ≤ 30 cho `case_type:two_party` → quá →
   `stage_validation_error{code:"people_limit"}`; `owner_row_id` **cấm**
-  (absent — `validation_error` nếu có); assets ≤3 giữ nguyên.
+  (absent — `validation_error` nếu có); assets ≤5 (§13.3).
 - **Không engine:** `diagram_evaluate` trên `two_party` trả `succeeded`
   với `render_model{engineVersion:2, status:"unsupported",
   allocations:{}, breakdowns:[], requiredSlots:[],
@@ -1286,8 +1552,8 @@ diagram_state v3 (domain two_party):
   sơ đồ hai bên **không bao giờ** đi vào engine thừa kế (rào kiến
   trúc: `InheritanceCase` hiện chỉ chở inheritance; persist hai bên cần
   backend riêng ở P5).
-- `diagram_save`/`workspace_commit_stage` persist + structural validate
-  như thường (theo shape two_party). `workspace_get` trả domain
+- `workspace_save_case` (renderer), `diagram_save`/`workspace_commit_stage`
+  (consumer khác) persist + structural validate như thường. `workspace_get` trả domain
   `two_party`, `capabilities:{intake:[…], diagram:true,
   word_export:true}` (NAIA-8: Word engine đã hỗ trợ context hai bên —
   §13.10); `word_export_*` trên `two_party` chạy bình thường, readiness
@@ -1299,6 +1565,9 @@ diagram_state v3 (domain two_party):
   là semantics client; wire chỉ thấy state sau hoán đổi.
 - `case_type` **immutable** sau khi tạo; đổi loại ở draft chưa tạo =
   client reset diagram buffer theo domain mới (rule client, Q8).
+- **Ngoại lệ (owner 16/10/2026):** hồ sơ **đã lưu** chuyển loại qua
+  đường chuyển loại đã duyệt — §13.18; ngoài đường đó `case_type`/
+  `document_type` vẫn bất biến (§6.1).
 
 ### 13.6 `workspace_create` v2 — owner trong Stage, diagram optional (Q1)
 
@@ -1310,39 +1579,53 @@ payload:
     document_type: <enum theo case_type> # inheritance: khai_nhan|thoa_thuan
                                          # two_party: §13.5 (Q11)
     ngay_lap_ho_so, noi_niem_yet, ghi_chu  # giữ nguyên
-  stage:                            # stage_v2
-    owner_row_id: <uuid4>           # BẮT BUỘC khi inheritance; phải là
-                                    # row_id có trong stage.people;
-                                    # CẤM khi two_party
-    people: [<person_row>]          # ≥1 (giữ nguyên)
-    assets: [<asset_row_v2>]        # ≥1, ≤3 — §13.3
+  stage:                            # stage_v2 create (vòng 2)
+    owner_row_id: <uuid4 | null>    # OPTIONAL/absent/null khi create nháp;
+                                    # non-null phải là row_id trong
+                                    # stage.people; CẤM khi two_party
+    people: [<person_row>]          # ≥0 — ho_ten có thể null (nháp ít dữ liệu)
+    assets: [<asset_row_v2>]        # ≥0, ≤5 — §13.3
   diagram:                          # OPTIONAL (đổi từ v1 bắt buộc)
     state: <diagram_state v3>       # domain phải khớp case.case_type
 ```
 
-- **`stage.owner_row_id`** là chỉ định "người để lại / bên chủ" ở cấp
-  Stage — phá vòng phụ thuộc: tạo hồ sơ không còn cần diagram. Server
-  suy `nguoi_chet_id` = entity của row đó; `tai_san_id` = entity của
-  `assets[0]` (vị trí 1) → **không cần sửa schema DB** (hai cột vẫn
-  NOT NULL, giá trị có sẵn).
-- `owner_row_id` thiếu/null/không thuộc `stage.people` →
-  `workspace_owner_required` (cùng nghĩa v1). `owner_row_id` mutable
-  qua commit: đổi giá trị = đổi người để lại → server sync node
-  `owner` (`personId := owner_row_id`) trong cùng transaction §6.1 và
-  cập nhật `nguoi_chet_id`.
+- **Vòng 2 — create nháp ít dữ liệu (ĐÃ TRIỂN KHAI 22/10/2026; proof:
+  `test_issue13_partial_draft.py`):** create cho
+  ≥0 Người/≥0 Tài sản, `ho_ten=null`, owner inheritance absent/null; kiểu/
+  ngày/enum/giới hạn vẫn strict. Owner **non-null** sai/ngoài Stage →
+  `workspace_owner_required`; two_party vẫn cấm key. Thiếu số giấy hoặc
+  serial rỗng/toàn whitespace không chặn ghi row: entity_id=null, không
+  identity giả. Dòng không tên lưu `ho_ten=null`, không chuỗi rỗng. Create
+  không nhận `is_primary`; địa chỉ tài sản nullable.
+- `commit_stage` **không** dùng nới `ho_ten=null`: vẫn cần tên non-empty
+  và owner inheritance hợp lệ. `workspace_save_case` từ 23/10/2026 đi theo
+  mức tối thiểu của Soạn hồ sơ (S1/S2): ≥0 Người/≥0 Tài sản, owner null,
+  mỗi dòng Người cần họ tên, mỗi dòng Tài sản cần số thửa + số tờ.
+  Không có API bypass.
+- nguoi_chet_id chỉ projection identity của owner (two_party không neo people[0]
+  vào người chết); tai_san_id chỉ projection identity asset vị trí 1. Hai
+  projection nullable khi row thiếu neo, không nguồn dữ kiện Word/hiển thị.
+- owner_row_id absent/null khi create = chưa gán owner (hợp lệ); chỉ
+  **non-null** sai/ngoài Stage mới → workspace_owner_required. Đổi owner khi
+  save_case/commit sync node owner/projection cùng transaction, không sửa identity.
 - `diagram` present: `state.domain` phải khớp `case.case_type` → sai →
   `diagram_domain_mismatch`; với inheritance, node `owner` (nếu có
   `personId`) phải bằng `owner_row_id` → sai → `diagram_owner_mismatch`.
-- `diagram` absent: server seed state mặc định — inheritance: node
-  `owner` gán `owner_row_id` + bộ slot rỗng chuẩn như hiện trạng;
-  two_party: 30 ô trống. `render_model` của create-result = null khi
-  chưa evaluate được (giữ §4.3).
-- `owner_row_id` trong `stage` result của `workspace_get` /
-  `workspace_commit_stage` / `workspace_create`: emit luôn với
-  inheritance (`null` cho hồ sơ legacy chưa có owner — commit kế tiếp
-  sẽ bắt buộc chọn); absent với `two_party`.
+- `diagram` absent: server seed state mặc định — inheritance **có owner**:
+  node `owner` gán `owner_row_id` + bộ slot rỗng chuẩn như hiện trạng;
+  inheritance **owner null**: không seed node owner giả và không có dấu
+  Chủ — `nodes=[]`; two_party: 30 ô trống. `render_model` của create-result
+  = null/hay incomplete theo engine khi chưa evaluate được (giữ §4.3);
+  không giả complete.
+- Result inheritance luôn emit owner_row_id (UUID hoặc `null` cho nháp chưa
+  gán); two_party absent. Không yêu cầu đọc/nâng pointer hồ sơ test legacy.
+  Owner là pointer row, không đồng nhất chudat; save_case dùng owner của
+  Stage cùng payload.
 
-### 13.7 Bảng chuyển trường v1 → v2
+### 13.7 Lịch sử bảng chuyển trường v1 → v2 (không phải yêu cầu migration B)
+
+Chỉ lưu dấu vết contract trước cutover. B tạo DB test mới, không backfill,
+migrate-on-read hoặc dual-read/write; bảng dưới không áp làm requirement runtime.
 
 | v1 | v2 (draft) | Quy tắc chuyển |
 |---|---|---|
@@ -1361,10 +1644,13 @@ payload:
 | error: — | + `diagram_domain_mismatch`, `diagram_owner_mismatch` | §13.9 |
 | field_error: `primary_count` | thay bằng `asset_limit` / `people_limit` | `primary_count` không còn ở v2 |
 | engine codes: §7.3 | + `invalid_position`, `missing_position` | dùng trong `details.errors[]`/`render_model.errors[]` |
-| data-codes | + `stage.legacy_asset_overflow`, `stage.legacy_primary_ambiguous`, `diagram.two_party_unsupported`, `diagram.selection_pruned` | §13.3/13.4/13.5/13.8 |
+| data-codes | + `stage.legacy_asset_overflow`, `stage.legacy_primary_ambiguous`, `diagram.two_party_unsupported`, `diagram.selection_pruned`, `stage.incomplete_fields` (warning evaluate nháp khi Stage còn lỗi field tùy chọn, S19) | §13.3/13.4/13.5/13.8/§7.4 |
 | `person_row`, `personId`, `row_id`, revision, `idempotency_key` | giữ nguyên | — |
 
-### 13.8 Tương thích hồ sơ cũ (persisted → v2)
+### 13.8 Lịch sử tương thích persisted cũ (không áp cutover Storage B)
+
+Các hành vi trong bảng là lịch sử, không yêu cầu runtime B thực hiện.
+Không giữ fallback master, pointer-only hoặc nghĩa locked; GET B không ghi DB.
 
 | Tình trạng persisted | Hành vi đọc v2 (đề xuất) |
 |---|---|
@@ -1383,24 +1669,37 @@ Job-level (namespace `notary.*`):
 
 | Code | Khi nào | `details` |
 |---|---|---|
-| `diagram_domain_mismatch` | `state.domain` khác `case.case_type` (create/save/evaluate) | `{expected, got}` |
-| `diagram_owner_mismatch` | `owner` node `personId` ≠ `stage.owner_row_id` (create/save) | `{owner_row_id, node_personId}` |
+| `diagram_domain_mismatch` | `state.domain` khác `case.case_type` (create/save/evaluate); duplicate khi state nguồn không khớp domain nguồn | `{expected, got}` |
+| `diagram_owner_mismatch` | `owner` node `personId` ≠ `stage.owner_row_id` (create/save); duplicate khi mirror nguồn không khớp | `{owner_row_id, node_personId}` |
+| `idempotency_conflict` | Key create/save_case mới hoặc duplicate đã dùng nhưng hash khác. Duplicate hash gồm `{command,intent,source_case_id}` — cùng key khác source/command | — |
+| `case_type_unsupported` | `workspace_source_latest` chọn case Done mới nhất có `case_type` ngoài `inheritance`/`two_party`; duplicate nguồn loại chưa hỗ trợ | `{case_type}` |
 
 Field-error code mới trong `stage_validation_error.details.field_errors[]`:
 
 | Code | Nghĩa |
 |---|---|
-| `asset_limit` | `stage.assets` > 3 (v2) |
+| `asset_limit` | `stage.assets` > 5 (v2, S7 23/10/2026) |
 | `people_limit` | `stage.people` > 30 với `case_type:two_party` |
 
+`entity_id` không còn mã field-error: hint lệch/không tồn tại/không khớp neo
+bị bỏ và resolve lại theo neo chuẩn (§4.1 mục 5, owner 23/10/2026). Ràng buộc
+integrity không ánh xạ được sang ô user thấy → `workspace_storage_error`
+(`details.constraint`, `retryable:false`), không giả danh field và không gắn
+row giả.
+
 Engine/detail codes mới (`details.errors[]`, `render_model.errors[]`):
-`invalid_position` (phần tử ngoài {1..3} / `id` ngoài `p1..p30` / sai
+`invalid_position` (phần tử ngoài {1..5} / `id` ngoài `p1..p30` / sai
 thứ tự), `missing_position` (state two_party thiếu slot canonical).
-Data-codes mới: `stage.legacy_asset_overflow`,
-`stage.legacy_primary_ambiguous`, `diagram.two_party_unsupported`,
-`diagram.selection_pruned`.
+Data-codes hiện hành: diagram.two_party_unsupported, diagram.selection_pruned.
+stage.legacy_asset_overflow/stage.legacy_primary_ambiguous chỉ là lịch sử §13.8.
 
 `primary_count` (v1) không dùng trong v2 — asset không `is_primary`.
+`workspace_owner_required` áp khi create inheritance có owner **non-null**
+sai/ngoài Stage và khi chuyển loại vào inheritance thiếu owner; create nháp
+với owner absent/null được phép. Không dùng để thêm điều kiện hoàn tất pháp
+lý cho Done. Duplicate giữ owner pointer của nguồn (kể cả null) và làm lại
+mirror; lỗi mirror là `diagram_owner_mismatch`, không bịa owner.
+Không có workspace_locked hiện hành.
 
 ### 13.10 Ranh giới Word — giới hạn + mapping theo Stage (NAIA-8)
 
@@ -1412,9 +1711,9 @@ Data-codes mới: `stage.legacy_asset_overflow`,
   **không** đổi số Người. Vai trò (Bên A/B, chủ đất, người nhận) lấy từ
   dữ liệu nghiệp vụ đã lưu, không suy từ vị trí node. Mọi alias
   placeholder cũ (`ngườ`, `ngườ ký`, `ngườ nhận`, …) giữ nguyên.
-- Vì v2 chặn `stage.assets` ≤ 3 (inheritance), dữ liệu v2 luôn nằm
-  trong giới hạn 5 của Word; vị trí 1..3 trên Stage tương ứng
-  `[Tài sản 1..3 - *]` — **không đổi nghĩa placeholder**.
+- `stage.assets` ≤ 5 (S7 23/10/2026) nằm đúng giới hạn 5 của Word; vị trí
+  1..5 trên Stage tương ứng `[Tài sản 1..5 - *]` — **không đổi nghĩa
+  placeholder**. Client/UI cập nhật số cụm hiển thị ở lát riêng.
 - `two_party` (NAIA-8 — đã hỗ trợ): `word_export:true`,
   `word_export_*` chạy bình thường. `[Người N - *]` = toàn bộ dòng
   Stage theo thứ tự; `[Bên A N - *]`/`[Bên B N - *]` = người gán vào
@@ -1424,23 +1723,46 @@ Data-codes mới: `stage.legacy_asset_overflow`,
   người nhận, phụ lục di sản) render rỗng trên văn bản hai bên.
 - Không đưa `two_party` vào engine thừa kế (§13.5 — `diagram_evaluate`
   vẫn `unsupported`, không chạy allocation).
+- Mọi slot/nhóm và binding lấy dữ kiện từ view B trong RAM: ordered case rows,
+  key row_id, kể cả null. Không Customer/Property/participant.customer fallback,
+  không tự thêm owner hoặc lấy Stage JSON cũ. Giữ luật template readiness §8.1,
+  không đồng nhất done với đủ trường/slot pháp lý.
+- Xuất Word chỉ dùng dữ kiện **đã lưu trong DB**, không dùng buffer đang sửa.
+  Có thay đổi Stage/meta/Diagram hoặc ngữ cảnh Word pending thì renderer yêu
+  cầu **Lưu hồ sơ** trước, không commit hoặc lưu ngầm để xuất. Ngoại lệ
+  `saveCaseMeta` trong dialog chỉ ghi meta qua `workspace_update` (§6.2).
 
 ### 13.11 Revision / retry / late-response — giữ nguyên, nêu lại cho rõ
 
-- Mọi write mang `base_revision`; lệch (cả `<` lẫn `>`) →
-  `workspace_conflict{details:{server_revision}}`; không ép ghi — client
-  reload hoặc giữ draft (`_bmad-output/specs/ui/README.md`). Commit retry sau conflict phải
-  gửi `base_revision` mới.
-- `workspace_create`: retry dùng **cùng** `idempotency_key` →
-  `created:false`, trả case đã persist — không hồi sinh bản nháp đã
-  bỏ. Timeout giữa chừng không phân biệt được "đã commit chưa" → luôn
-  retry bằng key cũ.
-- `diagram_save`/`workspace_commit_stage` retry an toàn: gửi lại
-  request nguyên vẹn; nếu request đầu đã commit → `base_revision` cũ
-  sẽ `<` server → `workspace_conflict` (idempotent qua revision).
+- Write case đã có bắt buộc base_revision; lệch → workspace_conflict với
+  server_revision, không ghi/tăng lần hai, không exactly-once response cache.
+  Sau timeout giữ payload/revision cũ; reload/đối chiếu trước quyết định ghi
+  bằng revision mới, không tự retry bằng revision mới.
+- workspace_create/save_case mới: sinh key một lần; retry đúng key **và
+  payload đã chụp**, không ô đã gõ thêm. Hash canonical JSON sau alias/shape
+  normalization, trước resolve: sort object keys, giữ array order/null/serial/
+  precision ngày và tên command/ý định draft hoặc done. Cùng hash trả workspace
+  hiện tại created=false, không hồi sinh payload tạo; khác → idempotency_conflict.
+- **Nguồn cho nháp (`workspace_source_latest`):** renderer khóa sửa/lưu
+  nháp đến khi response xong, bỏ response của phiên cũ, lỗi hiện rõ và
+  không coi nguồn rỗng là thành công khi request lỗi. Không tự ghi DB và
+  không tự refresh nguồn khi người dùng đang sửa. Nguồn rỗng (không Done)
+  là kết quả thành công với Stage rỗng; retry do người dùng chủ động.
+- **Nhân bản (`workspace_duplicate`):** sinh `idempotency_key` **một lần
+  cho một ý định** và giữ `{source_case_id,key}` khi timeout/lỗi hạ tầng
+  để retry đúng payload. Click Nhân bản mới sau success sinh key mới.
+  Hash chỉ gồm command+intent+source_case_id, **không** hash snapshot/
+  revision/timestamp nguồn: nguồn đổi/đổi revision/bị xóa sau lần tạo vẫn
+  replay đúng bản sao đã có (created=false), không tạo clone mới và không
+  trả conflict. Khác source/command cùng key → idempotency_conflict.
+  Không tự retry bằng key mới; không clear pending key trước khi biết
+  success; late response khác phiên bị discard.
+- Khi save đang chạy khóa editor và mọi mutation Stage/meta/Diagram/đổi case/
+  đổi loại/intake accept/reorder; lỗi giữ buffer+dirty. Chỉ nhận success sau
+  commit, hydrate đầy đủ rồi clear dirty; không ghi đè edit mới bằng response cũ.
 - Late response: client tương quan `job_id`/`command_id` + `case_id` của
   phiên hiện tại; result/job trễ từ phiên trước / case đã đổi / draft
-  đã Hủy PHẢI bị discard — không apply vào buffer (`_bmad-output/specs/ui/README.md`, giữ
+  đã bỏ nháp PHẢI bị discard — không apply vào buffer (`_bmad-output/specs/ui/README.md`, giữ
   nguyên).
 
 ### 13.12 Ví dụ trước/sau (JSON rút gọn)
@@ -1448,7 +1770,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 #### 13.12.1 Reorder tài sản — dấu chọn giữ theo vị trí (Q4)
 
 ```jsonc
-// TRƯỚC (stage committed)
+// TRƯỚC (baseline đã lưu; bản đang sửa ban đầu giống baseline)
 "assets": [
   {"row_id": "aaaa-…-1", "so_serial": "DD100001"},   // vị trí 1
   {"row_id": "bbbb-…-2", "so_serial": "EE200002"},   // vị trí 2
@@ -1456,7 +1778,7 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 ]
 // node: {"id":"owner","personId":"…p1","ownPositions":[1,2],"receivePositions":[]}
 
-// SAU khi user kéo aaaa xuống cuối + Cập nhật thành công
+// SAU khi user kéo aaaa xuống cuối (hiển thị ngay), rồi Lưu hồ sơ thành công
 "assets": [
   {"row_id": "bbbb-…-2", "so_serial": "EE200002"},   // vị trí 1 (primary mới)
   {"row_id": "cccc-…-3", "so_serial": "FF300003"},   // vị trí 2
@@ -1466,15 +1788,17 @@ Data-codes mới: `stage.legacy_asset_overflow`,
 // row_id aaaa KHÔNG được "kéo dấu" theo — không remap số sang ID cũ.
 ```
 
-#### 13.12.2 Xóa asset rồi Hủy — buffer vs committed (Q2, §13.2)
+#### 13.12.2 Xóa asset rồi bỏ nháp — bản đang sửa vs baseline đã lưu (Q2, §13.2)
 
 ```jsonc
-// committed: assets [A1,B2,C3]; node X.receivePositions=[2]
-// draft: user xóa B2  → buffer assets [A1,C3]; node X GIỮ [2] trong
-//        buffer (chưa prune ngay — khác hiện trạng)
-// Hủy:   buffer := committed → assets [A1,B2,C3], node X [2] — như
-//        chưa xóa. revision không đổi, không command nào lên wire.
-// (Nếu Cập nhật thay vì Hủy: server persist [A1,C3] → vị trí dồn:
+// baseline đã lưu: assets [A1,B2,C3]; node X.receivePositions=[2]
+// đang sửa: user xóa B2 → Stage/Pool dùng assets [A1,C3] ngay;
+//           node X giữ [2] trong buffer (chưa server prune).
+// xác nhận bỏ nháp khi rời/đóng hồ sơ thực sự (không phải tạm chuyển sidebar),
+// KHÔNG command ghi; mở lại đọc baseline →
+//        assets [A1,B2,C3], node X [2] — như chưa xóa.
+//        revision không đổi, không write nào lên wire (đọc vẫn workspace_get).
+// (Nếu Lưu hồ sơ bằng workspace_save_case thay vì bỏ nháp: persist [A1,C3] → vị trí dồn:
 //  C3 = 2; X.receivePositions giữ [2] = giờ là C3.)
 ```
 
@@ -1502,18 +1826,16 @@ Q1–Q12 **đã duyệt nguyên đề xuất** (owner, 27/09/2026); phương án
 thế bị loại giữ trong `_bmad-output/archive/linear-tasks/MIN-125/decisions.md` làm record.
 Các quyết định then chốt:
 
-- **Q1** — phá vòng phụ thuộc bằng `stage.owner_row_id` + create không
-  cần diagram (thay vì "commit phiên" cục bộ hay nullable
-  `nguoi_chet_id`).
+- **Q1 lịch sử** — owner trong Stage phá vòng phụ thuộc Pool; B hiện dùng
+  nullable projection identity, không giữ giả định FK NOT NULL của Q1 cũ.
 - **Q4** — dấu chọn theo vị trí, không bám `row_id` khi reorder/xóa.
 - **Q6** — `willReceive:true` legacy → nhận tất cả vị trí hiện có.
 - **Q7** — `p1..p30` cố định, bên suy ra từ số.
 - **Q11** — `document_type` `two_party` = `{chuyen_nhuong, tang_cho,
   cho_thue, dat_coc}`.
 
-C1–C4 vẫn mở và đã có hướng xử lý: C1/C2 chốt cùng NV2 trước khi P6
-cần; C3 quy ước tôn trọng `entity_id` (chi tiết persistence ở P5);
-C4 là task Word riêng — §13.10 chỉ ghi ý định đánh số.
+C1–C4 là record thiết kế cũ; resolve entity_id hiện theo §4.1/§4.2/§13.19,
+không dùng C3 để cho client ép master ID. Quy tắc Word hiện hành ở §13.10.
 
 ### 13.14 Checklist conformance bổ sung (áp dụng cho producer v2)
 
@@ -1523,21 +1845,45 @@ Producer v2 PHẢI (thêm vào §10):
       `diagram_state.version:3` + `domain` bắt buộc.
 - [ ] Không emit `is_primary`, `isLandOwner`, `willReceive`; stage
       inheritance mang `owner_row_id` (result) — absent với `two_party`.
-- [ ] `stage.assets` ≤3 trên mọi payload; `two_party` people ≤30;
+- [ ] `stage.assets` ≤5 trên mọi payload; `two_party` people ≤30;
       canonical 30 node `p1..p30` cho domain `two_party`.
 - [ ] `workspace_create` v2: cho phép `diagram` absent; seed owner theo
       `owner_row_id`; `tai_san_id` = asset vị trí 1.
-- [ ] Prune `personId` + dấu chọn vị trí `> len(assets)` trong cùng
-      transaction commit/save — không prune tại thời điểm client sửa
-      draft.
+- [ ] Server prune `personId` bị xóa khỏi Stage và dấu chọn vị trí
+      `> len(assets)` trong transaction commit/save. Client đã gỡ
+      `personId`/owner ngay khi xóa Người; dấu vị trí pending theo §13.2.
 - [ ] `diagram_evaluate` two_party → `unsupported` render_model, không
       chạy engine thừa kế; `word_export_*` trên two_party được hỗ trợ
       (NAIA-8) — readiness qua `block_reason` §8.1.
+- [ ] Rows/đất case-owned là SOT; không upsert/fallback master hoặc persisted
+      Stage JSON; cùng identity nhiều row không mất dữ kiện.
+- [ ] Tách validation theo ý định: `workspace_create` partial cho ≥0/tên
+      null/owner null; `workspace_save_case` cho ≥0/owner null với mức tối
+      thiểu họ tên + số thửa/số tờ; commit + convert giữ strict. Không
+      biến incomplete thành invalid hoặc ngược lại.
+- [ ] `workspace_source_latest`: chỉ đọc case Done lưu gần nhất, không ghi
+      DB; UUID v4 mới, owner remap, entity_id giữ nguyên; không trả
+      case/meta/Diagram/docx_import; lấy nguồn lặp lại được phép sinh UUID
+      khác.
+- [ ] `workspace_duplicate`: copy nội dung **đã lưu** (không buffer), draft/
+      rev1 cho lần tạo đầu, key/hash `{command,intent,source_case_id}`;
+      remap mọi row ref/participant/Diagram personId/records.row_id, giữ
+      slot ID/vị trí/identity/provenance; replay trả workspace hiện tại
+      created=false; lỗi rollback toàn bộ.
+- [ ] Save case ghi Stage/meta/Diagram/status/revision/key/hash nguyên tử,
+      lỗi rollback tất cả. Nhãn Nháp/Đã lưu theo status, không thay dirty
+      và không đổi cách tính báo cáo.
+- [ ] Chỉ draft|done, không locked field; API commit_stage giữ status và
+      thay snapshot DB; save_case draft→done, case mới rev1/cũ +1.
 
 Consumer v2 PHẢI (thêm vào §10):
 
-- [ ] Giữ buffer draft tách committed; Hủy restore cả stage lẫn diagram;
-      không prune diagram khi xóa row trong draft.
+- [ ] Stage/Pool/Diagram dùng chung bản đang sửa cho cả case mới/đã có;
+      baseline committed chỉ là lần lưu gần nhất, không nguồn hiển thị/gán.
+      Chỉ Lưu hồ sơ gửi save_case; không create/commit/diagram_save ngầm.
+      Bỏ nháp không ghi, giữ canLeave/window-close; mở lại đọc bản đã lưu.
+      Xóa Người gỡ personId/owner ngay; normalize/prune dấu vị trí pending
+      trong transaction lưu, không mượn dữ kiện baseline.
 - [ ] Map chip `[1][2][3]` ↔ positions; không theo `row_id`; disable
       chip vị trí chưa có asset.
 - [ ] Reject state v2/v3 sai domain, `is_primary`/`isLandOwner` dư —
@@ -1545,14 +1891,17 @@ Consumer v2 PHẢI (thêm vào §10):
 
 ### 13.15 Examples & validator draft
 
-- Fixtures: `contracts/notary-case-drafting/examples/draft-v2/` —
-  `*.valid.json` / `*.invalid.json` đặt
-  `fixture_context.draft_v2:true` (+ `case_type` khi hai bên) để
-  validator áp rule v2; file draft không ảnh hưởng bộ v1.
-- Schema tham chiếu: `draft-v2.schema.json` (định nghĩa `stage_v2`,
-  `diagram_state_v3`, payload create/commit v2). Normative text là
-  §13 — file schema draft hỗ trợ đọc, không phải nguồn duy nhất cho
-  tới khi owner duyệt.
+- Fixtures v2 trước cutover: `examples/draft-v2/`, flag
+  `fixture_context.draft_v2:true`; tên thư mục/flag là lịch sử, không nhãn
+  chất lượng hiện tại. Save-case dùng examples/valid và examples/invalid.
+- draft-v2.schema.json định nghĩa person/stage output, stage create
+  partial, stage strict, diagram_state_v3, create/commit;
+  workspace-save-case.schema.json định nghĩa command đó;
+  workspace-source-latest.schema.json và workspace-duplicate.schema.json
+  định nghĩa hai command vòng 2; workspace.schema.json có workspace
+  result v2 dùng chung. Schema draft-07 và validator kiểm wire, normative
+  text xác định transaction/resolve B.
+  Fixtures v1 chỉ đối chiếu shape lịch sử, không quyền khóa case hiện hành.
 
 ### 13.16 Quy tắc Stage hiện hành sau gộp MIN-141
 
@@ -1560,21 +1909,25 @@ Consumer v2 PHẢI (thêm vào §10):
 yêu cầu đưa vào nhánh chính và đồng bộ tài liệu/code. Mục này thay các quy
 tắc MIN-140 ngày 29/09/2026 bị mâu thuẫn; không đổi envelope/schema version.
 
-- Người: họ tên bắt buộc; giới tính Nam/Nữ/null; ngày sinh/chết/cấp nhận
-  YYYY-MM-DD, YYYY hoặc null; số giấy tờ/nơi cấp/địa chỉ/quê quán/loại giấy
-  tờ/nhãn địa chỉ nhận chuỗi hoặc null. Số giấy tờ có giá trị vẫn kiểm trùng.
+- Người: họ tên non-empty ở save/commit; `workspace_create` nháp vòng 2
+  cho `ho_ten=null`/absent (không chuỗi rỗng). Giới tính Nam/Nữ/null; ngày
+  sinh/chết/cấp nhận YYYY-MM-DD, YYYY hoặc null; số giấy tờ/nơi cấp/địa chỉ/
+  quê quán/loại giấy tờ/nhãn địa chỉ nhận chuỗi hoặc null (chuỗi rỗng ghi
+  null). Số giấy được trùng, match tên+số theo §4.1.
 - Tài sản: serial là chuỗi nguyên văn tùy nguồn (Owner 06/10/2026 bỏ
-  bắt buộc `[A-Z]{2}\d{6,8}` ở mọi tầng), địa chỉ không rỗng;
-  số thửa/số tờ và các trường còn lại nullable. Cụm đất có thể null/[];
-  mỗi cụm kiểm kiểu, không cho alias khác giá trị, tối đa 20 cụm.
-- Đọc hồ sơ cũ: serial giữ nguyên văn trong master, không chuẩn hóa,
-  không thay mã `XX`.
+  bắt buộc `[A-Z]{2}\d{6,8}` ở mọi tầng), **địa chỉ nullable**;
+  số thửa/số tờ bắt buộc có nội dung, các trường còn lại nullable. Cụm đất
+  có thể null/[]; không còn trần 20 cụm, alias mâu thuẫn ghi theo key mới,
+  diện tích không parse được → null (S6).
+- Case B giữ serial nguyên văn tại row; identity lookup exact, thiếu neo null.
 - `thoi_han` lẻ bỏ khỏi form và payload renderer; dữ liệu lịch sử vẫn giữ
   để đối chiếu/cảnh báo. Không tự gán vào thời hạn từng cụm.
-- Quy tắc suy trường Người, nguồn snapshot và phần tra cứu xã chưa có:
-  [`entities.md`](./entities.md) §8–§9.
-- Giữ nháp khi chuyển tab và khi commit lỗi; kiểm dữ liệu khi `Cập nhật`.
-  Giữ kiểm revision, owner, khóa hồ sơ, giới hạn người/tài sản và trùng ID.
+- Suy trường Người từ case row, không master/Stage JSON fallback; entities §8–§9.
+- Giữ nháp khi chuyển tab/lỗi; renderer kiểm khi Lưu hồ sơ. Giữ revision,
+  owner khi owner được chỉ định/strict, giới hạn/row/FK/date; bỏ guard trùng
+  shared identity. Done sửa được. Vòng 2: create nháp cho tập rỗng/tên null/
+  owner null; save_case từ 23/10 cho tập rỗng/owner null (tối thiểu họ tên +
+  số thửa/tờ), commit vẫn strict như trên.
 
 ### 13.17 Nhập hợp đồng DOCX và mẫu gốc — additive NAIA-4 / MIN-139
 
@@ -1590,8 +1943,8 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   người dùng chọn tối đa 20 cụm cho mỗi tài sản Stage,
   refs từng trường con có `land_row` 1-based và `land_field`. Intake không
   emit confirmed. Mơ hồ giữ normalized null và mọi alternative.
-- Create/commit/get và result có optional `docx_import`, schema tại
-  [`common.schema.json`](./notary-case-drafting/common.schema.json) definition
+- Create/commit/save_case/get và result có optional `docx_import`, schema tại
+  [`common.schema.json`](notary-case-drafting/common.schema.json) definition
   `docx_import`: version 1, tối đa 8 nguồn; mỗi nguồn có source_id/hash,
   records candidate_id→row_id, bindings candidate_id/occurrence_id/field_key/
   slot, optional template_sha256 và label do backend tạo. Mỗi record tài sản
@@ -1604,9 +1957,12 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 - Backend chỉ nhận ứng viên/vị trí từ extraction package đã lưu khi intake
   được cấp quyền. Stage và context lưu cùng transaction và revision; omit
   context giữ bản cũ, `sources:[]` là xóa đối chiếu. Xóa row prune record và
-  binding, không gắn sang row khác. Hủy nháp khôi phục context đã commit.
+  binding, không gắn sang row khác. Ở renderer, gỡ nguồn/detach hoặc xác nhận/
+  sửa binding chỉ đổi `docx_import` đang sửa và đánh dirty; **chỉ Lưu hồ sơ**
+  gửi `workspace_save_case` để persist, không commit trực tiếp trong dialog.
+  Bỏ nháp không ghi context pending; mở lại đọc context đã lưu.
   Client kiểm giới hạn 8 nguồn trước khi thêm row. Gỡ nguồn gửi context còn
-  lại (kể cả sources rỗng); không đọc file của nguồn được gỡ. Xóa cụm đất
+  lại khi Lưu hồ sơ (kể cả sources rỗng); không đọc file của nguồn được gỡ. Xóa cụm đất
   loại binding của chính cụm nguồn ấy; không lấy vị trí mảng mới làm danh tính.
 - Word options/batch nhận optional `original_source_id`, không đi cùng
   template_dir. Options trả thêm `binding_proposals` gồm chữ gốc, candidate/
@@ -1617,6 +1973,13 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   định dạng hỗn hợp không cho chọn; lưu bindings rỗng xóa mẫu đối chiếu.
   Proposal không phải binding đã xác nhận. Batch gốc cần base_revision và
   document_keys chính xác `["original.docx"]`; folder/catalog giữ hành vi cũ.
+  Renderer tải proposals/readiness ban đầu từ hồ sơ đã lưu sạch. Thay lựa
+  chọn binding chỉ đổi selection cục bộ, cho phép sửa lại lựa chọn pending;
+  không tự tạo template hash, suy lại slot/giá trị hoặc giả readiness đã lưu.
+  Stage/Diagram/revision đổi thì cache proposals hết hiệu lực. Có pending
+  context thì hành động xuất tự lưu (gồm provenance/vị trí) rồi nạp lại
+  readiness/proposals trên bản vừa lưu trước khi render; lưu/lỗi cấu trúc
+  thật dừng hành động, không export bản DB cũ (phần W, 23/10/2026).
 - Người N theo Stage; Bên A/B theo ô Diagram; tài sản N theo thứ tự Stage.
   Binding dùng row_id+field, slot phải khớp lại lúc xuất. N/seat đổi, source/
   derivative hash đổi, row mất hoặc slot trống → `word.original_mapping_invalid`,
@@ -1625,17 +1988,432 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
   trong transaction; sai slot hủy cả lần lưu. Đổi thứ tự của binding cũ
   vẫn cần xác nhận lại trước khi xuất. Nhận giá trị ngày từ evidence dùng
   quy tắc chuẩn hóa ngày hiện có; mơ hồ đất kiểm từng ô, không cả field.
+  Với B, validate bindings sau flush rows bằng materialized view case-owned
+  của chính transaction; save_case cũng nhận docx_import. Absent giữ provenance
+  đã lưu, không serialize Stage/assets vào JSON làm SOT; lỗi binding rollback
+  cả rows, identity mới, meta, Diagram/status/revision/key/hash.
   Ngày sửa sai chặn Đưa vào Stage cho tới khi sửa đúng, không dùng giá trị cũ.
 - Kho nguồn kiểm hash byte `extraction.json` qua `extraction.sha256`; dấu kiểm
   thiếu/hỏng hoặc nội dung đổi phải nhập và kiểm tra lại. Không tự tin dữ liệu cũ.
   Nguồn/mẫu chưa dùng vẫn giữ local; chưa duyệt thời hạn giữ hay dọn tự động.
   Sao lưu/dọn thủ công phải giữ tất cả nguồn/mẫu còn được hồ sơ tham chiếu.
+- **Nhân bản (§13.21):** copy nguyên `docx_import` đã lưu — source_id/
+  candidate_id/occurrence_id/field_key/slot/template hash/label giữ nguyên;
+  chỉ `records[].row_id` remap theo map Người/Tài sản của bản sao.
+  `records[].land_rows` là số dòng **nguồn Word**, giữ nguyên, không map
+  theo PK đất. `bindings` không có row_id trực tiếp nên gián tiếp qua
+  candidate → record. `slot_for` trước/sau remap phải cùng slot; binding
+  đã stale vẫn stale, không tự xác nhận/chữa và không prune im lặng.
+  Kiểm mọi ref có map trước khi validate; thiếu map/source bytes → lỗi rõ,
+  rollback, không bỏ `docx_import`.
 - Bản derivative tạo riêng, hash/path backend cố định; xuất dùng mapping
   Word tích hợp và sửa đúng w:t span. Giữ package part khác byte-exact;
   không dùng paragraph.text/global replace để làm mất format/ảnh. Output
   độc lập, exclusive create và tăng hậu tố khi trùng; cancellation dọn temp,
   giữ file đã publish. Giới hạn và phạm vi đọc tại
-  [`spec DOCX`](../_bmad-output/specs/notary_v2/input/docx-import.md).
+  [`spec DOCX`](../_bmad-output/specs/notary_v2/word-templates.md#docx-import).
+
+### 13.18 Chuyển loại hồ sơ đã lưu — ngoại lệ `case_type` immutable (owner 16/10/2026)
+
+**Nguồn:** owner duyệt nguyên đề xuất #3 ngày 16/10/2026 —
+[`decision-owner-saved-case-type-conversion-20261016.md`](../_bmad-output/decisions/decision-owner-saved-case-type-conversion-20261016.md);
+evidence `_bmad-output/tmp/issue-3-saved-case-policy/evidence.md`. Đây là ngoại lệ
+duy nhất cho luật `case_type`/`document_type` immutable (§6.1, §13.5, §13.6);
+ngoài đường này hai key vẫn bất biến.
+
+Phạm vi: hồ sơ **đã lưu** đổi giữa `inheritance` và `two_party`.
+
+- **Giữ Stage:** `stage.people`/`stage.assets` giữ nguyên `row_id` và giá trị;
+  không migrate/copy Người/Tài sản, không thêm bớt.
+- **Reset Diagram:** state mới mang domain của loại đích, seed rỗng — two_party:
+  đủ 30 node `p1..p30` với `personId:null`, không field quan hệ/dấu; inheritance:
+  seed **chỉ** node `owner` mirror đúng người vừa chọn — **không** seed khung 7
+  slot mặc định của tạo mới, không slot/quan hệ nào khác. Node này **vẫn đủ 8 key**
+  bắt buộc của `node_v3_inheritance` (§13.4; `draft-v2.schema.json`), **rỗng giá
+  trị chứ không bỏ key**: `id:"owner"`, `personId:<owner_row_id>`,
+  `parentSlotIds:[]`, `spouseSlotId:null`, `ownPositions:[]`, `receivePositions:[]`,
+  `hidden:false`, `deleted:false` (thiếu/`null` mảng → `invalid_node` như §13.4).
+  Không có mapping liên miền; không suy ghế/quan hệ/tài sản từ domain cũ.
+- **`document_type`:** hai tập enum rời nhau (`{khai_nhan, thoa_thuan}` ↔
+  `{chuyen_nhuong, tang_cho, cho_thue, dat_coc}`); client **buộc người dùng chọn**
+  giá trị hợp lệ của loại đích, không tự gán giá trị đầu enum.
+- **Xác nhận:** một bước xác nhận nêu rõ phần Diagram sẽ mất trước khi ghi.
+- **`owner_row_id`:** chuyển **vào** inheritance bắt buộc chọn `owner_row_id` là
+  `row_id` có trong Stage hiện có (thiếu → `workspace_owner_required`); chuyển
+  **vào** two_party **cấm** `owner_row_id` như §13.5/§13.6.
+- **Không reset gì thêm** ngoài Diagram/domain và các guard `document_type`/owner.
+- **Guard:** base_revision lệch → workspace_conflict; draft và Done đều đổi
+  loại được, giữ nguyên status. Một transaction, lỗi/hủy rollback toàn bộ,
+  revision không đổi, bản cũ còn dùng được. Write thành công đóng stamp
+  microsecond như mọi writer (§2.2/§13.20); không nới guard
+  `confirm_diagram_reset`/`owner_row_id` của đường chuyển loại.
+- **Word/binding:** giữ nguyên §13.17 — không remap ngầm; N/ghế đổi, hash/slot
+  đổi → `word.original_mapping_invalid`; không thêm chặn cho hồ sơ đã xuất/bound.
+- **Đường ghi:** `notary.workspace_convert_type`; commit Stage và
+  `workspace_update` vẫn từ chối đổi loại. Schema:
+  [`workspace-convert-type.schema.json`](notary-case-drafting/workspace-convert-type.schema.json).
+
+```yaml
+payload:
+  case_id: <int >= 1>
+  base_revision: <int >= 1>
+  case_type: inheritance | two_party # phải khác loại đã lưu
+  document_type: <enum hợp lệ loại đích, người dùng chọn rõ>
+  confirm_diagram_reset: true
+  owner_row_id: <uuid4> # chỉ inheritance, row_id Stage hiện có
+result:
+  kind: workspace_convert_type
+  data: <workspace_get v2 đầy đủ, case.revision tăng 1>
+```
+
+Key ngoài schema, loại không đổi, văn bản sai enum hoặc chưa xác nhận →
+`validation_error`; owner inheritance thiếu/ngoài Stage →
+`workspace_owner_required`. Không gửi Stage hoặc Diagram draft trong command.
+Stage/meta/ngữ cảnh Word chưa lưu phải **Lưu hồ sơ** trước; UI không tự lưu/bỏ nháp để đổi loại.
+Nháp Diagram chỉ bị reset sau thành công; hủy dialog/Escape/nền trước Áp dụng
+không gửi command. Sau Áp dụng dialog chờ kết quả, không thêm nút hủy in-flight.
+Command cancel được chấp nhận trước giao dịch thì không ghi; giao dịch ngắn
+và publish succeeded được phân xử cùng khóa job, cancel đến sau thành công
+bị từ chối terminal. Các command khác không thay semantics hủy.
+
+### 13.19 Storage B, draft/done và workspace_save_case — cutover tiền MVP
+
+**Vòng 2 issue 13 ĐÃ TRIỂN KHAI 22/10/2026.** Vòng 1 (rows
+case-owned, draft/done, save_case) có code; vòng 2 thêm source_latest/
+duplicate/partial-create (proof: `test_issue13_source_latest.py`,
+`test_issue13_workspace_duplicate.py`, `test_issue13_partial_draft.py`,
+`test_issue13_storage_b_proof.py`). Thay dữ liệu test bằng DB
+test mới; không migration bảo toàn, backfill, migrate-on-read, dual-read/write
+hoặc tương thích locked. Không xóa raw/provenance/evidence/tài liệu repo.
+Đây là breaking cutover phối hợp app/backend, giữ literal wire v2 và Diagram v3.
+
+**Ownership/SOT:** case_person_rows và case_asset_rows chứa dữ kiện đầy đủ,
+ordered theo vitri, row_id UUID ổn định. entity_id nullable chỉ identity dùng
+chung Customer/Property; neo resolve theo §4.1–§4.2 trong transaction ghi:
+renderer chỉ tại **Lưu hồ sơ**; API create/commit của consumer khác vẫn hỗ trợ.
+Không cập nhật master theo sửa case, không cascade đổi Hồ sơ khác,
+không UNIQUE neo/merge. Đất case_asset_land_rows thuộc row tài sản, không master.
+Participant/link là projection theo row_id, identity FK nullable; không dedupe
+hai row theo shared identity, giữ participant PK/vai trò tay/ghi chú còn tồn tại.
+Mỗi lần ghi Stage/Sơ đồ (commit_stage, save_case, diagram_save, convert_type sang
+inheritance), `vai_tro`/`hang_thua_ke` của dòng suy-từ-sơ-đồ được TÍNH LẠI theo
+Diagram đã lưu gần nhất, kể cả dòng đã tồn tại. Hai nguồn vai trò phân biệt
+bằng giá trị đang lưu — không thêm cột nguồn:
+- suy từ sơ đồ = `Vợ/Chồng`, `Cha`, `Mẹ`, `Cha_vc`, `Me_vc`, `Con_dau_re`,
+  `Con`, `Anh/Chị/Em`, `Cháu`, `Khac` (bộ giá trị hữu hạn của
+  `_project_role_nodes`; `Owner` không thành dòng participant);
+- gán tay = mọi giá trị khác (vd `Người được ủy quyền`) → projection giữ
+  nguyên `vai_tro` qua các lần ghi, chỉ tính lại `hang_thua_ke` từ vai trò đó.
+Một dòng chỉ mang một `vai_tro`: vai trò gán tay thắng cột này khi cùng người
+vừa có vị trí quan hệ. Dòng không còn node (gỡ/ẩn/xóa hoặc trùng owner) bị
+xóa như trước. Neo cặp vợ–chồng theo nhánh chưa có trường chuẩn (#45 TC3 mở).
+Nguoi_chet_id/tai_san_id chỉ projection owner/asset1, không fallback dữ kiện.
+
+Case metadata có cột là SOT; JSON case chỉ bảy scalar
+tenvanban/nhomhopdong/loaivanbannhandien/socongchung/ngaycongchung/congchungvien/thuky.
+case_state_json nội bộ schemaVersion=4 chỉ owner_row_id (inheritance), case
+scalar, diagram {state:v3,render_model,warnings?,updatedAt}, docx_import.
+Không Stage/assets/engineInput/assignments persisted; engine_state_json không
+đọc/ghi (null). View RAM ghép rows/meta/Diagram dùng chung cho Word/binding.
+chudat derived active ownPositions + tên rows + asset count, không input tay/
+Property/slot owner. Null meta ghi null; scalar absent giữ giá trị trước.
+
+**Validation theo ý định (vòng 2):** `workspace_create` là **partial-create**
+— cho `people`/`assets` ≥0, `ho_ten=null`, owner inheritance absent/null;
+giữ kiểu ngày/Boolean, row ownership/FK, giới hạn 5 tài sản/30 Người
+two_party (không còn trần 20 cụm — S6), và owner **non-null** sai →
+`workspace_owner_required`. `workspace_save_case` từ 23/10/2026 đi theo
+đường điền dần (S1/S2): ≥0 Người/≥0 Tài sản, owner null, tối thiểu họ tên
++ số thửa/số tờ; `commit_stage` và convert_type vẫn **strict** (tên
+non-empty, owner inheritance hợp lệ). Địa chỉ tài sản nullable ở mọi đường
+(thiếu dữ kiện vẫn lưu, chuỗi rỗng ghi null). Row thiếu số giấy/serial
+rỗng hoặc toàn whitespace vẫn lưu với `entity_id=null`; dòng chỉ số/ngày
+lưu `ho_ten=null`, không chuỗi giả. `entity_id` là wire echo/gợi ý nội bộ:
+hint lệch/không tồn tại/không khớp neo bị bỏ và resolve lại theo neo chuẩn,
+không chặn Lưu (§4.1 mục 5). Nháp thiếu dữ liệu mở/sửa được
+và **Lưu hồ sơ** được ở mức tối thiểu (S1/S2); API commit của consumer
+khác vẫn có ngưỡng strict riêng; không có cờ partial và không biến
+incomplete thành invalid.
+
+**Payload `notary.workspace_save_case`:**
+
+```yaml
+# Mới: case_id ABSENT, không phải null
+idempotency_key: <uuid4>
+case: <meta hiện có; case_type/document_type bắt buộc hợp lệ>
+stage: <stage_v2; mức tối thiểu S1/S2 — 0 Người/Tài sản, owner null được>
+diagram: {state: <v3, domain khớp case_type>} # bắt buộc
+# docx_import optional theo §13.17
+
+# Đã có: cấm idempotency_key
+case_id: <int >= 1>
+base_revision: <int >= 1>
+case: <meta đầy đủ tại thời điểm chụp; không đổi loại>
+stage: <stage_v2>
+diagram: {state: <v3, domain khớp case_type>}
+# docx_import absent giữ provenance đã lưu
+```
+Đây là đường persist nội dung soạn duy nhất của renderer, không gọi create/
+commit trước. Case mới dùng `draftId` ổn định của phiên làm idempotency_key;
+retry giữ đúng key + snapshot payload (§13.11). `stageForWire` giữ nguyên
+`entity_id` server trả (echo/gợi ý); server tự bỏ hint khi lệch/không khớp
+neo theo §4.1 mục 5 — client không phải lọc. Baseline đã lưu chỉ hỗ trợ
+phân biệt row mới/cũ, không thay Stage hiện tại.
+
+
+Case mới cấm base_revision; case cũ cấm key; null/Boolean/sai kiểu ID reject.
+Không nhận status/locked/render_model từ client; không chudat nhập tay.
+Meta allowlist/alias như hiện có; null ghi null, scalar absent giữ cũ.
+result.kind=workspace_save_case; data = workspace_get v2 đầy đủ từ rows vừa
+commit + created:boolean, case.status=done. Case mới revision=1; cũ N+1,
+kể cả re-save Done sạch. Không yêu cầu diagramDirty/sáu trường/đủ mọi slot.
+
+**Một transaction, một commit:** validate wire/meta/Stage → chiếm SQLite write
+reservation BEGIN IMMEDIATE trên session sạch trước load revision/resolve →
+check revision/key/hash/type → tạo case nếu mới → resolve/diff rows/đất/meta/
+provenance, flush → normalize/check/prune Diagram theo Stage **cùng payload**
+→ evaluate → diff projections/validate bindings → done/revision/updated_at →
+commit → trả workspace đầy đủ. Helper không commit lồng; CAS UPDATE case cũ
+theo base_revision và kiểm rowcount, không điều kiện status=draft.
+
+Prune refs tới row của case đã lưu nhưng bị xóa trong payload; UUID chưa từng
+thuộc bản cũ/payload là diagram_reference_outside_stage, không sanitize.
+Prune positions > asset count với diagram.selection_pruned, không remap khi
+reorder. Owner mirror mâu thuẫn → diagram_owner_mismatch. Inheritance evaluate
+bằng rows mới; two_party trả unsupported_render_model, không engine thừa kế.
+Incomplete hợp lệ giữ warning/requiredSlots/Pool và vẫn done; invalid reject.
+Bất kỳ lỗi sau flush rollback cả case/identity mới/rows/đất/projections/JSON/
+status/revision/key/hash. Không publish success trước commit.
+
+**Errors:** validation_error (shape/meta/type/date ngoài Stage/key cấm),
+stage_validation_error (field_errors row_id/field/code/message/index như hiện có),
+case_not_found/case_type_unsupported, workspace_conflict {server_revision},
+diagram_domain_mismatch/diagram_owner_mismatch/diagram_reference_outside_stage,
+diagram_invalid_state {errors}, idempotency_conflict và lỗi binding/Word gốc
+hiện có. Không partial write. SQLite busy/file lock là engine_unavailable
+retryable=true, không workspace_locked và không tự retry bằng revision mới.
+
+**Lifecycle/replay:** key+hash theo §13.11; replay mới trả workspace hiện tại
+created=false không ghi/revision bump, hash khác lỗi. Case cũ retry revision
+cũ sau commit → conflict, không double-write/journal exactly-once.
+API `workspace_create` tạo draft; `workspace_commit_stage` giữ status draft/
+done và thay snapshot DB, nhưng renderer không gọi hai API để lưu nội dung soạn.
+diagram_save/update_meta/convert_type giữ status. Chỉ save_case chuyển
+draft→done; không unlock→draft. Route /cases/{cid}/lock và /unlock là tombstone
+HTTP 410 {code:"endpoint_deprecated",message:"Dùng Lưu hồ sơ; Hồ sơ không còn khóa"},
+không query/mutate/commit DB, không redirect hoặc giả save thiếu payload.
+
+**Client:** Stage/Pool/Diagram cùng bản đang sửa; baseline committed chỉ là lần
+lưu gần nhất. Không nút Cập nhật/Lưu nháp, không lưu ngầm khi rời/đóng/chuyển
+loại/xuất Word; giữ canLeave/window-close và base_revision/conflict. Ngoại lệ
+Word saveCaseMeta → workspace_update chỉ meta, không persist context pending.
+Lưu hồ sơ flush ô focus, đồng bộ mặc định chưa touched (§13.4), giữ snapshot
+request khi retry, khóa mutation in-flight; lỗi giữ dirty/nháp, thay/dọn lỗi
+theo lần ghi gần nhất và khi sửa dữ liệu liên quan. Success hydrate workspace rồi clear
+dirty. Discard late response khác job/command/case/phiên. Nhãn trạng thái
+nghiệp vụ: `draft` → **Nháp**, `done` → **Đã lưu**, hiển thị trong danh sách
+và text định danh hồ sơ đã có ID; không thêm pill Nháp riêng, không đồng
+nhất nhãn với chấm dirty. Nháp mới chưa có ID giữ header chọn loại.
+Không tự apply/hủy modal đất đang mở: **B6 pending**, không claim vòng 2
+hoàn tất.
+Vòng 2 có nguồn latest-done và nhân bản (§13.20/§13.21). Vẫn ngoài vòng 2:
+copy/paste Excel, cách tính/bộ lọc báo cáo, UX rời/đóng/khôi phục, xóa Done,
+#42; giữ delete draft-only, Done sửa được không tự cấp quyền xóa Done.
+Không đóng toàn #13 hoặc mở gate mẫu #41 bằng commit contract này.
+
+### 13.20 `notary.workspace_source_latest` — đọc nguồn Done mới nhất (vòng 2)
+
+**Trạng thái:** ĐÃ TRIỂN KHAI 22/10/2026 (proof: `test_issue13_source_latest.py`,
+`test_issue13_storage_b_proof.py`). Read-only trên
+DB case: lấy **toàn bộ Người + toàn bộ Tài sản/cụm đất của đúng một Hồ sơ
+`done`** làm nguồn cho nháp mới. Không tạo/nhân bản case, không lấy buffer
+editor của nguồn, không đọc/lưu file DOCX như một phần của Stage nguồn.
+
+```yaml
+payload: {}                         # bắt buộc object rỗng — mọi key khác
+                                    # (case_id/base_revision/idempotency_key/
+                                    # filter…) → validation_error
+```
+
+```yaml
+result:
+  kind: workspace_source_latest
+  data:
+    schema_version: notary.case-drafting.v2
+    backend_mode: real | mock
+    source_case_id: <int >= 1 | null>
+    source_status: done | null
+    stage:                          # đúng field/type/thứ tự Stage output
+      owner_row_id: <uuid4 | null>  # chỉ inheritance và chỉ khi có nguồn
+      people: [<person_row output>] # ho_ten có thể null
+      assets: [<asset_row_v2 output>]
+  evidence: []
+  warnings: []
+  source_files: []
+```
+
+**Chọn nguồn (một read transaction/snapshot):**
+
+```sql
+SELECT ... FROM inheritance_cases
+WHERE trang_thai = 'done'
+ORDER BY (updated_at IS NULL) ASC, updated_at DESC, id DESC
+LIMIT 1;
+```
+
+- `updated_at` là mốc lưu kỹ thuật, **không** phải ngày giấy/ngày lập/độ đầy
+  đủ/identity. Bằng timestamp tuyệt đối → `id` case lớn hơn thắng.
+- `updated_at=null` (seed/ngoài luồng) xếp **sau** mọi timestamp có giá trị
+  (null-last), rồi `id DESC`; đọc không backfill/không ghi.
+- Chọn trên **toàn hệ thống**, không lọc theo loại việc/neo Người/Tài sản.
+  Case được chọn có tập rỗng → trả rỗng của **case đó**, không lùi sang case
+  khác. Loại nguồn ngoài `inheritance`/`two_party` → `case_type_unsupported`
+  với `details.case_type`, không lẳng lặng đổi case.
+- Không có case Done → **thành công** với `source_case_id=null`,
+  `source_status=null`, `stage={people:[],assets:[]}` (không owner key).
+  Không phải `case_not_found`.
+- Hai source field null đồng thời hoặc id+`done`; status khác `done` là lỗi
+  output. Không ghi DB, không tăng revision, không tạo Customer/Property/
+  case/revision.
+
+**Mốc lưu microsecond:** `updated_at` lưu Python UTC-naive đủ microsecond;
+mọi writer case (create, save_case mới/cũ, commit_stage, update_meta,
+convert_type, diagram_save kể cả child-only, participant add/edit/delete,
+legacy case_create) đóng đúng một stamp trong transaction của nó. Lỗi/
+rollback/conflict/replay/get/evaluate/export/import gợi ý không đóng stamp.
+Case mới gán explicit stamp; flush mọi mutation case/status **trước** CAS
+cuối để ORM/default không ghi đè. Độ mịn này tách hai lần lưu trong cùng
+giây; clock trùng tuyệt đối giải bằng `id`. `Diagram.updatedAt` trên wire
+vẫn chỉ tới giây, không dùng làm khóa chọn nguồn.
+
+**Remap:** mọi `row_id` Người/Tài sản trả về là **UUID v4 mới**; map
+person cũ→mới remap `owner_row_id`; asset cũ→mới thay row_id parent, đất
+không có wire ID nên giữ nguyên vị trí/giá trị. Giữ `entity_id` (kể cả ID
+cao/null), serial nguyên văn, độ đầy đủ năm và `null` khác `[]` của cụm đất.
+Không trả `case`/meta/`revision`/`diagram`/`docx_import`/`capabilities`;
+`source_case_id` chỉ là provenance kỹ thuật của phép đọc, không phải liên
+kết nghiệp vụ mới. Đọc lặp lại được phép sinh UUID khác (không phải
+allocator idempotent đã persist).
+
+**Giữ identity qua lần lưu đầu (khoảng nối bắt buộc):** UI gửi Stage nguồn
+vào `workspace_create`/save_case mới với `entity_id` của nguồn như **gợi ý
+có kiểm neo** (§4.1 mục 5). Neo payload còn khớp identity đó → giữ đúng ID
+(kể cả ID cao khi có ID cũ trùng neo); neo bị sửa → resolve lại, không sửa
+master; thiếu neo → `null`. Không strip ID nguồn rồi để resolver chọn
+min-ID, không dùng row_id nguồn để lách ownership, không lấy trường từ
+identity lấp Stage. Gợi ý không phải int dương/tồn tại đúng bảng →
+`stage_validation_error` gắn row/field.
+
+**Errors:** `validation_error` (payload không phải object rỗng),
+`case_type_unsupported {case_type}`, lỗi envelope hiện có
+(`engine_not_installed`/`engine_unavailable`; retryable theo adapter).
+Không có Done **không là lỗi**; không fallback rỗng khi runtime lỗi.
+
+**Client:** `newDraft` đọc nguồn **một lần**, khóa sửa/lưu đến khi xong,
+bỏ response phiên cũ, lỗi hiện rõ và không tự ghi DB. Thành công đặt Stage
+nguồn vào bản đang sửa (baseline `committed` vẫn rỗng, không chi phối Pool),
+`stageDirty=true` nếu có dòng; Pool/nhãn/gán node dùng ngay Stage nguồn;
+meta/diagram luôn mới của nháp, không copy ngụ ý từ nguồn. Loại do người
+dùng chọn; two_party bỏ owner key; nguồn two_party/không nguồn → owner
+`null`, không tự gán người đầu. Nguồn rỗng là Stage rỗng, không notice lỗi.
+`thoi_han` lẻ có trong nguồn phải giữ khi tạo dòng mới; không mở ô nhập mới.
+
+### 13.21 `notary.workspace_duplicate` — nhân bản toàn bộ hồ sơ (vòng 2)
+
+**Trạng thái:** ĐÃ TRIỂN KHAI 22/10/2026 (proof:
+`test_issue13_workspace_duplicate.py`). Command tạo
+case **mới** bằng cách copy nội dung **đã lưu** của nguồn trong một
+transaction; KHÔNG copy buffer editor chưa **Lưu hồ sơ**. Nguồn được phép
+`draft` hoặc `done`; `case_type` phải thuộc `inheritance`/`two_party`.
+
+> **Chốt kỹ thuật vòng 2, chờ owner xác nhận:** bản sao lần tạo đầu mang
+> `status=draft`, `revision=1`. Toàn bộ nội dung copy là yêu cầu đã có của
+> owner; **trạng thái bản sao chưa được owner duyệt**. Đây không phải
+> quyết định nghiệp vụ đã nghiệm thu và không chặn các phần đã rõ của vòng 2.
+
+```yaml
+payload:
+  source_case_id: <int >= 1>        # strict; cấm bool/string/null
+  idempotency_key: <uuid4>          # bắt buộc, giữ qua retry cùng ý định
+                                    # cấm case_id/base_revision/case/stage/
+                                    # diagram/status/field override
+```
+
+```yaml
+result:
+  kind: workspace_duplicate
+  data:
+    schema_version: notary.case-drafting.v2
+    backend_mode: real | mock
+    case: <workspace_get.case của bản sao>       # revision như get, không bịa
+    stage: <workspace_get.stage của bản sao>
+    diagram: <workspace_get.diagram của bản sao>
+    capabilities: <workspace_get.capabilities>
+    docx_import: <optional, như workspace_get>
+    source_case_id: <int >= 1>
+    created: <bool>                 # true lần tạo; false replay
+```
+
+**Idempotency:** hash SHA-256 canonical JSON
+`{command:"workspace_duplicate", intent:"draft", source_case_id:N}`
+(sort keys, separators như `_creation_hash`). **Không** hash snapshot,
+revision/timestamp nguồn, UUID mới, case đích hay thời gian: retry sau khi
+nguồn đổi vẫn trả bản sao đã tạo. Dùng cặp cột key/hash sẵn có, không thêm
+cột `source_case_id`. Thứ tự: validate → chiếm write lock → **lookup key
+trước khi load nguồn** → hash khớp trả workspace hiện tại của bản sao +
+`source_case_id`, `created=false` (kể cả nguồn đã bị xóa sau lần đầu) →
+hash khác `idempotency_conflict` → chưa có key mới load nguồn và tạo.
+Replay **không** ép lại draft/rev1 nếu bản sao đã được sửa/lưu Done và
+không tăng revision.
+
+**Copy/remap đầy đủ (một snapshot transaction):**
+
+| Nội dung | Quy tắc bản sao |
+|---|---|
+| Case ID/key/hash/revision/status/timestamps | ID mới; key/hash của duplicate; `draft`/rev1 lần tạo đầu; `created_at`/`updated_at` mới (§13.20). Không copy status/revision/key/hash/thời gian nguồn |
+| Meta cột + 7 scalar | Giữ `case_type`/`document_type`, ngày lập, nơi niêm yết, người nhận ủy quyền + ID, nội dung việc, ghi chú, kể cả null; giữ nguyên snapshot tên UQ, không resolve lại master. 7 scalar (`tenvanban`, `nhomhopdong`, `loaivanbannhandien`, `socongchung`, `ngaycongchung`, `congchungvien`, `thuky`) copy nguyên; `chudat` không copy mà derived lại |
+| Person/asset rows | Map `P[old]=uuid4()`/`A[old]=uuid4()` một-một; case_id mới; `customer_id`/`property_id` giữ nguyên (kể cả null/ID cao trùng neo); mọi cột dữ kiện/vị trí/`thoi_han`/serial giữ nguyên, không derive lại hoặc lấp master |
+| Land rows | PK integer mới; parent = `A[old]`; loại/diện tích/thời hạn/vị trí copy kể cả hàng trống; `null` vs `[]` giữ qua present flag; không thay identity đất bằng PK DB mới |
+| Owner pointer | `P[old owner]` hoặc `null`; two_party không key; không dùng `nguoi_chet_id` làm row pointer |
+| Diagram state | Chỉ `nodes[].personId` map qua `P`, kể cả hidden/deleted. `node.id`/`parentSlotIds`/`spouseSlotId` là slot ID → giữ topology; `ownPositions`/`receivePositions` là vị trí 1-based → giữ nguyên, không map qua asset. Không global string-replace UUID |
+| Diagram render/warnings | Cache derived rebuild từ state+rows đã remap bằng IW helper nếu nguồn có cache; null giữ null. `requiredSlots.anchorSlotId` là slot. Giữ warning ngoài engine; không copy warning trỏ row cũ |
+| Participants | PK mới, `ho_so_id` mới; person/parent pointer non-null map `P`; identity projection từ rows mới, pointer null legacy giữ null + identity nguồn; giữ vai trò/hàng thừa kế/`co_nhan_tai_san`/tỷ lệ/ghi chú. Không chỉ dựng lại derived rồi bỏ manual role/note |
+| Property links | PK mới/case_id mới; `case_asset_row_id` map `A`; `property_id` từ rows mới; primary theo vị trí. Không copy ID link/timestamps |
+| JSON case | schemaVersion 4, scalar/owner/diagram/docx_import; không resurrect Stage/assets/engine_state_json; `Diagram.updatedAt` là dấu kỹ thuật của bản mới |
+| `docx_import` | Giữ source_id/candidate/occurrence/field/slot/hash/label; **remap `sources[].records[].row_id` bằng P hoặc A**. `records[].land_rows` là số dòng nguồn Word → giữ nguyên. `bindings` gián tiếp qua candidate; `slot_for` trước/sau remap cùng slot; stale vẫn stale, không tự xác nhận/chữa/prune im lặng |
+
+- Dùng helper copy rows riêng (copy cột/PK/FK/thứ tự tường minh), **không**
+  serialize→strip→derive→upsert và không dùng `_write_stage_rows` cho clone.
+  Không gọi `_sync_participants_and_owner` (helper hiện hành loại participant
+  ngoài active role set và ghi lại field tay).
+- Kiểm mọi participant/record/diagram ref có map **trước** khi validate;
+  thiếu map/source bytes/context hỏng → lỗi rõ, rollback, không bỏ phần lỗi
+  để success. Validate context ở chế độ **read-only** (không save template,
+  không prune, không đổi label/hash); transaction DB không rollback file
+  ngoài DB.
+- Một transaction, một commit: tạo case mới → rows/đất → link/owner
+  projection → participants → remap Diagram/evaluate không commit →
+  copy/validate provenance → JSON v4 → stamp mới → `engine_state_json=null`
+  → commit. Lỗi ở bất kỳ bước nào rollback case/rows/đất/participants/
+  links/key/hash; nguồn và identity không UPDATE/DELETE.
+
+**Errors:** `validation_error` (shape/key/ID/type, binding/provenance không
+hợp lệ), `case_not_found {source_case_id}` (nguồn không tồn tại khi chưa
+replay), `case_type_unsupported`, `idempotency_conflict`, các lỗi Diagram
+(`diagram_invalid_state`/`diagram_reference_outside_stage`/
+`diagram_owner_mismatch`) nếu nội dung nguồn không copy đúng, lỗi binding/
+kho nguồn hiện có, lỗi hạ tầng envelope (`engine_unavailable` retryable
+cho SQLite busy → retry nguyên key). Không partial clone; không trả
+`workspace_conflict` vì payload không có `base_revision` — snapshot lấy
+tại transaction đã giữ writer.
+
+**Client:** nút **Nhân bản** là thao tác nhỏ trên từng dòng danh sách
+(container + button riêng, không nested button; Enter/Space không mở nguồn).
+Sinh key **một lần cho một ý định**, giữ `{sourceId,key}` khi timeout/lỗi
+hạ tầng; success hydrate workspace bản sao (caseId mới, dirty=false) rồi
+refresh list; lỗi giữ workspace/dirty trước đó + pending retry. Xác nhận
+bỏ sửa chưa lưu như open/newDraft; không lấy buffer nguồn làm dữ liệu clone;
+không gọi `newDraft`/source_latest trước duplicate.
 
 ---
 
@@ -1644,8 +2422,8 @@ contract trao đổi hồ sơ giữa Upload Lab và Soạn hồ sơ. Envelope v�
 **Trạng thái:** v2 APPROVED 05/10/2026 — Owner duyệt, runtime đã chuyển
 sang v2 tại TASK-3 (schema v1 đã xóa).
 **Breaking** so với v1.
-**SOT hành vi:** [`_bmad-output/specs/shared/administrative-lookup.md`](../_bmad-output/specs/shared/administrative-lookup.md);
-cách hồ sơ gọi: [`_bmad-output/specs/notary_v2/administrative-address.md`](../_bmad-output/specs/notary_v2/administrative-address.md).
+**SOT hành vi:** [`_bmad-output/specs/shared/administrative-lookup.md`](../_bmad-output/specs/shared/administrative-lookup.md#lookup);
+cách hồ sơ gọi: [`_bmad-output/specs/notary_v2/administrative-address.md`](../_bmad-output/specs/shared/administrative-lookup.md#usage).
 
 Command thứ mười của nhóm `notary.*`; `result.data.schema_version` =
 `notary.address-lookup.v2` (literal), ngoại lệ của rule §1. **Read-only,
@@ -1718,7 +2496,7 @@ result.data:
 ### 14.3 Schema & examples
 
 - Schema máy đọc v2:
-  [`address-lookup.v2.schema.json`](./notary-case-drafting/address-lookup.v2.schema.json).
+  [`address-lookup.v2.schema.json`](notary-case-drafting/address-lookup.v2.schema.json).
 - Examples:
   `examples/valid/command.address-lookup.valid.json` (payload),
   `examples/valid/job.address-lookup.valid.json` (`found`, `drafting`),

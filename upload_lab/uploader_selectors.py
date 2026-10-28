@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 DEFAULT_STATUS_TEXT = "Đã công chứng"
-DEFAULT_GHI_CHU = ""
-DEFAULT_PHI_CONG_CHUNG = ""
-DEFAULT_THU_LAO = ""
 
 LOGIN_SELECTORS = {
     "username": [
@@ -32,9 +29,7 @@ FORM_FIELD_ORDER = [
     "nguoi_yeu_cau",
     "duong_su",
     "tai_san",
-    "ghi_chu",
-    "phi_cong_chung",
-    "thu_lao_cong_chung",
+    "file_hop_dong",
 ]
 
 FORM_SELECTORS = {
@@ -45,6 +40,7 @@ FORM_SELECTORS = {
             {"type": "css", "value": r"#hopdong\.tenhopdong"},
         ],
         "verify": True,
+        "free_solo": True,
     },
     "ngay_cong_chung": {
         "kind": "text",
@@ -99,6 +95,7 @@ FORM_SELECTORS = {
             {"type": "css", "value": r"#hopdong\.thuky"},
         ],
         "verify": True,
+        "free_solo": True,
     },
     "nguoi_yeu_cau": {
         "kind": "editor",
@@ -138,43 +135,16 @@ FORM_SELECTORS = {
         ],
         "verify_upload": True,
     },
-    "ghi_chu": {
-        "kind": "text",
-        "label": "Ghi chú",
-        "strategies": [
-            {"type": "css", "value": "#ghichu"},
-        ],
-    },
-    "phi_cong_chung": {
-        "kind": "text",
-        "label": "Phí công chứng",
-        "strategies": [
-            {"type": "css", "value": r"#chiphi\.phicongchung"},
-        ],
-    },
-    "thu_lao_cong_chung": {
-        "kind": "text",
-        "label": "Thù lao công chứng",
-        "strategies": [
-            {"type": "css", "value": r"#chiphi\.thulaoCongchung"},
-        ],
-    },
 }
 
-SAVE_BUTTON_SELECTORS = [
-    {"type": "role", "role": "button", "name": "Lưu hợp đồng"},
-    {"type": "text", "value": "Lưu hợp đồng"},
-]
-
-UPLOAD_SUCCESS_MARKERS = [
-    {"type": "text_dynamic"},
-]
 
 VERIFY_FIELDS = [
     "ten_hop_dong",
     "so_cong_chung",
+    "tinh_trang",
     "nhom_hop_dong",
     "loai_tai_san",
     "cong_chung_vien",
     "thu_ky",
+    "file_hop_dong",
 ]

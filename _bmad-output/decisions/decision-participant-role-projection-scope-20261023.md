@@ -42,6 +42,6 @@ issue #45 đề xuất. Vì vậy lát 5 của đợt sửa lỗi E2E được c
 
 ## Nguồn
 
-- Issue: #45 (chỉ còn trong lịch sử Git: `git show f6705c8:docs/archive/backlog/bug-participant-role-projection-stale-spouse-anchor.md`).
+- Issue: [#45](../backlog/bug-participant-role-projection-stale-spouse-anchor.md).
 - Contract: `contracts/notary-case-drafting.md` §13.19.
 - Spec: `_bmad-output/specs/notary_v2/diagram-rules.md` §4.

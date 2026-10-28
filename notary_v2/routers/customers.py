@@ -3,7 +3,6 @@
 import io
 from pathlib import Path
 from typing import Any, Dict, Optional
-from sqlalchemy.exc import IntegrityError
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
@@ -46,7 +45,7 @@ def to_customer_json(c: Customer) -> Dict[str, Any]:
     }
 
 
-def validate_customer_form(form: Dict[str, str], db: Session, current_id: Optional[int] = None, duplicate_as_error: bool = True):
+def validate_customer_form(form: Dict[str, str], db: Session, current_id: Optional[int] = None):
     field_errors: Dict[str, str] = {}
 
     required = ["ho_ten"]
@@ -70,19 +69,13 @@ def validate_customer_form(form: Dict[str, str], db: Session, current_id: Option
         field_errors["ngay_cap"] = "Ngay khong hop le (yyyy hoac dd/mm/yyyy)"
 
     so_gt = (form.get("so_giay_to") or "").strip()
-    if so_gt and duplicate_as_error:
-        q = db.query(Customer).filter(Customer.so_giay_to == so_gt)
-        if current_id is not None:
-            q = q.filter(Customer.id != current_id)
-        if q.first():
-            field_errors["so_giay_to"] = "So giay to da ton tai"
 
     cleaned = {
         "ho_ten": (form.get("ho_ten") or "").strip(),
         "gioi_tinh": gioi_tinh,
         "ngay_sinh": ngay_sinh,
         "ngay_chet": ngay_chet,
-        "so_giay_to": so_gt or None,  # NULL thay vì "" để tránh unique constraint khi không có số giấy tờ
+        "so_giay_to": so_gt or None,
         "ngay_cap": ngay_cap,
         "dia_chi": (form.get("dia_chi") or "").strip(),
     }
@@ -192,12 +185,8 @@ async def upload_excel(request: Request, file: UploadFile = File(...), db: Sessi
         if not raw_form["ho_ten"] and not raw_form["so_giay_to"]:
             continue
 
-        if raw_form["so_giay_to"] and db.query(Customer).filter(Customer.so_giay_to == raw_form["so_giay_to"]).first():
-            results.append({"row": row_num, "name": raw_form["ho_ten"] or "?", "status": "skip", "message": "Trung so giay to, bo qua"})
-            skipped += 1
-            continue
 
-        cleaned, field_errors = validate_customer_form(raw_form, db, duplicate_as_error=False)
+        cleaned, field_errors = validate_customer_form(raw_form, db)
         if field_errors:
             results.append({
                 "row": row_num,
@@ -262,7 +251,7 @@ def upload_excel_save_row(
         "ngay_cap": (ngay_cap or "").strip(),
         "dia_chi": (dia_chi or "").strip(),
     }
-    cleaned, field_errors = validate_customer_form(form, db, duplicate_as_error=True)
+    cleaned, field_errors = validate_customer_form(form, db)
     if field_errors:
         return JSONResponse({"ok": False, "errors": field_errors, "message": result_message(field_errors)}, status_code=400)
 
@@ -294,42 +283,6 @@ def inline_create(
         return JSONResponse({"ok": False, "errors": {"ho_ten": "Bat buoc"}}, status_code=400)
 
     so_giay_to_val = (so_giay_to or "").strip() or None
-    # Upsert: nếu CCCD đã tồn tại → cập nhật với dữ liệu mới rồi trả về
-    if so_giay_to_val:
-        existing = db.query(Customer).filter(Customer.so_giay_to == so_giay_to_val).first()
-        if existing:
-            if name:
-                existing.ho_ten = name
-            if gioi_tinh is not None:
-                gt = normalize_gender(gioi_tinh)
-                if gt:
-                    existing.gioi_tinh = gt
-                elif not gioi_tinh.strip():
-                    existing.gioi_tinh = None
-            if ngay_sinh is not None:
-                ns = parse_date(ngay_sinh, allow_year_only=True)
-                if ns:
-                    existing.ngay_sinh = ns
-                elif not ngay_sinh.strip():
-                    existing.ngay_sinh = None
-            if ngay_chet is not None:
-                nd = parse_date(ngay_chet, allow_year_only=True)
-                if nd:
-                    existing.ngay_chet = nd
-                elif not ngay_chet.strip():
-                    existing.ngay_chet = None
-            if ngay_cap is not None:
-                nc = parse_date(ngay_cap, allow_year_only=True)
-                if nc:
-                    existing.ngay_cap = nc
-                elif not ngay_cap.strip():
-                    existing.ngay_cap = None
-            dc = (dia_chi or "").strip()
-            if dc or dia_chi is not None:
-                existing.dia_chi = dc or None
-            db.commit()
-            db.refresh(existing)
-            return JSONResponse({"ok": True, "customer": to_customer_json(existing), "updated": True})
 
     c = Customer(
         ho_ten=name,
@@ -341,14 +294,7 @@ def inline_create(
         dia_chi=(dia_chi or "").strip() or None,
     )
     db.add(c)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        existing = db.query(Customer).filter(Customer.so_giay_to == so_giay_to_val).first()
-        if existing:
-            return JSONResponse({"ok": True, "customer": to_customer_json(existing)})
-        return JSONResponse({"ok": False, "errors": {"so_giay_to": "Trùng"}}, status_code=400)
+    db.commit()
     db.refresh(c)
     return JSONResponse({"ok": True, "customer": to_customer_json(c)})
 
@@ -396,11 +342,7 @@ def quick_update(
     dc = (dia_chi or "").strip()
     if dc or dia_chi is not None:
         c.dia_chi = dc or None
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        return JSONResponse({"ok": False, "error": "so_giay_to trùng"}, status_code=400)
+    db.commit()
     db.refresh(c)
     return JSONResponse({"ok": True, "customer": to_customer_json(c)})
 
@@ -426,8 +368,6 @@ def create(
 
     cleaned, field_errors = validate_customer_form(form, db)
     errors = []
-    if "so_giay_to" in field_errors:
-        errors.append(f"So giay to '{form['so_giay_to']}' da ton tai")
 
     if field_errors:
         return templates.TemplateResponse("customers/form.html", {

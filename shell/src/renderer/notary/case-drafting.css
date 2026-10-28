@@ -29,6 +29,14 @@
   --cd-col-name: 214px;
   --cd-col-date: 86px;
   --cd-col-id: 106px;
+  /* Sàn chiều cao vùng Sơ đồ + Pool (report 802; owner chốt 2026-10-16 —
+   * decision-owner-802-diagram-height-20261016): tăng CHIỀU CAO 50% từ
+   * baseline đo 484px tại viewport report (1920×983) → 726px; KHÔNG đổi
+   * chiều rộng. Áp lên chính vùng diagram (đúng phần tử report đo) nên
+   * cả Pool trong cùng hàng cũng cao theo. Nội dung lớn hơn (ô Hai bên
+   * cao lên) vẫn cao theo nội dung, không bị thu nhỏ — phần tăng do nội
+   * dung không tính là fix 802. */
+  --cd-rel-min-h: 726px;
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
@@ -70,6 +78,23 @@
   gap: 8px;
   height: 42px;
   padding: 0 10px 0 4px;
+  /* Tabs + hành động + thông báo tạm bám trên cùng #view khi Stage/Sơ đồ
+   * cao hơn màn hình (báo cáo ac5: phản hồi phải còn trong tầm nhìn sau
+   * thao tác từ Sơ đồ — không đè lên điều khiển vì thanh này ở luồng
+   * trên, không phải lớp nổi). */
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-app);
+}
+/* Khi bám trên cùng, phủ kín dải padding của #view phía trên thanh để nội
+ * dung cuộn phía sau không lộ qua khe hở (chỉ thấy khi #view đã cuộn). */
+.cd-topbar::before {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--view-pad, 8px)) 0 0 0;
+  background: var(--bg-app);
+  z-index: -1;
 }
 .cd-localnav {
   display: flex;
@@ -154,13 +179,20 @@
 }
 .cd-case-row {
   display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cd-case-open {
+  display: flex;
   gap: 10px;
   align-items: baseline;
+  flex: 1 1 auto;
   min-height: var(--row-h);
   padding: 6px 10px;
   text-align: left;
   justify-content: flex-start;
 }
+.cd-case-duplicate { flex: 0 0 auto; margin-right: 6px; }
 .cd-case-row .cd-case-name { font-weight: 600; }
 .cd-case-row .muted { margin-left: auto; }
 .cd-caselist-count { font-size: var(--fs-small); }
@@ -182,9 +214,62 @@
   flex-direction: column;
   gap: var(--cd-gap);
 }
+/* Thông báo tạm (report ac5): nằm trong vùng hành động của thanh trên
+ * (khoảng trống trước nút chính) — luôn trong tầm nhìn, không đè lên
+ * điều khiển và không đẩy vùng Sơ đồ. Nhận chuột: nút nội dung (mở
+ * dialog đọc đầy đủ, Quick t1) và nút đóng. */
+.cd-notice-top {
+  margin: 0;
+  padding: 4px 8px;
+  min-height: 0;
+  max-width: 48ch;
+  /* Cho phép co lại: nút nội dung là <button> nên mặc định không shrink
+   * (flex 0 0 auto + min-width auto) — thông báo dài (>48ch) sẽ tràn
+   * thanh trên và đè nút chính nếu thiếu hai dòng này (Quick t1 long). */
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.cd-notice-top .cd-notice-text {
+  /* Nút thật nhưng trông như chữ: Tab tới được, Enter mở dialog đọc đầy
+   * đủ (Quick t1 — title trên div không dùng được bằng bàn phím). */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  /* display: block — nút mặc định inline-flex sẽ canh giữa nội dung và
+   * cắt cả hai đầu khi overflow; block cho ellipsis ở cuối như chuỗi. */
+  display: block;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cd-notice-top .cd-notice-text:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.cd-notice-full {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Nhãn trường mới (Nơi chết / Nơi cấp …) đọc đủ trong cột hẹp: cho xuống
+ * dòng thay vì bị ellipsis chung của ô bảng. */
+.cd-cell-lbl {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
 /* Vùng sơ đồ = phần chiều cao còn lại (chỉ lớp NGOÀI CÙNG — bên trong
- * .cd-rel-card thuộc W3/relationship-diagram.js). min-height giữ sơ đồ
- * đọc được khi Stage đẩy xuống (≈ mockup 1366×768). */
+ * .cd-rel-card thuộc W3/relationship-diagram.js). Sàn thật của vùng nằm ở
+ * `.cd-diagram` (min-height 726px — report 802, xem `.cd-diagram`); 280px
+ * ở đây chỉ là sàn cho trạng thái suy giảm khi Stage đẩy xuống
+ * (≈ mockup 1366×768). */
 .cd-workspace > .cd-rel-card {
   flex: 1 0 auto;
   min-height: 280px;
@@ -325,23 +410,84 @@
   border-color: var(--err, #dc2626);
   background: #fef2f2;
 }
+.cd-date-msg {
+  color: var(--err-text, #b91c1c);
+  font-size: 11px;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+.cd-err-jump {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cd-err-jump:hover {
+  color: var(--err, #dc2626);
+}
+@keyframes cd-err-flash-kf {
+  0%, 100% { box-shadow: none; }
+  30% { box-shadow: 0 0 0 2px var(--err, #dc2626); }
+}
+.cd-err-flash {
+  animation: cd-err-flash-kf 1.2s ease-out 1;
+}
 .cd-cell-err input,
 .cd-cell-err select,
 .cd-root .cd-stage-tbl .cd-cell-err .cd-cell {
   border-color: var(--err-text);
   background: #fff5f5;
 }
-/* ô có lỗi: cho phép dòng cao thêm để hiện thông báo (không cắt). */
-.cd-root .cd-stage-tbl td.cd-cell-err { height: auto; white-space: normal; }
-.cd-err-msg {
-  margin: 2px 0;
+/* R13: lỗi gắn ô = ô đỏ; dòng lỗi nằm trong slot của card (bên dưới),
+ * không chèn chữ vào ô nên chiều cao hàng không đổi. */
+.cd-col-err { box-shadow: inset 0 2px 0 var(--err-text); }
+
+/* ---------- R13: mỗi lỗi một chỗ, vùng lỗi KHÔNG đẩy bố cục ----------
+ * Slot lỗi nằm trong card (và một slot trong vùng sơ đồ), luôn chiếm
+ * chỗ sẵn: cao cố định, nội dung dài thì cuộn bên trong. Vì vậy lỗi
+ * xuất hiện/biến mất không làm nhảy các vùng khác. */
+.cd-card-errslot,
+.cd-diagram-errslot,
+.cd-stage-status {
+  height: calc(2 * 1.3em + 2px);
+  overflow-y: auto;
   font-size: 12px;
   line-height: 1.3;
   color: var(--err-text);
   white-space: normal;
 }
-.cd-col-err { box-shadow: inset 0 2px 0 var(--err-text); }
-.cd-row-errors { margin-bottom: 2px; }
+.cd-card-errslot { margin-bottom: 2px; }
+.cd-card-errslot:empty,
+.cd-diagram-errslot:empty,
+.cd-stage-status:empty { visibility: hidden; }
+.cd-stage-status { padding: 0 2px; }
+
+/* ---------- R14: trạng thái thao tác tại nút ---------- */
+.act-spin {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: act-spin 0.7s linear infinite;
+}
+.act-check {
+  margin-left: 6px;
+  color: var(--ok-text, #15803d);
+  font-weight: 700;
+}
+.cd-root button.is-ok { color: var(--ok-text, #15803d); }
+.cd-root button.is-error { color: var(--err-text); }
+@keyframes act-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .act-spin { animation: none; }
+}
 
 /* MIN-141 đợt 3: ba dong meta hồ sơ duoi card Tài sản. Ô nhập thấp hơn
  * ô Stage 10% (đợt 3 AC: giảm chiều cao ô nhập 10% theo hiện hành —
@@ -452,7 +598,7 @@
 .cd-suggest-text { flex: 1; min-width: 0; font-size: var(--fs-small); }
 
 /* ---------- relation tier (MIN-133: một card — head gồm cả Lưu sơ đồ /
- * Xuất Word theo D6; body = Pool 176px + splitter + diagram lấp phần
+ * Xuất Word theo D6; body = Pool 240px + splitter + diagram lấp phần
  * chiều cao còn lại, không có footer) ---------- */
 .cd-rel-card { min-width: 0; }
 .cd-rel-body {
@@ -464,7 +610,7 @@
   padding: 0 var(--card-pad-x) 8px;
 }
 .cd-pool {
-  flex: 0 0 176px;
+  flex: 0 0 240px;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -529,7 +675,7 @@
   color: var(--text-muted);
 }
 /* Nút → gán vị trí: nổi trên mép phải, chỉ hiện khi hover/focus —
- * vẫn trong tab order cho bàn phím (MIN-133: Pool 176px chỉ tên). */
+ * vẫn trong tab order cho bàn phím (MIN-133: Pool rộng chỉ tên). */
 .cd-pool-assign {
   flex: 0 0 auto;
   opacity: 0;
@@ -542,7 +688,10 @@
 .cd-diagram {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 0;
+  /* Sàn 726px = report 802 (+50% từ 484px baseline ở viewport report).
+   * Viewport thấp: vùng cao hơn phần còn lại nên trang (#view) cuộn;
+   * canvas vẫn là khung cuộn/pan bên trong. */
+  min-height: var(--cd-rel-min-h);
   display: flex;
   flex-direction: column;
 }
@@ -615,8 +764,9 @@
  * trống 88×24 viền đứt không chữ — khớp hằng relationship-diagram.js) ---------- */
 .cd-node {
   position: absolute;
-  width: 144px;
+  width: 173px;
   padding: 4px 5px 5px;
+  overflow: hidden;
   border-radius: var(--r-ctl);
   border: 1px solid var(--border-hairline);
   background: var(--surface-card);
@@ -633,9 +783,33 @@
   border: 1.5px dashed #b6c2d2;
   background: rgba(255, 255, 255, .55);
   box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cd-empty-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
 }
 .cd-node-owner { box-shadow: 0 0 0 2px var(--accent-soft), var(--sh-card); }
 .cd-node-hidden { opacity: .6; }
+.cd-node-spouse-lawful { border: 2px solid var(--accent); }
+.cd-node-spouse-faded { opacity: .58; }
+.cd-spouse-label {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cd-pool-blocked { cursor: not-allowed; opacity: .72; }
+.cd-node-spouse-lawful .cd-spouse-label { font-weight: 700; }
 /* Nút hành động trên node (gán lại / bỏ gán / xóa slot): nổi góc phải
  * trên, chỉ hiện khi hover/focus — vẫn trong tab order (MIN-133). */
 .cd-node-acts {
@@ -708,6 +882,36 @@
 }
 .cd-poschip:focus-visible { outline: 2px solid var(--focus-ring); }
 .cd-poschip:disabled { opacity: .45; }
+/* Nhắc "Chưa tick Nhận" — display-only, không đổi dữ liệu/engine. */
+.cd-receive-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: var(--cd-fs-data);
+}
+.cd-receive-reminder-name {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.cd-receive-hint {
+  font-size: 11px;
+  color: #92400e;
+  margin-top: 2px;
+}
+/* Nháy sáng ngắn khi bấm tên trong nhắc — tạm thời, class tự gỡ. */
+.cd-receive-flash { outline: 2px solid var(--focus-ring); }
 .cd-badge {
   display: inline-block;
   padding: 1px 6px;
@@ -750,7 +954,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 26px;
+  min-height: 52px;
   padding: 0 6px;
   border-radius: 6px;
   border: 1px solid var(--border-hairline);
@@ -933,7 +1137,6 @@
   padding: 0 6px;
   color: var(--err);
 }
-.cd-busy { padding: 2px 4px; }
 
 /* Cửa sổ hẹp: stage/rel xếp dọc, thanh trên cho wrap — không co chữ. */
 @media (max-width: 900px) {
@@ -956,3 +1159,22 @@
 .cd-root .cd-lookup-list { max-height: 40vh; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
 .cd-root .cd-lookup-item { display: flex; gap: 8px; align-items: flex-start; }
 .cd-root .cd-lookup-item span { flex: 1; min-width: 0; }
+.cd-toggle-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-small, 13px);
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  user-select: none;
+}
+.cd-toggle-checkbox {
+  cursor: pointer;
+}
+.cd-node-nospouse {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  cursor: pointer;
+}

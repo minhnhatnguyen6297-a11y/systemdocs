@@ -18,14 +18,14 @@
       "type": "string",
       "const": "notary.case-drafting.v2"
     },
-    "position_1_3": {
+    "position_1_5": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 3
+      "maximum": 5
     },
     "asset_row_v2": {
       "type": "object",
-      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3). MIN-141: `thoi_han` lẻ optional ở input (key vắng = giữ nguyên lịch sử master); emit vẫn mang key — như asset_row/asset_row_input của common.schema.json.",
+      "description": "Giống v1 asset_row nhưng KHÔNG có is_primary — vị trí = index+1 (§13.3). Storage B đang triển khai vòng 1: dữ kiện và land_rows thuộc dòng hồ sơ, không ghi đè master; thoi_han lẻ optional ở input, absent giữ giá trị của dòng hồ sơ.",
       "required": [
         "row_id", "entity_id", "so_serial", "so_vao_so",
         "so_thua_dat", "so_to_ban_do", "dia_chi", "loai_so",
@@ -40,12 +40,12 @@
         "so_vao_so": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "so_thua_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "so_to_ban_do": { "$ref": "common.schema.json#/definitions/nullable_string" },
-        "dia_chi": { "$ref": "common.schema.json#/definitions/non_empty_string" },
+        "dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "loai_so": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "hinh_thuc_su_dung": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "nguon_goc": { "$ref": "common.schema.json#/definitions/nullable_string" },
-        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_full" },
+        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_or_year" },
         "co_quan_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
         "land_rows": {
           "type": ["array", "null"],
@@ -56,22 +56,142 @@
     },
     "land_row_v2": {
       "type": "object",
-      "description": "Hàng loại đất cấu trúc: mục đích sử dụng + diện tích + thời hạn (§13.3)",
+      "description": "Hàng loại đất cấu trúc: mục đích sử dụng + diện tích + thời hạn (§13.3/§4.2). Đọc cả key canonical loaidat/dientich/thoihan; alias mâu thuẫn ghi theo key canonical mới (S6 23/10/2026). dien_tich chuỗi không parse được → ghi null.",
       "additionalProperties": false,
       "properties": {
         "loai_dat": { "$ref": "common.schema.json#/definitions/nullable_string" },
-        "dien_tich": { "type": ["number", "null"] },
-        "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" }
+        "dien_tich": { "type": ["number", "string", "null"] },
+        "thoi_han": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loaidat": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dientich": { "type": ["number", "string", "null"] },
+        "thoihan": { "$ref": "common.schema.json#/definitions/nullable_string" }
       }
     },
-    "stage_v2": {
+    "person_row_output_v2": {
       "type": "object",
+      "description": "Person row phía output/result (vòng 2): ho_ten nullable vì nháp đã lưu có thể chưa có tên; KHÔNG dùng cho input strict.",
+      "required": [
+        "row_id", "entity_id", "ho_ten", "gioi_tinh", "ngay_sinh",
+        "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
+        "place_of_origin", "loai_giay_to", "loai_dia_chi"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "common.schema.json#/definitions/uuid4" },
+        "entity_id": { "type": ["integer", "null"], "minimum": 1 },
+        "ho_ten": { "type": ["string", "null"], "minLength": 1 },
+        "gioi_tinh": { "enum": ["Nam", "Nữ", null] },
+        "ngay_sinh": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "ngay_chet": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "so_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "noi_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "place_of_origin": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" }
+      }
+    },
+    "person_row_create_v2": {
+      "type": "object",
+      "description": "Person row phía input của workspace_create partial (vòng 2): ho_ten null/absent được; canonical alias vẫn đọc được. KHÔNG dùng cho save_case/commit/evaluate strict.",
+      "required": [
+        "row_id", "entity_id", "gioi_tinh", "ngay_sinh",
+        "ngay_chet", "so_giay_to", "ngay_cap", "noi_cap", "dia_chi",
+        "place_of_origin", "loai_giay_to", "loai_dia_chi"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "row_id": { "$ref": "common.schema.json#/definitions/uuid4" },
+        "entity_id": { "type": ["integer", "null"], "minimum": 1 },
+        "ho_ten": { "type": ["string", "null"], "minLength": 1 },
+        "gioi_tinh": { "enum": ["Nam", "Nữ", null] },
+        "ngay_sinh": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "ngay_chet": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "so_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ngay_cap": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "noi_cap": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "place_of_origin": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_giay_to": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loai_dia_chi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ten": { "type": ["string", "null"], "minLength": 1 },
+        "gioitinh": { "enum": ["Nam", "Nữ", null] },
+        "ngaysinh": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "ngaychet": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "sogiayto": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "ngaycap": { "$ref": "common.schema.json#/definitions/date_or_year" },
+        "noicap": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "diachi": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loaigiayto": { "$ref": "common.schema.json#/definitions/nullable_string" },
+        "loaidiachi": { "$ref": "common.schema.json#/definitions/nullable_string" }
+      }
+    },
+    "asset_row_output_v2": {
+      "description": "Asset row phía output: asset_row_v2 + luôn emit `thoi_han` lẻ nullable để đối chiếu lịch sử/warning (§4.2).",
+      "allOf": [
+        { "$ref": "#/definitions/asset_row_v2" },
+        { "required": ["thoi_han"] }
+      ]
+    },
+    "stage_v2_output": {
+      "type": "object",
+      "description": "Stage phía output (§4, §13.20). owner_row_id nullable/absent: inheritance emit key (có thể null khi nháp chưa gán); two_party không key. people/assets có thể rỗng.",
       "required": ["people", "assets"],
       "additionalProperties": false,
       "properties": {
         "owner_row_id": {
-          "$ref": "common.schema.json#/definitions/uuid4",
-          "description": "BẮT BUỘC khi case_type=inheritance trong payload; CẤM khi two_party; result emit null cho legacy chưa có owner (§13.6)"
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ]
+        },
+        "people": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/person_row_output_v2" }
+        },
+        "assets": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/definitions/asset_row_output_v2" }
+        }
+      }
+    },
+    "stage_v2_create": {
+      "type": "object",
+      "description": "Stage input của workspace_create partial (vòng 2): people/assets ≥0, tên null được, owner inheritance absent/null được. Save_case dùng stage_v2 điền dần; commit dùng stage_v2 nhưng server áp strict.",
+      "required": ["people", "assets"],
+      "additionalProperties": false,
+      "properties": {
+        "owner_row_id": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ]
+        },
+        "people": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/person_row_create_v2" }
+        },
+        "assets": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/definitions/asset_row_v2" }
+        }
+      }
+    },
+    "stage_v2": {
+      "type": "object",
+      "description": "Stage input cho commit_stage/save_case/evaluate: person ho_ten non-empty; owner_row_id optional/null được trên save_case/evaluate (S2 23/10/2026), commit_stage vẫn bắt buộc theo domain; assets ≤5, mỗi dòng cần số thửa + số tờ. Không dùng cho workspace_create partial.",
+      "required": ["people", "assets"],
+      "additionalProperties": false,
+      "properties": {
+        "owner_row_id": {
+          "oneOf": [
+            { "$ref": "common.schema.json#/definitions/uuid4" },
+            { "type": "null" }
+          ],
+          "description": "Optional/null khi chưa gán Chủ đất trên save_case/evaluate; commit_stage bắt buộc với inheritance; CẤM khi two_party (§13.6)"
         },
         "people": {
           "type": "array",
@@ -80,16 +200,17 @@
         },
         "assets": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 5,
           "items": { "$ref": "#/definitions/asset_row_v2" },
-          "description": "vị trí = index+1; ≤3 → asset_limit (§13.3)"
+          "description": "vị trí = index+1; ≤5 → asset_limit (§13.3)"
         }
       }
     },
     "node_v3_inheritance": {
       "type": "object",
       "required": [
-        "id", "personId", "parentSlotIds", "spouseSlotId",
+        "id", "personId", "parentSlotIds", "spouseSlotIds",
+        "spouseSlotId", "spouseSuggestionId",
         "ownPositions", "receivePositions", "hidden", "deleted"
       ],
       "additionalProperties": false,
@@ -106,16 +227,22 @@
           "maxItems": 2,
           "items": { "type": "string", "minLength": 1 }
         },
+        "spouseSlotIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "spouseSlotId": { "type": ["string", "null"], "minLength": 1 },
+        "spouseSuggestionId": { "type": ["string", "null"], "minLength": 1 },
         "ownPositions": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/definitions/position_1_3" }
+          "items": { "$ref": "#/definitions/position_1_5" }
         },
         "receivePositions": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/definitions/position_1_3" }
+          "items": { "$ref": "#/definitions/position_1_5" }
         },
         "hidden": { "type": "boolean" },
         "deleted": { "type": "boolean" }
@@ -184,6 +311,21 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "casetype": { "$ref": "#/definitions/payload_workspace_create_v2/properties/case/properties/case_type" },
+            "documenttype": { "$ref": "#/definitions/payload_workspace_create_v2/properties/case/properties/document_type" },
+            "ngaylaphoso": { "$ref": "common.schema.json#/definitions/date_full" },
+            "noiniemyet": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoinhanuyquyen": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nguoinhanuyquyenid": { "type": ["integer", "null"], "minimum": 1 },
+            "noidungviec": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "ghichu": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "tenvanban": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nhomhopdong": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "loaivanbannhandien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "socongchung": { "type": ["string", "null"], "pattern": "^\\d+/\\d{4}$" },
+            "ngaycongchung": { "$ref": "common.schema.json#/definitions/date_full" },
+            "congchungvien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "thuky": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "case_type": { "enum": ["inheritance", "two_party"] },
             "document_type": {
               "type": "string",
@@ -197,7 +339,7 @@
             "ghi_chu": { "$ref": "common.schema.json#/definitions/nullable_string" }
           }
         },
-        "stage": { "$ref": "#/definitions/stage_v2" },
+        "stage": { "$ref": "#/definitions/stage_v2_create" },
         "diagram": {
           "type": "object",
           "description": "OPTIONAL ở v2 — absent thì server seed (§13.6)",
@@ -222,8 +364,15 @@
         "case": {
           "type": "object",
           "additionalProperties": false,
-          "description": "OPTIONAL — đợt 3 (MIN-141): metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type kèm theo phải khớp giá trị đã lưu (immutable). Chấp nhận cả key canonical liền không dấu — §6.",
+          "description": "OPTIONAL — metadata hồ sơ ghi cùng Stage trong một transaction; case_type/document_type kèm theo phải khớp giá trị đã lưu. Chỉ dedicated workspace_convert_type (§13.18) được chuyển loại; commit vẫn immutable. Chấp nhận key canonical — §6.",
           "properties": {
+            "tenvanban": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "nhomhopdong": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "loaivanbannhandien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "socongchung": { "type": ["string", "null"], "pattern": "^\\d+/\\d{4}$" },
+            "ngaycongchung": { "$ref": "common.schema.json#/definitions/date_full" },
+            "congchungvien": { "$ref": "common.schema.json#/definitions/nullable_string" },
+            "thuky": { "$ref": "common.schema.json#/definitions/nullable_string" },
             "case_type": { "enum": ["inheritance", "two_party", null] },
             "document_type": { "type": ["string", "null"] },
             "ngay_lap_ho_so": { "$ref": "common.schema.json#/definitions/date_full" },

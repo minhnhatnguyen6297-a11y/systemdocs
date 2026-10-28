@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: shell/package-lock.json
       - uses: actions/setup-python@v5   # 2 test JS gọi `python`
@@ -78,6 +78,9 @@ jobs:
   pytest-windows:
     runs-on: windows-latest
     timeout-minutes: 40
+    env:
+      # stdout mặc định cp1252 trên Windows: in ghi chú tiếng Việt của known-failures sẽ crash.
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -93,7 +96,14 @@ jobs:
           pip install -r shell/sidecar/requirements.txt -r notary_v2/requirements.txt pytest
       - name: pytest
         shell: bash
-        run: python -m pytest shell/test notary_v2/tests -q -p no:cacheprovider -rA --basetemp "$RUNNER_TEMP/pytest" | tee pytest-win.txt
+        run: |
+          set +e
+          python -m pytest shell/test notary_v2/tests -q -p no:cacheprovider -rA --basetemp "$RUNNER_TEMP/pytest" > pytest-win.txt 2>&1
+          echo "pytest exit=$?"; tail -3 pytest-win.txt
+          exit 0
+      - name: So với known-failures
+        shell: bash
+        run: python tools/ci/known_failures.py pytest pytest-win.txt tools/ci/known-failures-py-windows.txt
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -110,7 +120,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: shell/package-lock.json
       - uses: actions/setup-python@v5
@@ -120,4 +130,7 @@ jobs:
       - run: pip install -r shell/sidecar/requirements.txt -r notary_v2/requirements.txt
       - working-directory: shell
         run: npm ci --no-audit --no-fund
+      # Electron >= 40 bỏ postinstall: binary tải qua bin `install-electron`.
+      - working-directory: shell
+        run: npx --no-install install-electron
       - run: G1_PYTHON="$(command -v python)" tools/ci/e2e-smoke.sh

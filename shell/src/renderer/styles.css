@@ -474,6 +474,12 @@ table.tbl td[onclick], table.tbl td.clk { color: var(--text-link); cursor: point
 /* tên cũ — renderer đã chuyển sang .toast; giữ alias nếu markup cũ sót */
 .toast-item { border-left: 3px solid var(--accent); }
 .toast-item.toast-error, .toast.toast-error { border-left-color: var(--err-text); }
+.toast-action {
+  background: none; border: none; padding: 0;
+  color: var(--accent); font-weight: 600; cursor: pointer;
+  text-decoration: underline; font-size: inherit; font-family: inherit;
+}
+.toast-action:hover { opacity: 0.85; }
 
 /* -------------------------- DRAG / SPLITTER ---------------------------- */
 .drag-handle {

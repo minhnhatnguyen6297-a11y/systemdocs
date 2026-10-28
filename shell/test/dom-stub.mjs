@@ -42,7 +42,9 @@ function matches(el, selector) {
 }
 
 export function collect(root, pred, out = []) {
-  if (!root || !root.children) return out;
+  if (!root) return out;
+  if (root.body && !root.children) return collect(root.body, pred, out);
+  if (!root.children) return out;
   for (const c of root.children) {
     if (pred(c)) out.push(c);
     collect(c, pred, out);
@@ -64,6 +66,9 @@ export function makeDom() {
     dispatch(t, ev) {
       for (const f of this._ev[t] || []) f(ev);
     },
+    getElementById(id) {
+      return collect(this.body || this, (e) => e.id === id)[0] || null;
+    },
   };
 
   class El {
@@ -82,6 +87,14 @@ export function makeDom() {
       this.hidden = false;
       this.checked = false;
       this.selected = false;
+      // <select> — options read-only array; selectedOptions = option
+      // selected thật (screen reader đọc giá trị từ đây).
+      Object.defineProperty(this, 'options', {
+        get() { return this.children.filter((c) => c.tagName === 'OPTION'); },
+      });
+      Object.defineProperty(this, 'selectedOptions', {
+        get() { return this.options.filter((o) => o.selected); },
+      });
       this.draggable = false;
       this.onclick = null;
       this.oninput = null;

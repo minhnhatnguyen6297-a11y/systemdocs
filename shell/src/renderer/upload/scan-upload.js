@@ -179,20 +179,6 @@
     qCard.append(qHead);
     const qBody = h.el('div', 'card-body ul-queue-body');
 
-    // Canh bao can doi chieu + nut hanh dong (upload.reconcile — contract
-    // §6.15). Banner luon dem so ho so chua ro da Luu; hanh dong doi chieu
-    // nam ngay day, KHONG huong dan di qua trang log da bo.
-    const reconBanner = h.el('div', 'ul-reconcile');
-    reconBanner.hidden = true;
-    const reconText = h.el('span', 'ul-reconcile-text');
-    const reconBtn = h.el('button', 'ul-reconcile-btn secondary sm',
-      'Đối chiếu với sổ mới');
-    reconBtn.type = 'button';
-    reconBtn.addEventListener('click', () => actions.reconcile());
-    const reconHint = h.el('span', 'ul-reconcile-hint');
-    reconBanner.append(reconText, reconBtn, reconHint);
-    qBody.append(reconBanner);
-
     // Loi/partial cua dot prepare — hien ngay tren bang, khong nuot vao
     // the Job (spec §4).
     const prepErr = h.el('div', 'ul-error ul-prepare-error');
@@ -267,9 +253,7 @@
       c.so.textContent =
         row.contract_no || row.normalized_contract_no || '';
       let note = row.ghi_chu || '';
-      if (state.needsReconcileIds.has(id)) {
-        note = note ? `${note} — cần đối chiếu` : 'cần đối chiếu';
-      } else if (state.openTabIds.has(id)) {
+      if (state.openTabIds.has(id)) {
         note = note ? `${note} — đang mở trên web` : 'đang mở trên web';
       }
       c.chu.textContent = note;
@@ -277,8 +261,6 @@
       c.pathTxt.textContent = row.file_path || '';
       c.pathTxt.title = row.file_path || '';
       tr.classList.toggle('ul-row-selected', c.cb.checked);
-      tr.classList.toggle('ul-row-reconcile',
-        state.needsReconcileIds.has(id));
       tr.classList.toggle('ul-row-open', state.openTabIds.has(id));
       tr.classList.toggle('ul-row-issue', !!row.has_issue);
       return tr;
@@ -353,11 +335,6 @@
       chunkIn.disabled = prepRunning;
       browseBtn.disabled = scanLive;
       scanBtn.disabled = !state.websiteId || !capOf('scan') || scanLive;
-      // Doi chieu can audit MOI tu file hien tai (§6.15) — khoa khi chua
-      // nap so, dang audit/reconcile, hoac dang cho review.
-      reconBtn.disabled = !capOf('reconcile') || !state.runId ||
-        !state.excelFile || prepLive ||
-        jobActive(state.reconcileJobId) || jobActive(state.auditJobId);
     }
 
     let lastStaffKey = null;
@@ -410,17 +387,15 @@
           ? `Còn ${state.remaining} hồ sơ đợt sau.`
           : 'Chưa chuẩn bị.';
       }
-      // Dong tab portal theo snapshot phien (open/saved/closed/unknown) —
-      // hien ngay trong luc cho review de nguoi dung thay so da Lưu.
+      // Tab portal chi la tai nguyen: dang mo / da dong / khong xac dinh.
       const tb = state.sessionTabs;
       if (state.uploadSessionActive || tb) {
         const n = (k) => (tb && Array.isArray(tb[k]) ? tb[k].length : 0);
         sessLine.hidden = false;
         sessLine.textContent =
           `Tab portal: ${n('open_record_ids')} đang mở · ` +
-          `${n('saved_record_ids')} đã Lưu · ` +
           `${n('closed_record_ids')} đã đóng · ` +
-          `${state.needsReconcileIds.size} chưa rõ`;
+          `${n('unknown_record_ids')} không xác định`;
       } else {
         sessLine.hidden = true;
         sessLine.textContent = '';
@@ -484,28 +459,13 @@
       scanSummary.textContent = state.runId || state.rowIds.size
         ? parts.join(' | ') : 'Chưa quét thư mục.';
 
-      // Can doi chieu — dem so ho so chua ro da Lưu ngay tren bang, kem
-      // hanh dong upload.reconcile (audit moi → doi chieu → khong gui lai).
-      const rec = state.needsReconcileIds.size;
-      reconBanner.hidden = !rec;
-      if (rec) {
-        reconText.textContent =
-          `${rec} hồ sơ có thể đã Lưu nhưng chưa xác minh — ` +
-          'cần đối chiếu với sổ mới trước khi gửi lại.';
-        reconHint.textContent = !state.excelFile
-          ? ' Nạp sổ Excel mới ở tab Audit trước.' : '';
-      }
       // Loi/partial cua dot prepare ngay tren bang (khong chi o the Job).
       const pe = state.prepareError;
       prepErr.hidden = !pe;
       if (pe) {
         const parts = [pe.message || 'Chuẩn bị hồ sơ không hoàn tất.'];
         if (pe.code) parts.push(`[${pe.code}]`);
-        if (pe.retryable && !state.needsReconcileIds.size) {
-          parts.push('— có thể thử lại.');
-        } else if (state.needsReconcileIds.size) {
-          parts.push('— đối chiếu trước khi gửi lại.');
-        }
+        if (pe.retryable) parts.push('— có thể thử lại.');
         prepErr.textContent = parts.join(' ');
       }
 

@@ -554,9 +554,9 @@ def connect_page(pw, port: int):
         if page is None:
             time.sleep(0.5)
     require(page is not None, "khong tim thay cua so index.html qua CDP")
-    page.wait_for_selector('#module-list li[data-id="upload"]',
+    page.wait_for_selector('#module-list button[data-id="upload"]',
                            timeout=60000)
-    page.click('#module-list li[data-id="upload"]')
+    page.click('#module-list button[data-id="upload"]')
     page.wait_for_selector(".upload-lab", timeout=30000)
     return browser, page
 
@@ -628,19 +628,44 @@ def submit_and_wait(page, command, payload, timeout_s=40):
          "timeout": timeout_s})
 
 
+def dom_click(page, selector):
+    """Bam bang DOM: notice/banner duoc re-render moi nhip refresh nen click
+    theo locator de bi detach giua chung (Playwright retry vo han)."""
+    page.wait_for_selector(selector, timeout=30000)
+    page.evaluate(
+        "(sel) => { const el = document.querySelector(sel);"
+        " if (el) el.click(); }", selector)
+
+
+def dom_click_text(page, container_selector, text):
+    """Bam button theo text trong container bang DOM (khong :has-text)."""
+    page.evaluate(
+        "([sel, text]) => { const el = [...document.querySelectorAll("
+        "sel + ' button')].find(b => !b.disabled && "
+        "b.textContent.includes(text)); if (el) el.click(); }",
+        [container_selector, text])
+
+
 def ul_login(page, base):
     """Mo dang nhap → user login tren portal gia → xac nhan."""
     page.click("#ul-panel-audit button:has-text('Mở đăng nhập')")
     page.wait_for_selector(
         ".ul-notice .ul-login-confirm:not([disabled])", timeout=30000)
     http_json(f"{base}/api/login", method="POST", body={})
-    page.click(".ul-notice .ul-login-confirm")
-    page.wait_for_function(
-        """() => {
-          const b = document.querySelector(
-            '#ul-panel-audit .ul-badge-slot .ul-badge');
-          return b && b.textContent.includes('Đã đăng nhập');
-        }""", timeout=30000)
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        dom_click(page, ".ul-notice .ul-login-confirm")
+        try:
+            page.wait_for_function(
+                """() => {
+                  const b = document.querySelector(
+                    '#ul-panel-audit .ul-badge-slot .ul-badge');
+                  return b && b.textContent.includes('Đã đăng nhập');
+                }""", timeout=4000)
+            return
+        except Exception:
+            continue
+    raise E2EFail("xac nhan dang nhap khong doi duoc trang thai")
 
 
 def ul_wait_review_banner(page, timeout=60000):
@@ -692,6 +717,11 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         page.wait_for_selector(
             "#ul-panel-audit .ul-env :text('đạt')", timeout=30000)
         ul_login(page, base)
+        # 'Tai Excel tu Web' → audit. LUU Y (khong phai loi #28): trong khi
+        # MIN-112 chua migrate xong FileRef cua module Upload, MOI lenh mang
+        # file_ref deu bi main tu choi (file_token bat buoc) — ca duong tai
+        # Excel lan duong chon tep thu cong deu dung o buoc nay. Giu nguyen
+        # buoc goc lam bang chung, khong thay bang duong khac.
         page.click("#ul-panel-audit button:has-text('Tải Excel từ Web')")
         page.wait_for_selector("#ul-panel-audit .ul-audit-head",
                                timeout=60000)
@@ -815,18 +845,16 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         require(row_checked(page, 5) is False,
                 "bo chon thu cong bi mat sau khi doi tab")
 
-        # -- Save 2 tren portal → hang roi bang ngay (Save-awareness) -----
+        # -- Bam Luu 2 ho so tren portal → bang KHONG doi (khong suy Luu) --
         fuser(base, "save", 2)
         fuser(base, "save", 4)
-        page.wait_for_function(
-            """() => !document.querySelector(
-                 '#ul-panel-scan-upload tbody tr[data-k="2"]')""",
-            timeout=30000)
-        require(row_checked(page, 4) is None,
-                "row 4 (da Lưu) van con trong bang")
+        page.wait_for_timeout(2000)
+        for k in (2, 4):
+            require(row_checked(page, k) is not None,
+                    f"row {k} roi khoi bang sau khi Luu tren portal")
 
         # -- Finish review → terminal partial + con lai -------------------
-        page.click(".ul-notice button:has-text('Xong kiểm tra')")
+        dom_click_text(page, ".ul-notice", 'Xong kiểm tra')
         page.wait_for_function(
             """() => {
               const l = [...document.querySelectorAll(
@@ -838,16 +866,20 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         page.wait_for_selector(
             "#ul-panel-scan-upload .ul-prepare-error:not([hidden])",
             timeout=15000)
+        # Khong ghi ket qua Luu nao: 2/4 van la da chuan bi trong luot.
         reg = sql_rows(regdb,
                        "SELECT status FROM file_registry WHERE id IN (2,4)")
-        require(all(r["status"] == "uploaded_success" for r in reg)
+        require(all(r["status"] == "prepared_dry_run" for r in reg)
                 and len(reg) == 2,
-                f"saved records chua uploaded_success: {reg}")
+                f"2/4 phai giu prepared_dry_run: {reg}")
 
         # -- Tiep tuc co delay → Dung giua chung → KHONG tu chay dot moi --
         fctl(base, fail_record_ids=[], record_delay_s=1.0)
+        # Tab dot 1 VAN con mo (dung thiet ke): moc so sanh la tap tab MOI
+        # mo o bien lo, khong phai toan bo tab dang mo.
+        open_before = set(fstate(base)["session"]["open_record_ids"])
         page.click("#ul-panel-scan-upload button:has-text('Tiếp tục')")
-        wait_open_ids_gt(base, 7, timeout=30000)
+        wait_open_ids_gt(base, len(open_before), timeout=30000)
         page.click("#ul-panel-scan-upload button:has-text('Dừng')")
         page.wait_for_function(
             """() => {
@@ -862,8 +894,8 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         require(st2["prepare_calls"] == calls,
                 "tu chay them dot sau khi Dung (prepare_calls tang)")
         # Tiep tuc phai gui lai DUNG tap goc cua dot (activeUploadIds —
-        # gom ca 2/4 da Luu, engine tu loai), KHONG doc lai checkbox hien
-        # tai sau Save-awareness (26) — nhan nham se bo sot ho so dot.
+        # gom ca 2/4 da Luu, engine tu loai theo tien do prepared),
+        # KHONG doc lai checkbox hien tai.
         require(
             sorted(st2["last_prepare_kwargs"]["selected_record_ids"])
             == sent,
@@ -871,54 +903,63 @@ def case_upload(app: AppInstance, pw, tmp: Path):
             f"nhan {st2['last_prepare_kwargs']['selected_record_ids']}")
         require(sorted(st2["open_record_ids"]) == sorted(open_after),
                 "tab mo thay doi sau khi Dung — co dot chay ngam")
+        # Lo sau chi mo ho so CHUA chuan bi: so sanh tap tab MOI mo o bien
+        # lo (khong dung tap tab dang mo, vi tab dot 1 van mo dung thiet ke).
+        prepared_first = set(
+            r["id"] for r in sql_rows(
+                regdb, "SELECT id FROM file_registry WHERE run_id = ? "
+                       "AND status = 'prepared_dry_run'", (run_a,)))
+        newly_opened = set(open_after) - open_before
+        require(newly_opened, "dot Tiep tuc khong mo tab moi nao")
+        require(not (newly_opened & prepared_first),
+                f"lo sau mo lai ho so da chuan bi: "
+                f"{sorted(newly_opened & prepared_first)}")
+        require(newly_opened <= set(sent),
+                f"tab moi khong thuoc tap goc: "
+                f"{sorted(newly_opened - set(sent))}")
 
-        # -- Dong browser → tab con mo → needs_reconcile ------------------
-        # needs_reconcile = cac tab dot 1 da giao cho user kiem tra va
-        # store con track: {6..12} tru 2/4 da Luu. Tab mo trong dot 2 bi
-        # Dung chua kip dang ky open_tabs (add_open_tabs dat SAU cho
-        # review) → registry giu prepared_dry_run, khong phai "unknown".
-        want_needs = [6, 7, 8, 9, 10, 11, 12]
+        # -- Dong browser → tra tai nguyen; KHONG doi chieu, KHONG mat dong --
         page.click(
             "#ul-panel-scan-upload button:has-text('Đóng browser upload')")
-        page.wait_for_selector(
-            "#ul-panel-scan-upload .ul-reconcile:not([hidden])",
-            timeout=60000)
-        banner = page.eval_on_selector(
-            "#ul-panel-scan-upload .ul-reconcile", "e => e.textContent")
-        require(str(len(want_needs)) in banner,
-                f"banner doi chieu khong dem {len(want_needs)}: {banner}")
-        needs = sql_rows(wsdb,
-                         "SELECT record_id FROM needs_reconcile "
-                         "WHERE website_id='fake_portal_c'")
-        require(sorted(r["record_id"] for r in needs) == want_needs,
-                f"needs_reconcile DB sai: {needs} vs {want_needs}")
+        page.wait_for_function(
+            """() => {
+              const b = document.querySelector(
+                '#ul-panel-scan-upload .ul-badge');
+              return b && b.textContent.includes('Phiên đã đóng');
+            }""", timeout=60000)
+        require(fstate(base)["session"]["closed"], "session fixture chua dong")
         require(not sql_rows(wsdb, "SELECT record_id FROM open_tabs "
                              "WHERE website_id='fake_portal_c'"),
                 "open_tabs con sot sau session_close")
-        st = fstate(base)["session"]
-        require(st["closed"], "session fixture chua dong")
-        # Hang chua xac dinh KHONG bien mat khoi bang va duoc danh dau.
-        wait_rows(page, 29, timeout=60000)
-        marked = page.eval_on_selector_all(
+        tables = {r["name"] for r in sql_rows(
+            wsdb, "SELECT name FROM sqlite_master WHERE type='table'")}
+        require("needs_reconcile" not in tables,
+                "bang needs_reconcile van duoc tao moi")
+        # Khong con banner/dong danh dau doi chieu nao trong UI.
+        require(0 == page.eval_on_selector_all(
+            "#ul-panel-scan-upload .ul-reconcile", "els => els.length"),
+            "banner doi chieu van con trong DOM")
+        require(0 == page.eval_on_selector_all(
             "#ul-panel-scan-upload tbody tr.ul-row-reconcile",
-            "els => els.length")
-        require(marked == len(want_needs),
-                f"bang khong danh dau {len(want_needs)} dong doi chieu: "
-                f"{marked}")
-        # Trong luc can doi chieu, nut upload khong duoc mo retry mu:
-        # prepare moi phai bi chan (guard o UI + backend).
+            "els => els.length"),
+            "bang con danh dau dong can doi chieu")
+        # Bang giu nguyen so dong (ho so da chuan bi khong bi an di).
+        wait_rows(page, 31, timeout=60000)
+        reg = sql_rows(regdb,
+                       "SELECT status FROM file_registry WHERE id IN (2,4)")
+        require(all(r["status"] == "prepared_dry_run" for r in reg),
+                f"ket qua Luu bi ghi vao registry: {reg}")
     except BaseException:
         dump_debug(page)
         raise
     finally:
         browser.close()
 
-    # ---------- restart: recovery phai song qua app restart ------------
+    # ---------- restart: tien do prepared phai song qua app restart -----
     app.restart()
     base = app.portals["fake_portal_c"]
     browser, page = connect_page(pw, app.port)
     try:
-        # Website + run khoi phuc; banner doi chieu hien lai (§6.15/§8).
         page.wait_for_function(
             """() => {
               const s = document.querySelector(
@@ -926,28 +967,24 @@ def case_upload(app: AppInstance, pw, tmp: Path):
               return s && s.value === 'fake_portal_c';
             }""", timeout=60000)
         page.click("#ul-tab-scan-upload")
-        page.wait_for_selector(
-            "#ul-panel-scan-upload .ul-reconcile:not([hidden])",
-            timeout=90000)
-        wait_rows(page, 29, timeout=60000)  # 31 - 2 da Lưu
-        need_ids = [r["record_id"] for r in sql_rows(
-            wsdb, "SELECT record_id, run_id FROM needs_reconcile "
-                  "WHERE website_id='fake_portal_c'")]
-        require(sorted(need_ids) == want_needs,
-                f"needs_reconcile khong song qua restart: {need_ids}")
-        marked = page.eval_on_selector_all(
-            "#ul-panel-scan-upload tbody tr.ul-row-reconcile",
-            "els => els.length")
-        require(marked == len(want_needs),
-                f"bang khong danh dau {len(want_needs)} dong can doi "
-                f"chieu: {marked}")
+        wait_rows(page, 31, timeout=90000)
+        require(0 == page.eval_on_selector_all(
+            "#ul-panel-scan-upload .ul-reconcile", "els => els.length"),
+            "banner doi chieu xuat hien sau restart")
+        reg = sql_rows(regdb,
+                       "SELECT id, status FROM file_registry WHERE id "
+                       "BETWEEN 2 AND 12 ORDER BY id")
+        require(all(r["status"] == "prepared_dry_run" for r in reg),
+                f"tien do prepared khong song qua restart: {reg}")
 
-        # -- Reconcile: audit MOI chua so do → verified → mo khoa ---------
+        # -- So chinh thuc moi: cac so da chuan bi gio hien 'da co trong --
+        # Excel' va khong con duoc chon mac dinh -------------------------
+        prepared_ids = [6, 7, 8, 9, 10, 11, 12]
         contracts = sql_rows(
             regdb,
             "SELECT contract_no FROM file_registry WHERE id IN (%s)"
-            % ",".join("?" * len(need_ids)),
-            tuple(need_ids))
+            % ",".join("?" * len(prepared_ids)),
+            tuple(prepared_ids))
         fresh = tmp / "so_doi_chieu.xlsx"
         write_xlsx(fresh, [("Số công chứng", "Ngày công chứng")] + [
             (r["contract_no"].replace("/CCGD", ""), "12/05/2026")
@@ -958,22 +995,20 @@ def case_upload(app: AppInstance, pw, tmp: Path):
         page.wait_for_selector("#ul-panel-audit .ul-audit-head",
                                timeout=60000)
         page.click("#ul-tab-scan-upload")
-        page.click("#ul-panel-scan-upload .ul-reconcile-btn")
         page.wait_for_function(
             """() => {
-              const b = document.querySelector(
-                '#ul-panel-scan-upload .ul-reconcile');
-              return !b || b.hidden;
+              const tr = document.querySelector(
+                '#ul-panel-scan-upload tbody tr[data-k="6"]');
+              return tr && /da co trong Excel/.test(tr.textContent);
             }""", timeout=60000)
-        require(not sql_rows(wsdb,
-                             "SELECT record_id FROM needs_reconcile "
-                             "WHERE website_id='fake_portal_c'"),
-                "needs_reconcile con sot sau reconcile thanh cong")
-        ok = sql_rows(regdb,
-                      "SELECT status FROM file_registry WHERE id IN (%s)"
-                      % ",".join("?" * len(need_ids)), tuple(need_ids))
-        require(all(r["status"] == "uploaded_success" for r in ok),
-                f"reconcile khong ghi uploaded_success: {ok}")
+        require(row_checked(page, 6) is False,
+                "ho so da co trong so chinh thuc van duoc chon mac dinh")
+        reg = sql_rows(regdb,
+                       "SELECT status FROM file_registry WHERE id IN (%s)"
+                       % ",".join("?" * len(prepared_ids)),
+                       tuple(prepared_ids))
+        require(all(r["status"] == "prepared_dry_run" for r in reg),
+                f"app tu danh dau da Luu sau khi nap so: {reg}")
 
         # -- Mo lai phien + quet run B → scope_violation ------------------
         page.click("#ul-tab-audit")

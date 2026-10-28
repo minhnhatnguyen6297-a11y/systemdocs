@@ -10,7 +10,8 @@ from pathlib import Path
 from docx import Document
 
 from batch_scan import connect_registry, parse_modified_since, run_batch_scan, upsert_registry_record
-from extract_contract import extract, find_tai_san, scan_docx_for_contract_no
+from extraction_adapter import extract, scan_docx_for_contract_no
+from regex_workbench.engine.contract_extract import find_tai_san
 
 
 def make_docx(path: Path, *paragraphs: str) -> Path:
@@ -202,7 +203,7 @@ class UploadBatchScanTests(unittest.TestCase):
         self.assertEqual(len(output_files), 1)
         self.assertIn("428_2026_CCGD", output_files[0].name)
 
-    def test_batch_scan_skips_when_contract_already_uploaded_success(self):
+    def test_batch_scan_rescans_contract_with_legacy_success_status(self):
         batch_root = self.root / "hoso"
         docx_path = make_docx(
             batch_root / "KhachA" / "hop_dong.docx",
@@ -212,24 +213,27 @@ class UploadBatchScanTests(unittest.TestCase):
         conn = connect_registry(workdir / "registry.sqlite3")
         self.addCleanup(conn.close)
         stat_result = docx_path.stat()
+        # Trang thai cu truoc cutover: du lieu lich su, khong con la ly do
+        # de bo qua file khi quet lai (khong suy ket qua Luu tu registry).
         upsert_registry_record(
             conn,
-            file_key="seed-uploaded-success",
+            file_key="seed-legacy-status",
             file_path=docx_path,
             stat_result=stat_result,
             customer_folder="KhachA",
             contract_no="428/2026/CCGD",
             status="uploaded_success",
             run_id="seedrun",
-            uploaded_success_at="2026-04-06T10:00:00",
-            reason="Seed uploaded success",
+            reason="Seed lich su",
         )
         conn.close()
 
         manifest = run_batch_scan(batch_root, working_dir=workdir)
 
-        self.assertEqual(manifest["stats"]["skipped_duplicate"], 1)
-        self.assertFalse((workdir / "output").exists())
+        self.assertEqual(manifest["stats"]["candidates_found"], 1)
+        output_files = sorted((workdir / "output").glob("*.json"))
+        self.assertEqual(len(output_files), 1)
+        self.assertNotIn("skipped_duplicate", manifest["stats"])
 
     def test_batch_scan_retries_failed_file_even_if_older_than_modified_since(self):
         batch_root = self.root / "hoso"

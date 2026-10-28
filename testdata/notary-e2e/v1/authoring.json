@@ -1,0 +1,4915 @@
+{
+  "format_version": 1,
+  "corpus_version": "v1",
+  "authored_on": "2026-10-19",
+  "provenance": {
+    "kind": "independently_authored_synthetic",
+    "parser_observed_before_authoring": false,
+    "legal_status": "TEST only; not legal advice, official records or certified legal forms",
+    "identity_policy": "All names, numbers, addresses, facts and transactions invented for this suite; no copied office/private corpus."
+  },
+  "document_layout": {
+    "paper": "A4",
+    "margins_cm": {
+      "top": 2.0,
+      "bottom": 2.0,
+      "left": 3.0,
+      "right": 2.0
+    },
+    "font": "Times New Roman",
+    "font_size_pt": 13,
+    "line_spacing": 1.15,
+    "paragraph_after_pt": 6,
+    "header": "TEST — DỮ LIỆU TỔNG HỢP GIẢ ĐỊNH — KHÔNG DÙNG GIAO DỊCH",
+    "footer": "CORPUS NOTARY E2E v1 — Không phải giấy tờ thật hoặc tư vấn pháp lý",
+    "styles": {
+      "body": {
+        "alignment": "justify"
+      },
+      "center": {
+        "alignment": "center"
+      },
+      "center_bold": {
+        "alignment": "center",
+        "bold": true
+      },
+      "title": {
+        "alignment": "center",
+        "bold": true,
+        "size_pt": 15
+      },
+      "heading": {
+        "bold": true,
+        "keep_with_next": true
+      }
+    },
+    "tables": {
+      "header_bold": true,
+      "borders": true,
+      "font_size_pt": 12
+    }
+  },
+  "authoring_rules": [
+    "Render blocks in exact order. Preserve Vietnamese characters, punctuation and numeric/date spellings.",
+    "Paragraph text is literal content; table rows are real DOCX table rows/cells, never flattened text or image.",
+    "Every source is fully filled. Do not insert placeholders, field codes, content controls or invented missing values.",
+    "Use normal transitional DOCX namespace. Do not use Word Strict.",
+    "No network, OCR, extraction engine or golden-refresh operation. Do not change expected.json.",
+    "All person/asset values in source are authored below, not supplied by runtime extraction.",
+    "Support documents are context_only and not default multi-source ingestion. No automatic deduplication claim.",
+    "No native Word page/pixel claim; DOCX authoring is not E2E verification."
+  ],
+  "cases": [
+    {
+      "id": "01-chuyen-nhuong",
+      "title": "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+      "classification": "full_runtime",
+      "case_type": "two_party",
+      "document_type": "chuyen_nhuong",
+      "regex_kind": "transfer_contract",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "cn_a",
+          "ho_ten": "Nguyễn Minh An",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1975-05-10",
+          "ngay_chet": null,
+          "so_giay_to": "999075000101",
+          "ngay_cap": "2025-03-15",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 12 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "cn_b",
+          "ho_ten": "Trần Ngọc Bình",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1982-09-22",
+          "ngay_chet": null,
+          "so_giay_to": "999182000102",
+          "ngay_cap": "2025-04-20",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 25 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_01",
+          "so_serial": "TEST-GCN-2026-01",
+          "so_vao_so": "CS 26001",
+          "so_thua_dat": "101",
+          "so_to_ban_do": "11",
+          "dia_chi": "Thửa 101, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 120.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi gồm có:"
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN CHUYỂN NHƯỢNG (Bên A):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Nguyễn Minh An; Sinh ngày: 10/05/1975."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999075000101 do Bộ Công an cấp ngày 15/03/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 12 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN NHẬN CHUYỂN NHƯỢNG (Bên B):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Trần Ngọc Bình; Sinh ngày: 22/09/1982."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999182000102 do Bộ Công an cấp ngày 20/04/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 25 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 1. ĐỐI TƯỢNG CỦA HỢP ĐỒNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Đối tượng của Hợp đồng này là toàn bộ quyền sử dụng đất có thông tin sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 101, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 101; Tờ bản đồ số: 11."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 120 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-01 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26001."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 120 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 2. GIÁ VÀ THANH TOÁN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giá chuyển nhượng là 1.200.000.000 đồng (một tỷ hai trăm triệu đồng). Bên B chuyển khoản đủ cho Bên A trong ngày 19/10/2026; hai bên lập giấy xác nhận khi đã nhận tiền."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 3. BÀN GIAO VÀ ĐĂNG KÝ"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên A bàn giao đất và hồ sơ giấy chứng nhận ngày 20/10/2026. Bên B thực hiện thủ tục đăng ký theo quy định; hai bên phối hợp cung cấp giấy tờ cần thiết. Thuế do Bên A chịu, lệ phí đăng ký do Bên B chịu."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 4. CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên A xác nhận tài sản không tranh chấp, không bị kê biên và chưa dùng bảo đảm nghĩa vụ khác. Bên B đã xem hiện trạng, thông tin và giấy tờ tài sản. Các bên tự nguyện ký, không bị lừa dối hoặc ép buộc."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 2,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Nguyễn Minh An",
+              "NGƯỜI KÝ: Trần Ngọc Bình"
+            ],
+            [
+              "Đã ký TEST — Nguyễn Minh An",
+              "Đã ký TEST — Trần Ngọc Bình"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1101/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/cn_a.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-01-CN_A. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Nguyễn Minh An; Sinh ngày: 10/05/1975."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999075000101 do Bộ Công an cấp ngày 15/03/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 12 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/cn_b.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-01-CN_B. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Trần Ngọc Bình; Sinh ngày: 22/09/1982."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999182000102 do Bộ Công an cấp ngày 20/04/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 25 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-01; chủ sử dụng theo tình huống: Nguyễn Minh An. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 101, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 101; Tờ bản đồ số: 11."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 120 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-01 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26001."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 120 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/tinh-trang-hon-nhan.docx",
+          "title": "BẢN GHI TÌNH TRẠNG HÔN NHÂN VÀ NGUỒN GỐC TÀI SẢN — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN GHI TÌNH TRẠNG HÔN NHÂN VÀ NGUỒN GỐC TÀI SẢN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người có thông tin được đối chiếu: ông Nguyễn Minh An, sinh ngày 10/05/1975, Căn cước giả định số 999075000101."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tình huống: ông An chưa đăng ký kết hôn tại thời điểm được công nhận quyền sử dụng thửa 101, tờ 11 ngày 15/06/2020 và tại thời điểm ký hợp đồng TEST ngày 19/10/2026. Quyền sử dụng đất được mô tả là tài sản riêng của ông An trong kịch bản."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bản ghi này không phải giấy xác nhận tình trạng hôn nhân. Chỉ dùng để giải thích vì sao bộ dữ liệu không có người vợ/chồng cùng ký, không tự điền quan hệ trên Diagram."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02-tang-cho",
+      "title": "HỢP ĐỒNG TẶNG CHO QUYỀN SỬ DỤNG ĐẤT",
+      "classification": "full_runtime",
+      "case_type": "two_party",
+      "document_type": "tang_cho",
+      "regex_kind": "gift_contract",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "tc_a",
+          "ho_ten": "Lê Quang Cường",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1965-06-12",
+          "ngay_chet": null,
+          "so_giay_to": "999065000201",
+          "ngay_cap": "2025-02-12",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 31 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "tc_b",
+          "ho_ten": "Lê Ngọc Dung",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1994-08-23",
+          "ngay_chet": null,
+          "so_giay_to": "999194000202",
+          "ngay_cap": "2025-05-18",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 42 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_02",
+          "so_serial": "TEST-GCN-2026-02",
+          "so_vao_so": "CS 26002",
+          "so_thua_dat": "202",
+          "so_to_ban_do": "12",
+          "dia_chi": "Thửa 202, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 150.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "HỢP ĐỒNG TẶNG CHO QUYỀN SỬ DỤNG ĐẤT"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi gồm có:"
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN TẶNG CHO (Bên A):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Lê Quang Cường; Sinh ngày: 12/06/1965."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999065000201 do Bộ Công an cấp ngày 12/02/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 31 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN NHẬN TẶNG CHO (Bên B):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Lê Ngọc Dung; Sinh ngày: 23/08/1994."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999194000202 do Bộ Công an cấp ngày 18/05/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 42 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 1. ĐỐI TƯỢNG CỦA HỢP ĐỒNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Đối tượng của Hợp đồng này là toàn bộ quyền sử dụng đất có thông tin sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 202, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 202; Tờ bản đồ số: 12."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 150 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-02 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26002."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 150 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 2. TẶNG CHO VÀ NHẬN TẶNG CHO"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên A tự nguyện tặng cho toàn bộ quyền sử dụng đất nêu tại Điều 1 cho Bên B, không yêu cầu đền bù. Bên B đồng ý nhận tặng cho và nhận hồ sơ tài sản."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 3. BÀN GIAO VÀ ĐĂNG KÝ"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên A giao đất và giấy tờ ngày 20/10/2026. Bên B thực hiện đăng ký biến động; hai bên cùng cung cấp hồ sơ. Chi phí thủ tục do Bên B thanh toán theo chứng từ."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 4. CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên xác nhận quan hệ cha và con theo bản ghi quan hệ kèm hồ sơ TEST, đồng thời xác nhận tự nguyện giao kết; tài sản không tranh chấp, không bị kê biên."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 2,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Lê Quang Cường",
+              "NGƯỜI KÝ: Lê Ngọc Dung"
+            ],
+            [
+              "Đã ký TEST — Lê Quang Cường",
+              "Đã ký TEST — Lê Ngọc Dung"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1102/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/tc_a.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-02-TC_A. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Lê Quang Cường; Sinh ngày: 12/06/1965."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999065000201 do Bộ Công an cấp ngày 12/02/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 31 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/tc_b.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-02-TC_B. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Lê Ngọc Dung; Sinh ngày: 23/08/1994."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999194000202 do Bộ Công an cấp ngày 18/05/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 42 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-02; chủ sử dụng theo tình huống: Lê Quang Cường. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 202, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 202; Tờ bản đồ số: 12."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 150 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-02 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26002."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 150 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/quan-he-cha-con.docx",
+          "title": "BẢN KÊ QUAN HỆ CHA CON — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN KÊ QUAN HỆ CHA CON — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông Lê Quang Cường, sinh ngày 12/06/1965, Căn cước giả định 999065000201, là cha của bà Lê Ngọc Dung, sinh ngày 23/08/1994, Căn cước giả định 999194000202 theo tình huống thử."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thông tin quan hệ được nhóm tạo dữ liệu ấn định độc lập; không phải suy luận từ họ tên, tuổi hoặc hợp đồng. Tài sản tặng cho là thửa 202, tờ 12, giấy chứng nhận TEST-GCN-2026-02."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Không có quan hệ vợ/chồng, phần sở hữu chung hoặc người đại diện nào khác trong kịch bản này. Hai bên A/B vẫn phải được gán tay vào ghế của ứng dụng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03-cho-thue",
+      "title": "HỢP ĐỒNG CHO THUÊ QUYỀN SỬ DỤNG ĐẤT",
+      "classification": "full_runtime",
+      "case_type": "two_party",
+      "document_type": "cho_thue",
+      "regex_kind": "generic",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "ct_a",
+          "ho_ten": "Phạm Minh Giang",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1978-11-03",
+          "ngay_chet": null,
+          "so_giay_to": "999078000301",
+          "ngay_cap": "2025-01-16",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 53 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "ct_b",
+          "ho_ten": "Hoàng Ngọc Hạnh",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1988-02-14",
+          "ngay_chet": null,
+          "so_giay_to": "999188000302",
+          "ngay_cap": "2025-06-22",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 64 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_03",
+          "so_serial": "TEST-GCN-2026-03",
+          "so_vao_so": "CS 26003",
+          "so_thua_dat": "303",
+          "so_to_ban_do": "13",
+          "dia_chi": "Thửa 303, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 200.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "HỢP ĐỒNG CHO THUÊ QUYỀN SỬ DỤNG ĐẤT"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi gồm có:"
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN CHO THUÊ (Bên A):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Phạm Minh Giang; Sinh ngày: 03/11/1978."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999078000301 do Bộ Công an cấp ngày 16/01/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 53 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN THUÊ (Bên B):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Hoàng Ngọc Hạnh; Sinh ngày: 14/02/1988."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999188000302 do Bộ Công an cấp ngày 22/06/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 64 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 1. ĐỐI TƯỢNG CỦA HỢP ĐỒNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Đối tượng của Hợp đồng này là toàn bộ quyền sử dụng đất có thông tin sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 303, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 303; Tờ bản đồ số: 13."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 200 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-03 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26003."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 200 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 2. THỜI HẠN, TIỀN THUÊ"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thời hạn thuê từ ngày 01/11/2026 đến hết ngày 31/10/2028. Tiền thuê là 5.000.000 đồng/tháng, trả trước ngày 05 hằng tháng bằng chuyển khoản. Đặt trước một tháng tiền thuê khi nhận bàn giao."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 3. SỬ DỤNG VÀ BÀN GIAO"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên B sử dụng đúng mục đích sử dụng đất, không tự ý xây dựng hoặc cho thuê lại. Bàn giao hiện trạng ngày 01/11/2026 theo biên bản kèm theo; hoàn trả đất và thanh toán các khoản phát sinh khi chấm dứt."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 4. QUYỀN VÀ NGHĨA VỤ"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên A bảo đảm quyền sử dụng ổn định trong thời gian thuê; Bên B bảo quản tài sản và thanh toán đúng hạn. Thay đổi hoặc chấm dứt trước hạn phải lập văn bản thống nhất, trừ trường hợp pháp luật quy định khác."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 2,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Phạm Minh Giang",
+              "NGƯỜI KÝ: Hoàng Ngọc Hạnh"
+            ],
+            [
+              "Đã ký TEST — Phạm Minh Giang",
+              "Đã ký TEST — Hoàng Ngọc Hạnh"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1103/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/ct_a.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-03-CT_A. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Phạm Minh Giang; Sinh ngày: 03/11/1978."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999078000301 do Bộ Công an cấp ngày 16/01/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 53 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/ct_b.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-03-CT_B. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Hoàng Ngọc Hạnh; Sinh ngày: 14/02/1988."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999188000302 do Bộ Công an cấp ngày 22/06/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 64 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-03; chủ sử dụng theo tình huống: Phạm Minh Giang. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 303, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 303; Tờ bản đồ số: 13."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 200 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-03 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26003."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 200 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/bien-ban-ban-giao.docx",
+          "title": "BIÊN BẢN BÀN GIAO ĐẤT CHO THUÊ — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BIÊN BẢN BÀN GIAO ĐẤT CHO THUÊ — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thời điểm mô phỏng bàn giao: 09 giờ ngày 01/11/2026. Bên giao: ông Phạm Minh Giang; bên nhận: bà Hoàng Ngọc Hạnh, theo hợp đồng thuê TEST lập ngày 19/10/2026."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản: thửa 303, tờ bản đồ 13, diện tích 200 m2 tại đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai; giấy chứng nhận TEST-GCN-2026-03."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hiện trạng giả định: mặt bằng trống, ranh giới được hai bên chỉ dẫn theo bản mô tả nội bộ; không bàn giao nhà, công trình hoặc trang thiết bị. Hồ sơ kèm bàn giao gồm một bản chép thông tin GCN và một bản hợp đồng thuê TEST."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hai bên xác nhận tình huống bàn giao không ghi nhận tranh chấp hoặc hư hỏng. Khi hoàn trả sẽ lập biên bản riêng; bản TEST này không chứng minh có việc bàn giao ngoài đời."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "04-dat-coc",
+      "title": "HỢP ĐỒNG ĐẶT CỌC CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+      "classification": "full_runtime",
+      "case_type": "two_party",
+      "document_type": "dat_coc",
+      "regex_kind": "generic",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "dc_a",
+          "ho_ten": "Võ Minh Khánh",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1980-12-06",
+          "ngay_chet": null,
+          "so_giay_to": "999080000401",
+          "ngay_cap": "2025-02-21",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 75 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "dc_b",
+          "ho_ten": "Đặng Ngọc Lan",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1990-03-27",
+          "ngay_chet": null,
+          "so_giay_to": "999190000402",
+          "ngay_cap": "2025-07-19",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 86 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_04",
+          "so_serial": "TEST-GCN-2026-04",
+          "so_vao_so": "CS 26004",
+          "so_thua_dat": "404",
+          "so_to_ban_do": "14",
+          "dia_chi": "Thửa 404, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 180.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "HỢP ĐỒNG ĐẶT CỌC CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi gồm có:"
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN NHẬN ĐẶT CỌC (Bên A):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Võ Minh Khánh; Sinh ngày: 06/12/1980."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999080000401 do Bộ Công an cấp ngày 21/02/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 75 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN ĐẶT CỌC (Bên B):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Đặng Ngọc Lan; Sinh ngày: 27/03/1990."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999190000402 do Bộ Công an cấp ngày 19/07/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 86 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 1. ĐỐI TƯỢNG CỦA HỢP ĐỒNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Đối tượng của Hợp đồng này là toàn bộ quyền sử dụng đất có thông tin sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 404, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 404; Tờ bản đồ số: 14."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 180 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-04 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26004."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 180 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 2. SỐ TIỀN VÀ MỤC ĐÍCH ĐẶT CỌC"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên B giao cho Bên A 100.000.000 đồng (một trăm triệu đồng) ngày 19/10/2026 để bảo đảm việc ký hợp đồng chuyển nhượng tài sản tại Điều 1. Giá chuyển nhượng dự kiến là 1.800.000.000 đồng; tiền cọc được trừ vào giá khi ký."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 3. THỜI HẠN VÀ NGHĨA VỤ"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên dự kiến ký hợp đồng chuyển nhượng chậm nhất ngày 19/11/2026. Bên A chuẩn bị giấy tờ quyền sử dụng đất; Bên B chuẩn bị khoản thanh toán còn lại và giấy tờ nhân thân."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 4. XỬ LÝ TIỀN CỌC"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nếu Bên B từ chối giao kết không có căn cứ đã thống nhất thì tiền cọc thuộc Bên A; nếu Bên A từ chối thì hoàn trả tiền cọc và trả thêm khoản bằng tiền cọc. Khi có trở ngại khách quan, hai bên lập thỏa thuận bằng văn bản, không tự khẳng định lỗi của bên còn lại."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 2,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Võ Minh Khánh",
+              "NGƯỜI KÝ: Đặng Ngọc Lan"
+            ],
+            [
+              "Đã ký TEST — Võ Minh Khánh",
+              "Đã ký TEST — Đặng Ngọc Lan"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1104/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/dc_a.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-04-DC_A. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Võ Minh Khánh; Sinh ngày: 06/12/1980."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999080000401 do Bộ Công an cấp ngày 21/02/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 75 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/dc_b.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-04-DC_B. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Đặng Ngọc Lan; Sinh ngày: 27/03/1990."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999190000402 do Bộ Công an cấp ngày 19/07/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 86 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-04; chủ sử dụng theo tình huống: Võ Minh Khánh. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 404, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 404; Tờ bản đồ số: 14."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 180 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-04 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26004."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 180 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/bien-nhan-tien-coc.docx",
+          "title": "BIÊN NHẬN TIỀN ĐẶT CỌC — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BIÊN NHẬN TIỀN ĐẶT CỌC — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày nhận tiền giả định: 19/10/2026. Người giao: bà Đặng Ngọc Lan, Căn cước 999190000402. Người nhận: ông Võ Minh Khánh, Căn cước 999080000401."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số tiền nhận: 100.000.000 đồng (một trăm triệu đồng), theo hợp đồng đặt cọc TEST liên quan thửa 404, tờ bản đồ 14, giấy chứng nhận TEST-GCN-2026-04."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Phương thức giả định: chuyển khoản; mã đối chiếu nội bộ TEST-CK-004, không phải số tài khoản ngân hàng hoặc giao dịch có thật. Khoản này sẽ được trừ vào giá chuyển nhượng nếu giao kết theo thỏa thuận."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người giao và người nhận xác nhận số liệu phục vụ đối chiếu, không suy ra đã có thanh toán thực tế từ file Word TEST này."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "05-khai-nhan",
+      "title": "VĂN BẢN KHAI NHẬN DI SẢN",
+      "classification": "full_runtime",
+      "case_type": "inheritance",
+      "document_type": "khai_nhan",
+      "regex_kind": "inheritance_declaration",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "kn_heir",
+          "ho_ten": "Đỗ Minh Nam",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1985-04-26",
+          "ngay_chet": null,
+          "so_giay_to": "999085000501",
+          "ngay_cap": "2025-03-11",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 97 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "kn_dead",
+          "ho_ten": "Đỗ Quang Phúc",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1950-07-08",
+          "ngay_chet": "2024-08-20",
+          "so_giay_to": "15/2024/TLKT",
+          "ngay_cap": "2024-08-21",
+          "noi_cap": "UBND xã Bình Minh",
+          "dia_chi": "Số 97 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Trích lục khai tử (Bản sao)",
+          "loai_dia_chi": "Nơi chết"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_05",
+          "so_serial": "TEST-GCN-2026-05",
+          "so_vao_so": "CS 26005",
+          "so_thua_dat": "505",
+          "so_to_ban_do": "15",
+          "dia_chi": "Thửa 505, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 160.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "VĂN BẢN KHAI NHẬN DI SẢN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi là những người được hưởng di sản thừa kế của người chết có tên sau đây:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Đỗ Minh Nam; Sinh ngày: 26/04/1985."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999085000501 do Bộ Công an cấp ngày 11/03/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 97 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Người để lại di sản:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Đỗ Quang Phúc; Sinh ngày: 08/07/1950."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chết ngày: 20/08/2024."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Trích lục khai tử (Bản sao) số: 15/2024/TLKT do UBND xã Bình Minh cấp ngày 21/08/2024."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nơi thường trú cuối cùng trước khi chết: Số 97 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Di sản:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Khi còn sống, người để lại di sản có quyền sử dụng đất sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 505, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 505; Tờ bản đồ số: 15."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 160 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-05 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26005."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 160 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "NỘI DUNG KHAI NHẬN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông Đỗ Minh Nam là con duy nhất của ông Đỗ Quang Phúc. Theo bản kê quan hệ giả định kèm hồ sơ TEST, vợ và cha mẹ của người chết đã mất trước thời điểm mở thừa kế, không còn người thừa kế cùng hàng khác và không có người hưởng thế vị. Không có di chúc trong tình huống thử này."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "KHAI NHẬN DI SẢN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông Đỗ Minh Nam tự nguyện khai nhận toàn bộ di sản nêu trên, chịu trách nhiệm về thông tin đã kê khai và thực hiện nghĩa vụ tài sản trong phạm vi di sản theo quy định. Bản thông báo niêm yết mẫu kèm theo chỉ là tài liệu TEST, không chứng minh một thủ tục thực tế đã hoàn thành."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Người khai nhận xác nhận đã đọc lại toàn văn, hiểu nội dung và ký tự nguyện. Không dùng văn bản thử này để đăng ký quyền hoặc giao dịch thực tế."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 1,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Đỗ Minh Nam"
+            ],
+            [
+              "Đã ký TEST — Đỗ Minh Nam"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1105/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/kn_heir.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-05-KN_HEIR. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Đỗ Minh Nam; Sinh ngày: 26/04/1985."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999085000501 do Bộ Công an cấp ngày 11/03/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 97 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/kn_dead.docx",
+          "title": "BẢN CHÉP THÔNG TIN TRÍCH LỤC KHAI TỬ — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN TRÍCH LỤC KHAI TỬ — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-05-KN_DEAD. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Đỗ Quang Phúc; Sinh ngày: 08/07/1950."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Chết ngày: 20/08/2024."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Trích lục khai tử (Bản sao) số: 15/2024/TLKT do UBND xã Bình Minh cấp ngày 21/08/2024."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nơi thường trú cuối cùng trước khi chết: Số 97 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-05; chủ sử dụng theo tình huống: Đỗ Quang Phúc. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 505, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 505; Tờ bản đồ số: 15."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 160 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-05 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26005."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 160 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/quan-he-gia-dinh.docx",
+          "title": "BẢN KÊ QUAN HỆ GIA ĐÌNH VÀ PHẠM VI TÌNH HUỐNG — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN KÊ QUAN HỆ GIA ĐÌNH VÀ PHẠM VI TÌNH HUỐNG — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông Đỗ Minh Nam là con duy nhất của ông Đỗ Quang Phúc. Vợ và cha mẹ của ông Phúc đã mất trước ngày 20/08/2024. Không có con khác, con nuôi hoặc người hưởng thế vị trong tình huống giả định."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người chết: Đỗ Quang Phúc, ngày chết 20/08/2024; số trích lục khai tử giả định 15/2024/TLKT."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản nêu trong main.docx được xác định là tài sản riêng của người chết chỉ trong kịch bản thử. Không có di chúc trong dữ liệu này. Việc kê quan hệ là dữ liệu tình huống do người dùng xác nhận tay; engine regex không tự thiết lập quan hệ, quyền sở hữu hoặc tư cách pháp lý."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài liệu không phải kết quả tra cứu hộ tịch hoặc xác minh người thừa kế. Không dùng để suy rằng một thủ tục thực tế đã được hoàn thành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-bao-niem-yet.docx",
+          "title": "THÔNG BÁO NIÊM YẾT VIỆC TIẾP NHẬN HỒ SƠ THỪA KẾ — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "THÔNG BÁO NIÊM YẾT VIỆC TIẾP NHẬN HỒ SƠ THỪA KẾ — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Văn phòng công chứng Mẫu Thử TEST thông báo tình huống tiếp nhận hồ sơ của người để lại di sản Đỗ Quang Phúc, chết ngày 20/08/2024; tài sản theo bản chép GCN kèm hồ sơ."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nơi niêm yết giả định: UBND xã Bình Minh, tỉnh Đồng Nai. Khoảng thời gian giả định phục vụ đọc mẫu: từ 01/10/2026 đến 16/10/2026. Đây không phải chứng cứ cơ quan đã niêm yết hoặc đã kết thúc thời hạn ngoài đời."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ý kiến liên quan nếu có trong tình huống thử được gửi về Chuyên viên Dữ Liệu Mẫu tại địa chỉ nội bộ TEST, không có số điện thoại hoặc thông tin liên hệ cá nhân. Không có ý kiến phản đối được đưa vào kịch bản này."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nơi niêm yết phải được nhập và lưu bằng thao tác người dùng nếu muốn dùng trên Word; không tự suy từ địa chỉ tài sản hoặc từ file hỗ trợ này."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "06-phan-chia",
+      "title": "VĂN BẢN THỎA THUẬN PHÂN CHIA DI SẢN",
+      "classification": "full_runtime",
+      "case_type": "inheritance",
+      "document_type": "thoa_thuan",
+      "regex_kind": "inheritance_partition",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "pc_spouse",
+          "ho_ten": "Bùi Ngọc Quỳnh",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1960-10-09",
+          "ngay_chet": null,
+          "so_giay_to": "999160000601",
+          "ngay_cap": "2025-04-14",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 108 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "pc_child1",
+          "ho_ten": "Mai Minh Sơn",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1984-05-17",
+          "ngay_chet": null,
+          "so_giay_to": "999084000602",
+          "ngay_cap": "2025-05-16",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 119 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "pc_child2",
+          "ho_ten": "Mai Ngọc Thu",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1987-09-28",
+          "ngay_chet": null,
+          "so_giay_to": "999187000603",
+          "ngay_cap": "2025-06-18",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 130 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "pc_dead",
+          "ho_ten": "Mai Quang Vinh",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1958-02-13",
+          "ngay_chet": "2024-11-10",
+          "so_giay_to": "26/2024/TLKT",
+          "ngay_cap": "2024-11-12",
+          "noi_cap": "UBND xã Bình Minh",
+          "dia_chi": "Số 108 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Trích lục khai tử (Bản sao)",
+          "loai_dia_chi": "Nơi chết"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_06",
+          "so_serial": "TEST-GCN-2026-06",
+          "so_vao_so": "CS 26006",
+          "so_thua_dat": "606",
+          "so_to_ban_do": "16",
+          "dia_chi": "Thửa 606, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 150.0,
+              "thoi_han": "Lâu dài"
+            },
+            {
+              "loai_dat": "Đất trồng cây lâu năm",
+              "dien_tich": 200.0,
+              "thoi_han": "31/12/2063"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "VĂN BẢN THỎA THUẬN PHÂN CHIA DI SẢN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi là những người được hưởng di sản thừa kế của người chết có tên sau đây:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Bùi Ngọc Quỳnh; Sinh ngày: 09/10/1960."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999160000601 do Bộ Công an cấp ngày 14/04/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 108 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Mai Minh Sơn; Sinh ngày: 17/05/1984."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999084000602 do Bộ Công an cấp ngày 16/05/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 119 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Mai Ngọc Thu; Sinh ngày: 28/09/1987."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999187000603 do Bộ Công an cấp ngày 18/06/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 130 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Người để lại di sản:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Mai Quang Vinh; Sinh ngày: 13/02/1958."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chết ngày: 10/11/2024."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Trích lục khai tử (Bản sao) số: 26/2024/TLKT do UBND xã Bình Minh cấp ngày 12/11/2024."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nơi thường trú cuối cùng trước khi chết: Số 108 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Di sản:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Khi còn sống, người để lại di sản có quyền sử dụng đất sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 606, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 606; Tờ bản đồ số: 16."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 350 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-06 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26006."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "table",
+          "columns": 5,
+          "rows": [
+            [
+              "Số thửa",
+              "Số tờ",
+              "Diện tích",
+              "Mục đích sử dụng",
+              "Thời hạn sử dụng"
+            ],
+            [
+              "606",
+              "16",
+              "150",
+              "Đất ở tại nông thôn",
+              "Lâu dài"
+            ],
+            [
+              "606",
+              "16",
+              "200",
+              "Đất trồng cây lâu năm",
+              "31/12/2063"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "QUAN HỆ VÀ PHẠM VI DI SẢN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông Mai Quang Vinh và bà Bùi Ngọc Quỳnh là vợ chồng, có hai người con là ông Mai Minh Sơn và bà Mai Ngọc Thu. Theo tình huống TEST, cha mẹ của ông Vinh đã mất trước ông Vinh, không còn người thừa kế cùng hàng khác, không có di chúc, không có người hưởng thế vị. Toàn bộ tài sản mô tả là tài sản riêng của ông Vinh, không có phần sở hữu riêng của người còn sống."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "THỎA THUẬN PHÂN CHIA"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà Bùi Ngọc Quỳnh, ông Mai Minh Sơn và bà Mai Ngọc Thu thống nhất cùng nhận di sản; mỗi người nhận một phần ba quyền sử dụng đất và có trách nhiệm cùng thực hiện nghĩa vụ tài sản trong phạm vi được nhận. Không ai trong hồ sơ này lập văn bản từ chối nhận di sản."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Những người tham gia xác nhận đã kiểm tra thông tin người và tài sản, tự nguyện thỏa thuận; hồ sơ TEST không chứng nhận rằng việc niêm yết hoặc đăng ký ngoài đời đã diễn ra."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 3,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Bùi Ngọc Quỳnh",
+              "NGƯỜI KÝ: Mai Minh Sơn",
+              "NGƯỜI KÝ: Mai Ngọc Thu"
+            ],
+            [
+              "Đã ký TEST — Bùi Ngọc Quỳnh",
+              "Đã ký TEST — Mai Minh Sơn",
+              "Đã ký TEST — Mai Ngọc Thu"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1106/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/pc_spouse.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-06-PC_SPOUSE. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Bùi Ngọc Quỳnh; Sinh ngày: 09/10/1960."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999160000601 do Bộ Công an cấp ngày 14/04/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 108 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/pc_child1.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-06-PC_CHILD1. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Mai Minh Sơn; Sinh ngày: 17/05/1984."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999084000602 do Bộ Công an cấp ngày 16/05/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 119 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/pc_child2.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-06-PC_CHILD2. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Mai Ngọc Thu; Sinh ngày: 28/09/1987."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999187000603 do Bộ Công an cấp ngày 18/06/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 130 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/pc_dead.docx",
+          "title": "BẢN CHÉP THÔNG TIN TRÍCH LỤC KHAI TỬ — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN TRÍCH LỤC KHAI TỬ — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-06-PC_DEAD. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Mai Quang Vinh; Sinh ngày: 13/02/1958."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Chết ngày: 10/11/2024."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Trích lục khai tử (Bản sao) số: 26/2024/TLKT do UBND xã Bình Minh cấp ngày 12/11/2024."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nơi thường trú cuối cùng trước khi chết: Số 108 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-06; chủ sử dụng theo tình huống: Mai Quang Vinh. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 606, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 606; Tờ bản đồ số: 16."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 350 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-06 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26006."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 150 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất trồng cây lâu năm; Diện tích: 200 m2; Thời hạn sử dụng: 31/12/2063."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/quan-he-gia-dinh.docx",
+          "title": "BẢN KÊ QUAN HỆ GIA ĐÌNH VÀ PHẠM VI TÌNH HUỐNG — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN KÊ QUAN HỆ GIA ĐÌNH VÀ PHẠM VI TÌNH HUỐNG — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà Bùi Ngọc Quỳnh là vợ ông Mai Quang Vinh; ông Mai Minh Sơn và bà Mai Ngọc Thu là hai người con. Cha mẹ của ông Vinh đã mất trước ngày 10/11/2024. Không có người thừa kế cùng hàng khác hoặc người hưởng thế vị trong tình huống giả định."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người chết: Mai Quang Vinh, ngày chết 10/11/2024; số trích lục khai tử giả định 26/2024/TLKT."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản nêu trong main.docx được xác định là tài sản riêng của người chết chỉ trong kịch bản thử. Không có di chúc trong dữ liệu này. Việc kê quan hệ là dữ liệu tình huống do người dùng xác nhận tay; engine regex không tự thiết lập quan hệ, quyền sở hữu hoặc tư cách pháp lý."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài liệu không phải kết quả tra cứu hộ tịch hoặc xác minh người thừa kế. Không dùng để suy rằng một thủ tục thực tế đã được hoàn thành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-bao-niem-yet.docx",
+          "title": "THÔNG BÁO NIÊM YẾT VIỆC TIẾP NHẬN HỒ SƠ THỪA KẾ — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "THÔNG BÁO NIÊM YẾT VIỆC TIẾP NHẬN HỒ SƠ THỪA KẾ — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Văn phòng công chứng Mẫu Thử TEST thông báo tình huống tiếp nhận hồ sơ của người để lại di sản Mai Quang Vinh, chết ngày 10/11/2024; tài sản theo bản chép GCN kèm hồ sơ."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nơi niêm yết giả định: UBND xã Bình Minh, tỉnh Đồng Nai. Khoảng thời gian giả định phục vụ đọc mẫu: từ 01/10/2026 đến 16/10/2026. Đây không phải chứng cứ cơ quan đã niêm yết hoặc đã kết thúc thời hạn ngoài đời."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ý kiến liên quan nếu có trong tình huống thử được gửi về Chuyên viên Dữ Liệu Mẫu tại địa chỉ nội bộ TEST, không có số điện thoại hoặc thông tin liên hệ cá nhân. Không có ý kiến phản đối được đưa vào kịch bản này."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nơi niêm yết phải được nhập và lưu bằng thao tác người dùng nếu muốn dùng trên Word; không tự suy từ địa chỉ tài sản hoặc từ file hỗ trợ này."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "07-tu-choi",
+      "title": "VĂN BẢN TỪ CHỐI NHẬN DI SẢN",
+      "classification": "extraction_only",
+      "case_type": null,
+      "document_type": null,
+      "regex_kind": "inheritance_refusal",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "ref_person",
+          "ho_ten": "Ngô Minh Uy",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1986-06-19",
+          "ngay_chet": null,
+          "so_giay_to": "999086000701",
+          "ngay_cap": "2025-01-23",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 141 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "ref_dead",
+          "ho_ten": "Ngô Quang Xuân",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1952-01-24",
+          "ngay_chet": "2024-12-18",
+          "so_giay_to": "37/2024/TLKT",
+          "ngay_cap": "2024-12-20",
+          "noi_cap": "UBND xã Bình Minh",
+          "dia_chi": "Số 141 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Trích lục khai tử (Bản sao)",
+          "loai_dia_chi": "Nơi chết"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_07",
+          "so_serial": "TEST-GCN-2026-07",
+          "so_vao_so": "CS 26007",
+          "so_thua_dat": "707",
+          "so_to_ban_do": "17",
+          "dia_chi": "Thửa 707, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 140.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "VĂN BẢN TỪ CHỐI NHẬN DI SẢN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi là:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Ngô Minh Uy; Sinh ngày: 19/06/1986."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999086000701 do Bộ Công an cấp ngày 23/01/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 141 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Người để lại di sản:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Ngô Quang Xuân; Sinh ngày: 24/01/1952."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chết ngày: 18/12/2024."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Trích lục khai tử (Bản sao) số: 37/2024/TLKT do UBND xã Bình Minh cấp ngày 20/12/2024."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nơi thường trú cuối cùng trước khi chết: Số 141 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Di sản:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Khi còn sống, người để lại di sản có quyền sử dụng đất sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 707, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 707; Tờ bản đồ số: 17."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 140 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-07 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26007."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 140 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "NỘI DUNG TỪ CHỐI"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bằng Văn bản này, ông Ngô Minh Uy tự nguyện từ chối nhận phần di sản được hưởng từ ông Ngô Quang Xuân là cha của mình, không chỉ định người nhận thay và không nhằm trốn tránh nghĩa vụ tài sản của bản thân."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Người lập đã đọc nội dung và hiểu việc từ chối phải được xem xét trong hồ sơ thực tế theo quy định. Đây là văn bản TEST để kiểm tra bóc trường; ứng dụng chưa có loại hồ sơ từ chối hay đầu vào pháp lý tương ứng trên Diagram."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 1,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Ngô Minh Uy"
+            ],
+            [
+              "Đã ký TEST — Ngô Minh Uy"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1107/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/ref_person.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-07-REF_PERSON. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Ngô Minh Uy; Sinh ngày: 19/06/1986."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999086000701 do Bộ Công an cấp ngày 23/01/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 141 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/ref_dead.docx",
+          "title": "BẢN CHÉP THÔNG TIN TRÍCH LỤC KHAI TỬ — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN TRÍCH LỤC KHAI TỬ — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-07-REF_DEAD. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Ngô Quang Xuân; Sinh ngày: 24/01/1952."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Chết ngày: 18/12/2024."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Trích lục khai tử (Bản sao) số: 37/2024/TLKT do UBND xã Bình Minh cấp ngày 20/12/2024."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nơi thường trú cuối cùng trước khi chết: Số 141 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-07; chủ sử dụng theo tình huống: Ngô Quang Xuân. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 707, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 707; Tờ bản đồ số: 17."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 140 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-07 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26007."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 140 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/quan-he-gia-dinh.docx",
+          "title": "BẢN KÊ QUAN HỆ GIA ĐÌNH VÀ PHẠM VI TÌNH HUỐNG — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN KÊ QUAN HỆ GIA ĐÌNH VÀ PHẠM VI TÌNH HUỐNG — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông Ngô Minh Uy là con của ông Ngô Quang Xuân; bản TEST chỉ mô tả người từ chối, không liệt kê hoặc xác nhận toàn bộ những người thừa kế khác và không chỉ định người nhận thay."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người chết: Ngô Quang Xuân, ngày chết 18/12/2024; số trích lục khai tử giả định 37/2024/TLKT."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản nêu trong main.docx được xác định là tài sản riêng của người chết chỉ trong kịch bản thử. Không có di chúc trong dữ liệu này. Việc kê quan hệ là dữ liệu tình huống do người dùng xác nhận tay; engine regex không tự thiết lập quan hệ, quyền sở hữu hoặc tư cách pháp lý."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài liệu không phải kết quả tra cứu hộ tịch hoặc xác minh người thừa kế. Không dùng để suy rằng một thủ tục thực tế đã được hoàn thành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "08-tai-san-rieng",
+      "title": "VĂN BẢN CAM KẾT TÀI SẢN RIÊNG",
+      "classification": "extraction_only",
+      "case_type": null,
+      "document_type": null,
+      "regex_kind": "asset_commitment",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "sc_husband",
+          "ho_ten": "Dương Minh Yên",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1979-07-21",
+          "ngay_chet": null,
+          "so_giay_to": "999079000801",
+          "ngay_cap": "2025-02-24",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 152 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "sc_wife",
+          "ho_ten": "Tạ Ngọc Ánh",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1981-08-22",
+          "ngay_chet": null,
+          "so_giay_to": "999181000802",
+          "ngay_cap": "2025-03-25",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 152 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_08",
+          "so_serial": "TEST-GCN-2026-08",
+          "so_vao_so": "CS 26008",
+          "so_thua_dat": "808",
+          "so_to_ban_do": "18",
+          "dia_chi": "Thửa 808, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 170.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "VĂN BẢN CAM KẾT TÀI SẢN RIÊNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi là vợ chồng:"
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Người chồng:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Dương Minh Yên; Sinh ngày: 21/07/1979."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999079000801 do Bộ Công an cấp ngày 24/02/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 152 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Người vợ:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Tạ Ngọc Ánh; Sinh ngày: 22/08/1981."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999181000802 do Bộ Công an cấp ngày 25/03/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 152 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "Hiện đang sở hữu Tài Sản là quyền sử dụng đất có thông tin sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 808, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 808; Tờ bản đồ số: 18."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 170 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-08 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26008."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 170 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "NỘI DUNG CAM KẾT"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bằng văn bản này chúng tôi xác định quyền sử dụng đất nêu trên do bà Tạ Ngọc Ánh nhận tặng cho riêng trước khi kết hôn theo tình huống TEST; hai người chưa thỏa thuận nhập tài sản này vào tài sản chung."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông Dương Minh Yên xác nhận không yêu cầu ghi nhận phần sở hữu đối với tài sản riêng nêu trên. Hai người tự nguyện cam kết và chịu trách nhiệm về thông tin cung cấp. Đây không phải phán quyết xác định quyền sở hữu của cơ quan có thẩm quyền."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 2,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Dương Minh Yên",
+              "NGƯỜI KÝ: Tạ Ngọc Ánh"
+            ],
+            [
+              "Đã ký TEST — Dương Minh Yên",
+              "Đã ký TEST — Tạ Ngọc Ánh"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1108/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/sc_husband.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-08-SC_HUSBAND. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Dương Minh Yên; Sinh ngày: 21/07/1979."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999079000801 do Bộ Công an cấp ngày 24/02/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 152 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/sc_wife.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-08-SC_WIFE. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Tạ Ngọc Ánh; Sinh ngày: 22/08/1981."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999181000802 do Bộ Công an cấp ngày 25/03/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 152 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-08; chủ sử dụng theo tình huống: Tạ Ngọc Ánh. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 808, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 808; Tờ bản đồ số: 18."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 170 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-08 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26008."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 170 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/ban-chep-ket-hon.docx",
+          "title": "BẢN CHÉP THÔNG TIN ĐĂNG KÝ KẾT HÔN — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN ĐĂNG KÝ KẾT HÔN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người chồng: ông Dương Minh Yên, sinh ngày 21/07/1979, Căn cước 999079000801. Người vợ: bà Tạ Ngọc Ánh, sinh ngày 22/08/1981, Căn cước 999181000802."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đăng ký kết hôn giả định: 10/03/2021; nơi ghi nhận giả định: UBND xã Bình Minh; mã nội bộ TEST-KH-008. Không phải bản sao hoặc trích lục hộ tịch chính thức."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa 808, tờ 18, giấy chứng nhận TEST-GCN-2026-08 được kịch bản ấn định do bà Ánh nhận tặng cho riêng trước hôn nhân. Đây là dữ kiện do tác giả tình huống đặt ra, không phải kết luận tự động từ ngày kết hôn hoặc ngày cấp giấy."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "09-huy-chuyen-nhuong",
+      "title": "VĂN BẢN THỎA THUẬN VỀ VIỆC HỦY BỎ HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT",
+      "classification": "extraction_only",
+      "case_type": null,
+      "document_type": null,
+      "regex_kind": "transfer_cancellation",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "cx_a",
+          "ho_ten": "Hồ Minh Bảo",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1976-09-23",
+          "ngay_chet": null,
+          "so_giay_to": "999076000901",
+          "ngay_cap": "2025-04-26",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 163 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "cx_b",
+          "ho_ten": "Vũ Ngọc Chi",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1983-10-24",
+          "ngay_chet": null,
+          "so_giay_to": "999183000902",
+          "ngay_cap": "2025-05-27",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 174 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_09",
+          "so_serial": "TEST-GCN-2026-09",
+          "so_vao_so": "CS 26009",
+          "so_thua_dat": "909",
+          "so_to_ban_do": "19",
+          "dia_chi": "Thửa 909, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 190.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "VĂN BẢN THỎA THUẬN VỀ VIỆC HỦY BỎ HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Chúng tôi gồm có:"
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN A:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Hồ Minh Bảo; Sinh ngày: 23/09/1976."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999076000901 do Bộ Công an cấp ngày 26/04/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 163 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN B:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Vũ Ngọc Chi; Sinh ngày: 24/10/1983."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999183000902 do Bộ Công an cấp ngày 27/05/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 174 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 1. ĐỐI TƯỢNG CỦA HỢP ĐỒNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Đối tượng của Hợp đồng này là toàn bộ quyền sử dụng đất có thông tin sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 909, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 909; Tờ bản đồ số: 19."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 190 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-09 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26009."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 190 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 2. THỎA THUẬN HỦY BỎ"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên thống nhất hủy bỏ Hợp đồng chuyển nhượng quyền sử dụng đất số 901/2026/CCGD, ký ngày 01/09/2026 tại Văn phòng công chứng Mẫu Thử TEST. Theo tình huống thử, chưa bàn giao đất và chưa đăng ký chuyển quyền."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 3. HOÀN TRẢ VÀ CHI PHÍ"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên A hoàn trả cho Bên B 200.000.000 đồng đã nhận trước ngày 21/10/2026. Bên B giao lại bộ giấy tờ đã nhận; hai bên lập biên nhận hoàn trả riêng. Chi phí lập văn bản hủy bỏ được chia đều."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 4. CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên không dùng việc hủy bỏ để che giấu giao dịch khác hoặc làm ảnh hưởng quyền hợp pháp của người thứ ba; tự nguyện ký và xác nhận đã đọc toàn văn."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 2,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Hồ Minh Bảo",
+              "NGƯỜI KÝ: Vũ Ngọc Chi"
+            ],
+            [
+              "Đã ký TEST — Hồ Minh Bảo",
+              "Đã ký TEST — Vũ Ngọc Chi"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1109/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/cx_a.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-09-CX_A. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Hồ Minh Bảo; Sinh ngày: 23/09/1976."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999076000901 do Bộ Công an cấp ngày 26/04/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 163 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/cx_b.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-09-CX_B. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Vũ Ngọc Chi; Sinh ngày: 24/10/1983."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999183000902 do Bộ Công an cấp ngày 27/05/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 174 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-09; chủ sử dụng theo tình huống: Hồ Minh Bảo. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 909, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 909; Tờ bản đồ số: 19."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 190 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-09 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26009."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 190 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/hop-dong-goc-901.docx",
+          "title": "HỢP ĐỒNG CHUYỂN NHƯỢNG GỐC SỐ 901 — TEST",
+          "consumption": "context_only",
+          "reason": "Hợp đồng tham chiếu của văn bản hủy bỏ; không nhập cùng main mặc định để tránh tự gộp hoặc nhân đôi ứng viên.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT — BẢN HỖ TRỢ TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 01/09/2026 tại Văn phòng công chứng Mẫu Thử TEST. Số tham chiếu 901/2026/CCGD, sổ TEST."
+            },
+            {
+              "type": "paragraph",
+              "style": "heading",
+              "text": "BÊN CHUYỂN NHƯỢNG (Bên A):"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Hồ Minh Bảo; Sinh ngày: 23/09/1976."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999076000901 do Bộ Công an cấp ngày 26/04/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 163 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "heading",
+              "text": "BÊN NHẬN CHUYỂN NHƯỢNG (Bên B):"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Vũ Ngọc Chi; Sinh ngày: 24/10/1983."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999183000902 do Bộ Công an cấp ngày 27/05/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 174 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "heading",
+              "text": "ĐIỀU 1. QUYỀN SỬ DỤNG ĐẤT CHUYỂN NHƯỢNG"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 909, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 909; Tờ bản đồ số: 19."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 190 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-09 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26009."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 190 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "heading",
+              "text": "ĐIỀU 2. GIÁ VÀ THANH TOÁN"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giá thỏa thuận giả định là 1.600.000.000 đồng. Bên B trả trước 200.000.000 đồng ngày 01/09/2026; phần còn lại thanh toán khi bàn giao. Chưa có việc bàn giao hoặc đăng ký chuyển quyền trong tình huống này."
+            },
+            {
+              "type": "paragraph",
+              "style": "heading",
+              "text": "ĐIỀU 3. THỰC HIỆN"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hai bên dự kiến bàn giao ngày 01/11/2026, phối hợp thực hiện đăng ký khi đủ điều kiện. Mọi thay đổi hoặc hủy bỏ được lập thành văn bản riêng. Các bên tự nguyện giao kết và đã đọc lại nội dung."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bên A: Hồ Minh Bảo — ký TEST. Bên B: Vũ Ngọc Chi — ký TEST."
+            },
+            {
+              "type": "paragraph",
+              "style": "heading",
+              "text": "LỜI CHỨNG TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Công chứng viên giả định Nguyễn Kiểm Thử xác nhận nội dung chỉ là tình huống mô phỏng. Không có hiệu lực giao dịch, không có chữ ký hoặc con dấu thật."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10-the-chap",
+      "title": "HỢP ĐỒNG THẾ CHẤP QUYỀN SỬ DỤNG ĐẤT",
+      "classification": "extraction_only",
+      "case_type": null,
+      "document_type": null,
+      "regex_kind": "mortgage_contract",
+      "main_path": "main.docx",
+      "people_truth": [
+        {
+          "truth_id": "mg_owner",
+          "ho_ten": "Đinh Minh Duy",
+          "gioi_tinh": "Nam",
+          "ngay_sinh": "1977-11-25",
+          "ngay_chet": null,
+          "so_giay_to": "999077001001",
+          "ngay_cap": "2025-06-28",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 185 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        },
+        {
+          "truth_id": "mg_rep",
+          "ho_ten": "Cao Ngọc Hà",
+          "gioi_tinh": "Nữ",
+          "ngay_sinh": "1989-12-26",
+          "ngay_chet": null,
+          "so_giay_to": "999189001002",
+          "ngay_cap": "2025-07-29",
+          "noi_cap": "Bộ Công an",
+          "dia_chi": "Số 196 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_giay_to": "Căn cước",
+          "loai_dia_chi": "Cư trú tại"
+        }
+      ],
+      "assets_truth": [
+        {
+          "truth_id": "asset_10",
+          "so_serial": "TEST-GCN-2026-10",
+          "so_vao_so": "CS 26010",
+          "so_thua_dat": "1010",
+          "so_to_ban_do": "20",
+          "dia_chi": "Thửa 1010, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai",
+          "loai_so": "Giấy chứng nhận quyền sử dụng đất",
+          "hinh_thuc_su_dung": "Sử dụng riêng",
+          "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+          "ngay_cap": "2020-06-15",
+          "co_quan_cap": "UBND tỉnh Đồng Nai",
+          "land_rows": [
+            {
+              "loai_dat": "Đất ở tại nông thôn",
+              "dien_tich": 210.0,
+              "thoi_han": "Lâu dài"
+            }
+          ]
+        }
+      ],
+      "main_blocks": [
+        {
+          "type": "paragraph",
+          "style": "center_bold",
+          "text": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
+        },
+        {
+          "type": "paragraph",
+          "style": "center",
+          "text": "Độc lập - Tự do - Hạnh phúc"
+        },
+        {
+          "type": "paragraph",
+          "style": "title",
+          "text": "HỢP ĐỒNG THẾ CHẤP QUYỀN SỬ DỤNG ĐẤT"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hôm nay, ngày 19 tháng 10 năm 2026, tại Văn phòng công chứng Mẫu Thử TEST, các bên lập văn bản với nội dung sau:"
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN THẾ CHẤP (Bên A):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ông: Đinh Minh Duy; Sinh ngày: 25/11/1977."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999077001001 do Bộ Công an cấp ngày 28/06/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 185 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "BÊN NHẬN THẾ CHẤP (Bên B):"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Ngân hàng Mô Phỏng TEST; Mã hồ sơ tổ chức: TEST-NH-010; trụ sở: Số 10 đường Ngân Hàng Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Người đại diện theo ủy quyền:"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà: Cao Ngọc Hà; Sinh ngày: 26/12/1989."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Căn cước số: 999189001002 do Bộ Công an cấp ngày 29/07/2025."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Cư trú tại: Số 196 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 1. TÀI SẢN THẾ CHẤP"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản thứ 1: Quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Địa chỉ thửa đất: Thửa 1010, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Thửa đất số: 1010; Tờ bản đồ số: 20."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Diện tích: 210 m2."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Hình thức sử dụng: Sử dụng riêng."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-10 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số vào sổ cấp GCN: CS 26010."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 210 m2; Thời hạn sử dụng: Lâu dài."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 2. NGHĨA VỤ ĐƯỢC BẢO ĐẢM"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tài sản bảo đảm nghĩa vụ trả khoản vay gốc 600.000.000 đồng theo Hợp đồng tín dụng TEST-TD-010 ngày 15/10/2026 của ông Đinh Minh Duy tại Ngân hàng Mô Phỏng TEST, thời hạn vay đến ngày 15/10/2028. Lãi và chi phí thực hiện theo thỏa thuận tín dụng giả định kèm theo."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 3. QUẢN LÝ VÀ GIẢI CHẤP"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bên thế chấp tiếp tục quản lý, sử dụng đất đúng mục đích, không chuyển quyền hoặc bảo đảm thêm khi chưa đáp ứng điều kiện áp dụng. Bên nhận thế chấp phối hợp giải chấp khi nghĩa vụ đã hoàn tất; xử lý tài sản chỉ theo trình tự hợp pháp."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU 4. ĐẠI DIỆN VÀ CAM ĐOAN"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Bà Cao Ngọc Hà ký theo văn bản ủy quyền TEST-UQ-010 của ngân hàng giả định. Tổ chức ngân hàng không phải một bản ghi Người của Stage; hồ sơ này chỉ kiểm tra phạm vi regex hiện có, không giả lập loại hồ sơ thế chấp đã được hỗ trợ trong ứng dụng."
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "ĐIỀU KHOẢN CHUNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Các bên đã đọc toàn văn, hiểu quyền và nghĩa vụ, đồng ý nội dung và ký dưới đây. Mọi thông tin trong bộ hồ sơ này đều được tạo độc lập cho kiểm thử; không phải giấy tờ hoặc giao dịch có thật."
+        },
+        {
+          "type": "table",
+          "columns": 2,
+          "rows": [
+            [
+              "NGƯỜI KÝ: Đinh Minh Duy",
+              "NGƯỜI KÝ: Cao Ngọc Hà"
+            ],
+            [
+              "Đã ký TEST — Đinh Minh Duy",
+              "Đã ký TEST — Cao Ngọc Hà"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "style": "heading",
+          "text": "LỜI CHỨNG"
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Tôi, Nguyễn Kiểm Thử, Công chứng viên giả định của Văn phòng công chứng Mẫu Thử TEST, ghi nhận các bên đã tự nguyện ký văn bản trong tình huống mô phỏng. Nội dung này chỉ nhằm kiểm tra phần mềm, không xác nhận bất kỳ sự kiện pháp lý thực tế nào."
+        },
+        {
+          "type": "paragraph",
+          "style": "body",
+          "text": "Số công chứng 1110/2026/CCGD; quyển số 01/2026/TP/CC-SCC/HĐGD (sổ TEST)."
+        }
+      ],
+      "support_documents": [
+        {
+          "path": "support/mg_owner.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-10-MG_OWNER. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ông: Đinh Minh Duy; Sinh ngày: 25/11/1977."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999077001001 do Bộ Công an cấp ngày 28/06/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 185 đường Mẫu Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/mg_rep.docx",
+          "title": "PHIẾU THÔNG TIN NHÂN THÂN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thủ công thông tin nhân thân; không chứng minh OCR hoặc hỗ trợ parser giấy tờ chuyên biệt.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "PHIẾU THÔNG TIN NHÂN THÂN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã tài liệu: TEST-10-MG_REP. Chỉ là bản chép giả định, không phải căn cước hoặc trích lục do cơ quan có thẩm quyền phát hành."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bà: Cao Ngọc Hà; Sinh ngày: 26/12/1989."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Căn cước số: 999189001002 do Bộ Công an cấp ngày 29/07/2025."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Cư trú tại: Số 196 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người lập phiếu: Chuyên viên Dữ Liệu Mẫu; ngày lập: 19/10/2026. Thông tin dùng để đối chiếu nhân thân trong bộ hồ sơ kiểm thử, không được sử dụng để xác minh người thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Xác nhận nội bộ: Đã đọc và ghi nhận đúng dữ liệu giả định của tình huống TEST. Không có chữ ký số, con dấu hoặc số định danh có giá trị thực tế."
+            }
+          ]
+        },
+        {
+          "path": "support/thong-tin-gcn.docx",
+          "title": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST",
+          "consumption": "context_only",
+          "reason": "Đối chiếu thông tin tài sản; không mô phỏng phôi GCN chính thức.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN CHÉP THÔNG TIN GIẤY CHỨNG NHẬN — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Mã bản chép TEST-GCN-10; chủ sử dụng theo tình huống: Đinh Minh Duy. Bản chép do nhóm kiểm thử tự tạo, không có giá trị chứng nhận quyền."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Tài sản thứ 1: Quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Địa chỉ thửa đất: Thửa 1010, đường Dữ Liệu Mẫu, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Thửa đất số: 1010; Tờ bản đồ số: 20."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Diện tích: 210 m2."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Hình thức sử dụng: Sử dụng riêng."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Giấy chứng nhận quyền sử dụng đất số: TEST-GCN-2026-10 do UBND tỉnh Đồng Nai cấp ngày 15/06/2020."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Số vào sổ cấp GCN: CS 26010."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Loại đất: Đất ở tại nông thôn; Diện tích: 210 m2; Thời hạn sử dụng: Lâu dài."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Sơ đồ mô tả nội bộ: cạnh phía Bắc giáp đường Dữ Liệu Mẫu, ba cạnh còn lại giáp đất tình huống giả định. Không có bản đồ đo đạc hoặc xác nhận địa giới thực tế."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Ngày đối chiếu nội bộ: 19/10/2026. Chuyên viên: Nguyễn Dữ Liệu Mẫu. Tình trạng ghi chú giả định: không có đăng ký bảo đảm hoặc thay đổi thông tin khác trong kịch bản này."
+            }
+          ]
+        },
+        {
+          "path": "support/uy-quyen-ngan-hang.docx",
+          "title": "VĂN BẢN ỦY QUYỀN ĐẠI DIỆN NGÂN HÀNG — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "VĂN BẢN ỦY QUYỀN ĐẠI DIỆN NGÂN HÀNG — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Bên ủy quyền: Ngân hàng Mô Phỏng TEST, mã tổ chức nội bộ TEST-NH-010, trụ sở giả định số 10 đường Ngân Hàng Mẫu, xã Bình Minh, tỉnh Đồng Nai. Người ký nội bộ: Giám đốc giả định Nguyễn Đại Diện TEST."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Người được ủy quyền: bà Cao Ngọc Hà, sinh ngày 26/12/1989, Căn cước giả định 999189001002, cư trú tại số 196 đường Kiểm Thử, xã Bình Minh, tỉnh Đồng Nai."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Phạm vi: ký hợp đồng thế chấp thửa 1010, tờ 20, giấy chứng nhận TEST-GCN-2026-10 để bảo đảm nghĩa vụ của ông Đinh Minh Duy theo hợp đồng tín dụng TEST-TD-010. Mã văn bản TEST-UQ-010; thời hạn giả định từ 15/10/2026 đến 31/12/2026."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Không ủy quyền lại và không xác nhận nghĩa vụ ngoài tình huống. Đây không phải loại hồ sơ ủy quyền đã được ứng dụng hỗ trợ; tổ chức không được nhét vào bản ghi Người của Stage."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        },
+        {
+          "path": "support/tom-tat-nghia-vu-vay.docx",
+          "title": "BẢN TÓM TẮT NGHĨA VỤ TÍN DỤNG — TEST",
+          "consumption": "context_only",
+          "reason": "Pièce d’appui synthétique / tài liệu tình huống để người kiểm tra đối chiếu; không phải kết quả regex hoặc chứng nhận pháp lý.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "style": "title",
+              "text": "BẢN TÓM TẮT NGHĨA VỤ TÍN DỤNG — TEST"
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Chủ thể vay giả định: ông Đinh Minh Duy, Căn cước 999077001001. Bên cho vay giả định: Ngân hàng Mô Phỏng TEST. Hợp đồng tín dụng TEST-TD-010 ký ngày 15/10/2026."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Khoản gốc giả định: 600.000.000 đồng; thời hạn đến 15/10/2028; lãi suất giả định cố định 8%/năm. Lãi thanh toán hằng tháng, gốc thanh toán khi đến hạn. Không có số tài khoản hoặc khoản giải ngân có thật."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Biện pháp bảo đảm mô tả trong bộ hồ sơ: thế chấp quyền sử dụng thửa 1010, tờ 20, giấy chứng nhận TEST-GCN-2026-10. Bản này không phải báo cáo tín dụng, không chứng minh đã giải ngân và không kiểm chứng phép tính tài chính của engine."
+            },
+            {
+              "type": "paragraph",
+              "style": "body",
+              "text": "Lập ngày 19/10/2026 bởi Chuyên viên Dữ Liệu Mẫu. Nội dung hoàn toàn giả định cho TEST; không có chữ ký, con dấu hoặc xác nhận của cơ quan có thẩm quyền."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

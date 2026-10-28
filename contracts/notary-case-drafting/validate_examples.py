@@ -1,4 +1,4 @@
-"""Validator cho contracts/notary-case-drafting/examples — stdlib-only.
+"""Validator cho contracts/notary-case-drafting/examples (jsonschema cho Save Case).
 
 Chạy:  python contracts/notary-case-drafting/validate_examples.py
 Quy tắc: mọi *.valid.json phải pass hết rule; mọi *.invalid.json phải vi phạm
@@ -7,7 +7,12 @@ Quy tắc: mọi *.valid.json phải pass hết rule; mọi *.invalid.json phả
 
 Fixture được phép mang top-level `fixture_context` (không nằm trên wire) mô tả
 trạng thái server giả định để validator kiểm rule ngữ cảnh:
-    {"server_revision": <int>, "stage_row_ids": [<row_id>, ...]}
+    {"server_revision": <int>, "stage_row_ids": [<row_id>, ...],
+     "source_case_type": "inheritance", "source_row_ids": [...],
+     "known_person_entity_ids": [<int>],
+     "known_asset_entity_ids": [<int>], "duplicate_replay": <bool>,
+     "duplicate_key_registry": {"<key>": {"command": ...,
+     "intent": ..., "source_case_id": <int>}}}
 """
 import json
 import ntpath
@@ -15,6 +20,8 @@ import os
 import re
 import sys
 from pathlib import Path
+
+from jsonschema import Draft7Validator, RefResolver
 
 HERE = Path(__file__).resolve().parent
 EX = HERE / "examples"
@@ -26,13 +33,14 @@ DRAFT_CASE_TYPES = {"inheritance", "two_party"}
 DRAFT_TWO_PARTY_DOC_TYPES = {
     "chuyen_nhuong", "tang_cho", "cho_thue", "dat_coc",
 }
-DRAFT_MAX_ASSETS = 3
+DRAFT_MAX_ASSETS = 5
 DRAFT_MAX_PEOPLE_TWO_PARTY = 30
-DRAFT_POSITIONS = {1, 2, 3}
+DRAFT_POSITIONS = {1, 2, 3, 4, 5}
 DRAFT_TWO_PARTY_IDS = [f"p{i}" for i in range(1, 31)]
 DRAFT_NODE_FIELDS = {
-    "id", "personId", "parentSlotIds", "spouseSlotId",
-    "ownPositions", "receivePositions", "hidden", "deleted",
+    "id", "personId", "parentSlotIds", "spouseSlotIds", "spouseSlotId",
+    "spouseSuggestionId", "ownPositions", "receivePositions",
+    "hidden", "deleted",
 }
 DRAFT_NODE_FIELDS_TWO_PARTY = {"id", "personId", "hidden", "deleted"}
 # asset_row_v2 = asset_row trừ is_primary (§13.3)
@@ -53,7 +61,11 @@ COMMANDS = {
     "notary.address_lookup": "address_lookup",
     "notary.workspace_create": "workspace_create",
     "notary.workspace_get": "workspace_get",
+    "notary.workspace_source_latest": "workspace_source_latest",
+    "notary.workspace_duplicate": "workspace_duplicate",
     "notary.workspace_update": "workspace_update",
+    "notary.workspace_save_case": "workspace_save_case",
+    "notary.workspace_convert_type": "workspace_convert_type",
     "notary.intake_analyze": "intake_analyze",
     "notary.workspace_commit_stage": "workspace_commit_stage",
     "notary.diagram_evaluate": "diagram_evaluate",
@@ -66,11 +78,22 @@ KINDS = set(COMMANDS.values())
 # §2.1a — case_id: bắt buộc / nháp được (absent ok, null lỗi) / cấm
 CASE_ID_REQUIRED = {
     "notary.workspace_get", "notary.workspace_update",
+    "notary.workspace_convert_type",
     "notary.workspace_commit_stage", "notary.diagram_save",
     "notary.word_export_options", "notary.word_export_batch",
 }
 CASE_ID_DRAFTABLE = {"notary.intake_analyze", "notary.diagram_evaluate"}
-CASE_ID_FORBIDDEN = {"notary.workspace_create"}
+CASE_ID_FORBIDDEN = {"notary.workspace_create", "notary.workspace_source_latest"}
+DUPLICATE_FIELDS = {"source_case_id", "idempotency_key"}
+SOURCE_LATEST_RESULT_FIELDS = {
+    "schema_version", "backend_mode", "source_case_id", "source_status",
+    "stage",
+}
+DUPLICATE_RESULT_FIELDS = {
+    "schema_version", "backend_mode", "case", "stage", "diagram",
+    "capabilities", "docx_import", "source_case_id", "created",
+}
+STAGE_INTENTS = {"output", "create", "save", "strict"}
 CASE_FIELDS = {
     "id", "case_type", "document_type", "status", "locked", "revision",
     "ngay_lap_ho_so", "noi_niem_yet", "ghi_chu",
@@ -82,6 +105,11 @@ CASE_META_FIELDS = {
     # đợt 3: meta mới trong payload.case create/commit
     "nguoi_nhan_uy_quyen", "nguoi_nhan_uy_quyen_id", "noi_dung_viec",
 }
+CASE_SCALAR_FIELDS = {
+    "tenvanban", "nhomhopdong", "loaivanbannhandien", "socongchung",
+    "ngaycongchung", "congchungvien", "thuky",
+}
+CASE_META_FIELDS |= CASE_SCALAR_FIELDS
 # đợt 3: commit payload.case — meta + cặp immutable gửi kèm kiểm tra
 COMMIT_CASE_FIELDS = CASE_META_FIELDS | {"case_type"}
 # canonical key server chấp nhận ở payload (contract §4.1/§6)
@@ -113,9 +141,7 @@ GENDERS = {"Nam", "Nữ", None}
 # registry mở — khi backend thêm document_key phải cập nhật set này
 DOC_CATALOG = {"khai_nhan_di_san", "thoa_thuan_phan_chia", "niem_yet"}
 BLOCK_REASONS = {
-    "word.no_people", "word.no_diagram",
-    "word.no_assets", "word.no_landowner", "word.no_deceased_landowner",
-    "word.no_receiver", "word.too_many_assets", "word.too_many_people",
+    "word.too_many_assets", "word.too_many_people",
     "word.too_many_signers", "word.template_missing",
 }
 RENDER_STATUSES = {"invalid", "unsupported", "incomplete", "complete"}
@@ -141,7 +167,7 @@ SENSITIVE_KEY = re.compile(
 
 # Field nullable — "" cấm thay null (g1-module-data §6 + contract §2.2/2.3)
 NEVER_EMPTY = {
-    "normalized_value", "raw_value", "ho_ten", "so_serial", "dia_chi",
+    "normalized_value", "raw_value", "ho_ten", "dia_chi",
     "display_name", "actual_filename", "path", "row_id", "personId",
     "source_id", "suggestion_id", "document_key", "id", "case_type",
     "filename_stem", "text",
@@ -182,8 +208,8 @@ NODE_BOOL_FIELDS = {"isLandOwner", "willReceive", "hidden", "deleted"}
 
 ERRORS = {
     # mã riêng của contract này
-    "case_not_found", "case_type_unsupported", "workspace_locked",
-    "workspace_conflict", "stage_validation_error",
+    "case_not_found", "case_type_unsupported",
+    "workspace_conflict", "idempotency_conflict", "stage_validation_error",
     "intake_unsupported_source", "intake_source_too_large",
     "intake_too_many_sources", "intake_text_too_long",
     "diagram_reference_outside_stage", "diagram_invalid_state",
@@ -241,34 +267,43 @@ def _canon_conflicts(row, canon, where, v):
                       f"{where} {ck}!={lk} conflict"))
 
 
-def check_person_row(row, where, v):
+def check_person_row(row, where, v, *, allow_null_name=False,
+                     in_payload=False, ctx=None):
     if not isinstance(row, dict):
         v.append(("stage_validation_error", f"{where} not object"))
         return
     extra = set(row) - PERSON_FIELDS
     if extra:
         v.append(("validation_error", f"{where} extra keys {sorted(extra)}"))
-    _canon_conflicts(row, PERSON_CANON, where, v)
+    if in_payload:
+        _canon_conflicts(row, PERSON_CANON, where, v)
     rid = row.get("row_id")
     if not (isinstance(rid, str) and UUID4_RX.match(rid)):
         v.append(("stage_validation_error", f"{where} row_id={rid!r}"))
-    eid = row.get("entity_id")
-    if eid is not None and not isinstance(eid, int):
-        v.append(("stage_validation_error", f"{where} entity_id={eid!r}"))
-    if not (isinstance(row.get("ho_ten"), str) and row["ho_ten"].strip()):
+    # entity_id là gợi ý nội bộ (§4.1 mục 5): giá trị lạ/không có trong
+    # fixture identity không phải lỗi field.
+    name = row.get("ho_ten")
+    if allow_null_name:
+        if name is not None and (not isinstance(name, str) or not name.strip()):
+            v.append(("stage_validation_error",
+                      f"{where} ho_ten={name!r} must be non-empty str/null"))
+    elif not (isinstance(name, str) and name.strip()):
         v.append(("stage_validation_error", f"{where} ho_ten required"))
     if row.get("gioi_tinh") not in GENDERS:
         v.append(("stage_validation_error",
                   f"{where} gioi_tinh={row.get('gioi_tinh')!r}"))
     for f in PERSON_DATE_FIELDS:
         val = row.get(f)
+        if isinstance(val, str) and not val.strip():
+            continue  # ô trống = chưa nhập, chuẩn hóa null khi ghi
         if val is not None and not (isinstance(val, str)
                                     and DATE_OR_YEAR_RX.match(val)):
             v.append(("stage_validation_error",
                       f"{where} {f}={val!r} bad date"))
 
 
-def check_asset_row(row, where, v, draft_v2=False):
+def check_asset_row(row, where, v, draft_v2=False, ctx=None,
+                    require_land_keys=False):
     if not isinstance(row, dict):
         v.append(("stage_validation_error", f"{where} not object"))
         return
@@ -285,10 +320,21 @@ def check_asset_row(row, where, v, draft_v2=False):
     # có thể rỗng/trùng — chỉ kiểm kiểu chuỗi, không ép format.
     if not isinstance(serial, str):
         v.append(("stage_validation_error", f"{where} so_serial not string"))
-    if not (isinstance(row.get("dia_chi"), str) and row["dia_chi"].strip()):
-        v.append(("stage_validation_error", f"{where} dia_chi required"))
+    if require_land_keys:
+        for f in ("so_thua_dat", "so_to_ban_do"):
+            val = row.get(f)
+            if not (isinstance(val, str) and val.strip()):
+                v.append(("stage_validation_error",
+                          f"{where} {f} required"))
+    addr = row.get("dia_chi")
+    # S4d/S5b: chuỗi rỗng/toàn khoảng trắng chuẩn hóa null, không lỗi.
+    if addr is not None and not isinstance(addr, str):
+        v.append(("stage_validation_error",
+                  f"{where} dia_chi={addr!r} must be str/null"))
+    # entity_id là gợi ý nội bộ — không phải lỗi field (§4.1 mục 5).
     nc = row.get("ngay_cap")
-    if nc is not None and not (isinstance(nc, str) and DATE_FULL_RX.match(nc)):
+    if nc is not None and not (isinstance(nc, str)
+                              and DATE_OR_YEAR_RX.match(nc)):
         v.append(("stage_validation_error", f"{where} ngay_cap={nc!r}"))
     lr = row.get("land_rows")
     if lr is not None:
@@ -302,10 +348,20 @@ def check_asset_row(row, where, v, draft_v2=False):
 
 
 def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
-                in_payload=False, allow_overflow=False):
+                in_payload=False, allow_overflow=False, intent="strict",
+                ctx=None):
     """people/assets rows + primary count + duplicate row_id.
-    draft_v2 (§13): stage = {owner_row_id?, people, assets}; assets ≤3;
-    two_party people ≤30; owner_row_id rules theo case_type/payload."""
+    draft_v2 (§13): stage = {owner_row_id?, people, assets}; assets ≤5;
+    two_party people ≤30. `intent` tách rõ:
+      output — ho_ten/owner nullable, owner key optional;
+      create — partial-create: rỗng/tên null/owner null được, owner non-null
+               vẫn phải là UUID trong people;
+      save — workspace_save_case (S1/S2 23/10/2026): rỗng/owner null được,
+             tên non-empty, mỗi asset cần số thửa + số tờ;
+      strict — commit/evaluate: tên non-empty, owner inheritance bắt buộc.
+    """
+    if intent not in STAGE_INTENTS:
+        raise ValueError(f"intent={intent!r}")
     if not isinstance(stage, dict):
         v.append(("validation_error", f"{where} not object"))
         return
@@ -315,24 +371,28 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
             v.append(("validation_error",
                       f"{where} extra keys {sorted(extra)}"))
         oid = stage.get("owner_row_id")
+        people_ids = {
+            r.get("row_id") for r in stage.get("people") or []
+            if isinstance(r, dict)}
         if case_type == "two_party":
             if "owner_row_id" in stage:
                 v.append(("validation_error",
                           f"{where}.owner_row_id forbidden for two_party"))
-        elif in_payload:
-            # commit/create/evaluate-nháp inheritance: phải trỏ row people
-            people_ids = {
-                r.get("row_id") for r in stage.get("people") or []
-                if isinstance(r, dict)}
+        elif intent in {"create", "save"}:
+            if oid is not None and (
+                    not (isinstance(oid, str) and UUID4_RX.match(oid))
+                    or oid not in people_ids):
+                v.append(("workspace_owner_required",
+                          f"{where}.owner_row_id={oid!r}"))
+        elif intent == "strict":
             if not (isinstance(oid, str) and UUID4_RX.match(oid)) \
                     or oid not in people_ids:
                 v.append(("workspace_owner_required",
                           f"{where}.owner_row_id={oid!r}"))
-        else:
-            # result stage: luôn emit owner_row_id (uuid4 hoặc null legacy)
-            if "owner_row_id" not in stage or (
-                    oid is not None and not (
-                        isinstance(oid, str) and UUID4_RX.match(oid))):
+        else:  # output
+            if oid is not None and (
+                    not (isinstance(oid, str) and UUID4_RX.match(oid))
+                    or oid not in people_ids):
                 v.append(("validation_error",
                           f"{where}.owner_row_id={oid!r}"))
     people = stage.get("people")
@@ -345,14 +405,19 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
         assets = []
     seen = set()
     for i, r in enumerate(people):
-        check_person_row(r, f"{where}.people[{i}]", v)
+        check_person_row(
+            r, f"{where}.people[{i}]", v,
+            allow_null_name=(draft_v2 and intent in {"create", "output"}),
+            in_payload=in_payload, ctx=ctx)
         rid = r.get("row_id") if isinstance(r, dict) else None
         if rid in seen:
             v.append(("stage_validation_error",
                       f"{where} duplicate row_id {rid!r}"))
         seen.add(rid)
     for i, r in enumerate(assets):
-        check_asset_row(r, f"{where}.assets[{i}]", v, draft_v2=draft_v2)
+        check_asset_row(r, f"{where}.assets[{i}]", v, draft_v2=draft_v2,
+                        ctx=ctx,
+                        require_land_keys=(draft_v2 and intent != "output"))
         rid = r.get("row_id") if isinstance(r, dict) else None
         if rid in seen:
             v.append(("stage_validation_error",
@@ -377,7 +442,7 @@ def check_stage(stage, where, v, draft_v2=False, case_type="inheritance",
 
 
 def check_positions(n, w, v):
-    """§13.4 — ownPositions/receivePositions ⊆ {1,2,3}, unique, non-null."""
+    """§13.4 — ownPositions/receivePositions ⊆ {1..5}, unique, non-null."""
     for f in ("ownPositions", "receivePositions"):
         arr = n.get(f)
         if not isinstance(arr, list):
@@ -464,15 +529,25 @@ def check_diagram_state_v2(state, where, stage_ids, v, case_type):
                     and all(isinstance(x, str) for x in ps)):
                 v.append(("diagram_invalid_state",
                           f"{w} parentSlotIds={ps!r}"))
-            ss = n.get("spouseSlotId")
-            if ss is not None and not isinstance(ss, str):
+            spouse_ids = n.get("spouseSlotIds")
+            if not isinstance(spouse_ids, list) or any(
+                    not isinstance(x, str) or not x for x in spouse_ids):
                 v.append(("diagram_invalid_state",
-                          f"{w} spouseSlotId={ss!r}"))
+                          f"{w} spouseSlotIds={spouse_ids!r}"))
+                spouse_ids = []
+            if len(set(spouse_ids)) != len(spouse_ids):
+                v.append(("diagram_invalid_state", f"{w} duplicate_spouse"))
+            expected = spouse_ids[-1] if spouse_ids else None
+            if n.get("spouseSlotId") != expected:
+                v.append(("diagram_invalid_state", f"{w} spouseSlotId mirror"))
+            if n.get("spouseSuggestionId") is not None and not isinstance(
+                    n.get("spouseSuggestionId"), str):
+                v.append(("diagram_invalid_state", f"{w} spouseSuggestionId"))
             if isinstance(nid, str):
                 if isinstance(ps, list) and nid in ps:
                     v.append(("diagram_invalid_state",
                               f"{w} self_parent"))
-                if ss == nid:
+                if nid in spouse_ids:
                     v.append(("diagram_invalid_state",
                               f"{w} self_spouse"))
         check_person_id(n, w, stage_ids, v)
@@ -605,7 +680,7 @@ def check_render_model(rm, where, v):
         v.append(("validation_error", f"{where}.conservation missing keys"))
     for i, r in enumerate(rm.get("requiredSlots") or []):
         if isinstance(r, dict) and r.get("reason") not in (
-                "active_estate", "representation_branch"):
+                "active_estate", "representation_branch", "living_owner"):
             v.append(("validation_error",
                       f"{where}.requiredSlots[{i}].reason="
                       f"{r.get('reason')!r}"))
@@ -719,10 +794,16 @@ def check_case_object(case, where, v, draft_v2=False):
     if not isinstance(case, dict):
         v.append(("validation_error", f"{where} missing/not object"))
         return
-    extra = set(case) - CASE_FIELDS
+    fields = CASE_FIELDS - {"locked"} if draft_v2 else CASE_FIELDS
+    extra = set(case) - fields - CASE_SCALAR_FIELDS - {"chudat"}
     if extra:
         v.append(("validation_error", f"{where} extra keys {sorted(extra)}"))
-    for rk in CASE_FIELDS:
+    if draft_v2:
+        if "locked" in case:
+            v.append(("validation_error", f"{where}.locked forbidden"))
+        if case.get("status") not in {"draft", "done"}:
+            v.append(("validation_error", f"{where}.status invalid"))
+    for rk in fields:
         if rk not in case:
             v.append(("validation_error", f"{where} missing {rk}"))
     ct = case.get("case_type")
@@ -748,8 +829,8 @@ def check_case_object(case, where, v, draft_v2=False):
         v.append(("validation_error", f"{where} ngay_lap_ho_so={nl!r}"))
 
 
-def check_create_payload(payload, v, draft_v2=False):
-    """notary.workspace_create — §4.3 (v1) / §13.6 (v2 draft)."""
+def check_create_payload(payload, v, draft_v2=False, ctx=None):
+    """notary.workspace_create — §4.3 (v1) / §13.6 (v2 partial-create)."""
     ik = payload.get("idempotency_key")
     if not (isinstance(ik, str) and UUID4_RX.match(ik)):
         v.append(("validation_error", f"idempotency_key={ik!r}"))
@@ -789,30 +870,25 @@ def check_create_payload(payload, v, draft_v2=False):
             v.append(("validation_error",
                       f"payload.case.ngay_lap_ho_so={nl!r}"))
     st = payload.get("stage")
+    intent = "create" if draft_v2 else "strict"
+    if draft_v2:
+        check_schema_definition("draft-v2.schema.json",
+                                "payload_workspace_create_v2", payload,
+                                v, "create")
     check_stage(st, "payload.stage", v, draft_v2=draft_v2,
-                case_type=case_type, in_payload=True)
+                case_type=case_type, in_payload=True, intent=intent,
+                ctx=ctx)
     people = st.get("people") if isinstance(st, dict) else None
     assets = st.get("assets") if isinstance(st, dict) else None
     row_ids = set()
     if isinstance(people, list):
-        if not people:
+        if not draft_v2 and not people:
             v.append(("stage_validation_error", "payload.stage.people empty"))
         for r in people:
-            if isinstance(r, dict):
-                if r.get("entity_id") is not None:
-                    v.append(("stage_validation_error",
-                              f"person row {r.get('row_id')!r} "
-                              "entity_id must be null"))
-                if isinstance(r.get("row_id"), str):
-                    row_ids.add(r["row_id"])
-    if isinstance(assets, list):
-        if not assets:
-            v.append(("stage_validation_error", "payload.stage.assets empty"))
-        for r in assets:
-            if isinstance(r, dict) and r.get("entity_id") is not None:
-                v.append(("stage_validation_error",
-                          f"asset row {r.get('row_id')!r} "
-                          "entity_id must be null"))
+            if isinstance(r, dict) and isinstance(r.get("row_id"), str):
+                row_ids.add(r["row_id"])
+    if isinstance(assets, list) and not draft_v2 and not assets:
+        v.append(("stage_validation_error", "payload.stage.assets empty"))
     dg = payload.get("diagram")
     state = dg.get("state") if isinstance(dg, dict) else None
     if draft_v2:
@@ -838,6 +914,43 @@ def check_create_payload(payload, v, draft_v2=False):
         if len(owners) != 1 or owners[0].get("personId") not in row_ids:
             v.append(("workspace_owner_required",
                       "node 'owner' must reference one stage person"))
+
+
+def check_schema_definition(schema_file, definition, value, v, label):
+    """Validate `value` against a concrete definition of a contract schema."""
+    documents = [json.loads(path.read_text(encoding="utf-8"))
+                 for path in HERE.glob("*.schema.json")]
+    store = {document["$id"]: document for document in documents}
+    schema = store[
+        f"https://systemdocs/contracts/notary-case-drafting/{schema_file}"]
+    resolver = RefResolver.from_schema(schema, store=store)
+    target = {**schema, "$ref": f"#/definitions/{definition}"}
+    for error in Draft7Validator(target, resolver=resolver).iter_errors(value):
+        path = ".".join(str(p) for p in error.absolute_path)
+        v.append(("validation_error",
+                  f"{label}.{definition}.{path}: {error.message}"))
+
+
+def check_save_case_schema(value, definition, v):
+    """Keep the new strict payload/result schema wired into this harness."""
+    check_schema_definition("workspace-save-case.schema.json", definition,
+                            value, v, "save_case")
+
+
+def check_save_case_payload(payload, ctx, v):
+    check_save_case_schema(payload, "payload", v)
+    stage = payload.get("stage")
+    if not isinstance(stage, dict) or any(
+            not isinstance(stage.get(key), list) for key in ("people", "assets")):
+        return  # Schema already reports the malformed Stage shape.
+    # Save path từ 23/10/2026 (S1/S2): 0 Người/0 Tài sản và owner null là
+    # hợp lệ; chỉ giữ tối thiểu họ tên + số thửa/số tờ.
+    case_type = _payload_case_type(payload, ctx)
+    check_stage(stage, "payload.stage", v, draft_v2=True,
+                case_type=case_type, in_payload=True, intent="save",
+                ctx=ctx)
+    if "case_id" in payload:
+        check_base_revision(payload, ctx, v)
 
 
 def check_update_payload(payload, ctx, v):
@@ -1019,6 +1132,85 @@ def _has_data_warning(data, code):
         isinstance(w, dict) and w.get("code") == code for w in ws)
 
 
+def _check_output_stage_owner(stage, ct, where, v, require_key=True):
+    if not isinstance(stage, dict):
+        return
+    if ct == "two_party":
+        if "owner_row_id" in stage:
+            v.append(("validation_error",
+                      f"{where}.owner_row_id forbidden for two_party"))
+        return
+    if require_key and "owner_row_id" not in stage:
+        v.append(("validation_error", f"{where}.owner_row_id missing"))
+    oid = stage.get("owner_row_id")
+    if oid is not None:
+        people = {r.get("row_id") for r in stage.get("people") or []
+                  if isinstance(r, dict)}
+        if not (isinstance(oid, str) and UUID4_RX.match(oid)) \
+                or oid not in people:
+            v.append(("validation_error",
+                      f"{where}.owner_row_id={oid!r} outside stage"))
+
+
+def check_source_latest_data(data, v, ctx):
+    check_schema_definition("workspace-source-latest.schema.json",
+                            "result_data", data, v, "source_latest")
+    sid = data.get("source_case_id")
+    status = data.get("source_status")
+    if (sid is None) != (status is None):
+        v.append(("validation_error",
+                  "source_case_id/source_status must be null together"))
+    if sid is not None and status != "done":
+        v.append(("validation_error",
+                  f"source_status={status!r} must be done"))
+    ct = ctx.get("source_case_type", "inheritance")
+    if ct not in DRAFT_CASE_TYPES:
+        v.append(("validation_error", f"source_case_type={ct!r}"))
+    st = data.get("stage")
+    check_stage(st, "data.stage", v, draft_v2=True, case_type=ct,
+                intent="output", ctx=ctx)
+    # Có nguồn inheritance: key owner vẫn được emit (UUID hoặc null).
+    _check_output_stage_owner(st, ct, "data.stage", v,
+                              require_key=sid is not None)
+    if sid is None and isinstance(st, dict):
+        if st.get("people") or st.get("assets"):
+            v.append(("validation_error",
+                      "no-source stage must be empty"))
+    known = ctx.get("source_row_ids")
+    if sid is not None and isinstance(known, list) and isinstance(st, dict):
+        for key in ("people", "assets"):
+            for row in st.get(key) or []:
+                if isinstance(row, dict) and row.get("row_id") in known:
+                    v.append(("validation_error",
+                              f"data.stage.{key} row_id reused from source"))
+
+
+def check_duplicate_data(data, v, ctx):
+    check_schema_definition("workspace-duplicate.schema.json",
+                            "result_data", data, v, "duplicate")
+    if not isinstance(data.get("created"), bool):
+        v.append(("validation_error",
+                  f"duplicate.created={data.get('created')!r}"))
+    case = data.get("case") if isinstance(data.get("case"), dict) else {}
+    ct = case.get("case_type", "inheritance")
+    st = data.get("stage")
+    check_stage(st, "data.stage", v, draft_v2=True, case_type=ct,
+                intent="output", ctx=ctx)
+    _check_output_stage_owner(st, ct, "data.stage", v, require_key=True)
+    if data.get("created") is True:
+        if case.get("status") != "draft":
+            v.append(("validation_error",
+                      "duplicate first-create status must be draft"))
+        if case.get("revision") != 1:
+            v.append(("validation_error",
+                      "duplicate first-create revision must be 1"))
+        if ctx.get("duplicate_replay") is True:
+            v.append(("validation_error",
+                      "duplicate created=true contradicts replay context"))
+    elif ctx.get("duplicate_replay") is True and not case:
+        v.append(("validation_error", "duplicate replay without workspace"))
+
+
 def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
     if not isinstance(data, dict):
         v.append(("validation_error", "result.data not object"))
@@ -1052,16 +1244,29 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
             elif (r["level"] == "province") != (r.get("province") is None):
                 v.append(("validation_error", "address_lookup province ref invalid"))
         return
+    if kind == "workspace_source_latest":
+        check_source_latest_data(data, v, ctx or {})
+        return
+    if kind == "workspace_duplicate":
+        check_duplicate_data(data, v, ctx or {})
+        return
     want_sv = DRAFT_SCHEMA_VERSION if draft_v2 else SCHEMA_VERSION
     if data.get("schema_version") != want_sv:
         v.append(("validation_error",
                   f"schema_version={data.get('schema_version')!r}"))
     ct = _data_case_type(data, ctx) if draft_v2 else "inheritance"
-    if kind == "workspace_get" or kind == "workspace_create":
-        if kind == "workspace_create" \
+    if kind in ("workspace_get", "workspace_create", "workspace_convert_type",
+                "workspace_save_case"):
+        if kind in ("workspace_create", "workspace_save_case") \
                 and not isinstance(data.get("created"), bool):
             v.append(("validation_error",
                       f"data.created={data.get('created')!r}"))
+        if kind == "workspace_save_case":
+            if not draft_v2 or (data.get("case") or {}).get("status") != "done":
+                v.append(("validation_error", "Save Case requires v2 done result"))
+            if (data.get("diagram") or {}).get("render_model") is None:
+                v.append(("validation_error", "Save Case requires render_model"))
+            check_save_case_schema(data, "result_data", v)
         check_case_object(data.get("case"), "data.case", v,
                           draft_v2=draft_v2)
         caps = data.get("capabilities")
@@ -1077,7 +1282,11 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
         allow_overflow = draft_v2 \
             and _has_data_warning(data, "stage.legacy_asset_overflow")
         check_stage(data.get("stage"), "data.stage", v, draft_v2=draft_v2,
-                    case_type=ct, allow_overflow=allow_overflow)
+                    case_type=ct, allow_overflow=allow_overflow,
+                    intent="output", ctx=ctx)
+        if draft_v2 and ct == "inheritance":
+            _check_output_stage_owner(data.get("stage"), ct,
+                                      "data.stage", v)
         dg = data.get("diagram")
         if isinstance(dg, dict):
             if draft_v2:
@@ -1109,7 +1318,10 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
             v.append(("validation_error",
                       f"revision={data.get('revision')!r}"))
         check_stage(data.get("stage"), "data.stage", v, draft_v2=draft_v2,
-                    case_type=ct)
+                    case_type=ct, intent="output", ctx=ctx)
+        if draft_v2 and ct == "inheritance":
+            _check_output_stage_owner(data.get("stage"), ct,
+                                      "data.stage", v)
         dg = data.get("diagram")
         if isinstance(dg, dict):
             check_diagram_state(dg.get("state"), "data.diagram.state",
@@ -1259,7 +1471,7 @@ def violations(doc):
     stage_ids = set()
     res = doc.get("result") or {}
     data = res.get("data") if isinstance(res, dict) else {}
-    payload = doc.get("payload") or {}
+    payload = doc.get("payload")
     for container in (data, payload):
         st = container.get("stage") if isinstance(container, dict) else None
         if isinstance(st, dict):
@@ -1289,6 +1501,33 @@ def violations(doc):
                 v.append(("validation_error", "address_lookup presentation invalid"))
         elif cmd == "notary.intake_analyze":
             check_intake_payload(payload, v)
+        elif cmd == "notary.workspace_save_case":
+            if not draft_v2:
+                v.append(("validation_error", "Save Case requires wire v2"))
+            check_save_case_payload(payload, ctx, v)
+        elif cmd == "notary.workspace_source_latest":
+            check_schema_definition("workspace-source-latest.schema.json",
+                                    "payload", payload, v, "source_latest")
+        elif cmd == "notary.workspace_duplicate":
+            check_schema_definition("workspace-duplicate.schema.json",
+                                    "payload", payload, v, "duplicate")
+            src_ct = ctx.get("source_case_type")
+            if isinstance(src_ct, str) and src_ct not in DRAFT_CASE_TYPES:
+                v.append(("case_type_unsupported",
+                          f"source_case_type={src_ct!r}"))
+            reg = ctx.get("duplicate_key_registry")
+            key = payload.get("idempotency_key")
+            if isinstance(reg, dict) and key in reg:
+                prev = reg[key]
+                same = (isinstance(prev, dict)
+                        and prev.get("command") == "workspace_duplicate"
+                        and prev.get("intent") == "draft"
+                        and prev.get("source_case_id")
+                        == payload.get("source_case_id"))
+                if not same:
+                    v.append(("idempotency_conflict",
+                              f"key {key!r} used for another "
+                              "command/intent/source"))
         elif cmd == "notary.workspace_commit_stage":
             check_base_revision(payload, ctx, v)
             # đợt 3: payload.case optional — meta hồ sơ cùng transaction
@@ -1319,7 +1558,8 @@ def violations(doc):
                                   "payload.case.nguoi_nhan_uy_quyen_id="
                                   f"{uq!r}"))
             check_stage(payload.get("stage"), "payload.stage", v,
-                        draft_v2=draft_v2, case_type=ct, in_payload=True)
+                        draft_v2=draft_v2, case_type=ct, in_payload=True,
+                        intent="strict", ctx=ctx)
         elif cmd == "notary.diagram_save":
             check_base_revision(payload, ctx, v)
             if draft_v2:
@@ -1341,10 +1581,28 @@ def violations(doc):
                                       f"!= owner_row_id={oid!r}"))
         elif cmd == "notary.word_export_batch":
             check_word_batch_payload(payload, v)
+        elif cmd == "notary.workspace_convert_type":
+            check_base_revision(payload, ctx, v)
+            target = payload.get("case_type")
+            docs = DOCUMENT_TYPES if target == "inheritance" else DRAFT_TWO_PARTY_DOC_TYPES
+            if (set(payload) - {"case_id", "base_revision", "case_type",
+                                "document_type", "confirm_diagram_reset", "owner_row_id"}
+                    or target not in DRAFT_CASE_TYPES
+                    or target == ctx.get("case_type")
+                    or payload.get("document_type") not in docs
+                    or payload.get("confirm_diagram_reset") is not True):
+                v.append(("validation_error", "invalid conversion destination/confirmation"))
+            if target == "inheritance":
+                owner = payload.get("owner_row_id")
+                if not isinstance(owner, str) or not UUID4_RX.match(owner) or (
+                        stage_ids is not None and owner not in stage_ids):
+                    v.append(("workspace_owner_required", "conversion owner outside saved Stage"))
+            elif "owner_row_id" in payload:
+                v.append(("validation_error", "owner forbidden for two_party"))
         elif cmd == "notary.workspace_update":
             check_update_payload(payload, ctx, v)
         elif cmd == "notary.workspace_create":
-            check_create_payload(payload, v, draft_v2=draft_v2)
+            check_create_payload(payload, v, draft_v2=draft_v2, ctx=ctx)
         # NAIA-8: word_export_* trên two_party KHÔNG còn bị chặn
         # case_type_unsupported — engine hỗ trợ context/mapping hai bên.
         # case_id: bắt buộc / nháp được / cấm — §2.1a
@@ -1378,7 +1636,8 @@ def violations(doc):
             st = payload.get("stage") if isinstance(payload, dict) else None
             if st is not None and cmd == "notary.diagram_evaluate":
                 check_stage(st, "payload.stage", v, draft_v2=draft_v2,
-                            case_type=ct, in_payload=True)
+                            case_type=ct, in_payload=True, intent="strict",
+                            ctx=ctx)
         # diagram state trong payload (evaluate/save/create)
         dg = payload.get("diagram") if isinstance(payload, dict) else None
         if isinstance(dg, dict) and "state" in dg:

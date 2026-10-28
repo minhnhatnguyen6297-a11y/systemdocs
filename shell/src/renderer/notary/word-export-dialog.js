@@ -15,26 +15,36 @@
  * - Mot lan notary.word_export_batch; progress + cancel theo job seam.
  * - Ket qua per-document: Đã lưu (+Mở file qua openPath) / Lỗi (+ly do) /
  *   Bỏ qua (breakdown.skipped — canceled giua batch, MIN-115).
- * - "Nơi niêm yết" la meta hồ sơ: hien gia tri da luu, Luu qua
- *   model.saveCaseMeta → notary.workspace_update (§6.2); loi luu bao ro.
+ * - "Nơi niêm yết" la meta hồ sơ: hien gia tri da luu; sửa trong dialog
+ *   được ghi kèm trong CHÍNH hành động xuất (owner 23/10/2026 phần W) —
+ *   không còn nút/nhắc "lưu trước khi xuất" riêng.
  * - partial/all-failed/canceled deu render; KHONG tu dong khi con loi.
  *
  * Export UMD: window.G1_NOTARY_WORD + module.exports. DOM chi trong open().
  */
 
 const WORD_BLOCK_LABEL = {
-  'word.no_people': 'Stage chưa có người nào',
-  'word.no_diagram': 'Chưa có sơ đồ hai bên đã lưu',
-  'word.no_assets': 'Hồ sơ chưa có tài sản',
-  'word.no_landowner': 'Chưa có chủ đất trên sơ đồ',
-  'word.no_deceased_landowner': 'Chưa có chủ đất đã mất',
-  'word.no_receiver': 'Chưa có người nhận',
+  // Chỉ còn lý do KỸ THUẬT (owner 23/10/2026 phần W): thiếu dữ kiện không
+  // khoá file nữa — nó thành dòng "thiếu: …" trong kết quả từng file.
   'word.too_many_assets': 'Quá nhiều tài sản (tối đa 5)',
-  'word.too_many_people': 'Quá nhiều người trong Stage',
+  'word.too_many_people': 'Quá nhiều người trong hồ sơ',
   'word.too_many_signers': 'Quá nhiều người ký',
   'word.template_missing': 'Văn bản không còn mẫu trong thư mục',
   'word.original_mapping_invalid': 'Hãy kiểm tra và xác nhận lại các vị trí Word gốc',
+  // Mã per-file mà readiness cũng dùng (mẫu không mở/parse được, file đích
+  // khóa/mất) — readiness chỉ có code nên cần nhãn tiếng Việt; hàng kết quả
+  // dùng cùng nếp ưu tiên nhãn như các mã word.* phía trên.
+  'word.render_failed': 'Không xuất được văn bản từ mẫu',
+  'file_locked': 'File đang bị khóa bởi chương trình khác',
+  'file_not_found': 'Không tìm thấy file',
 };
+
+// Có chữ cho user (message hoặc mục catalog) thì dùng; mã trần thì không.
+function WORD_ERROR_HAS_TEXT(e) {
+  const cat = typeof window !== 'undefined' && window.G1_NOTARY_ERRORS;
+  return !!(e && (e.message ||
+    (cat && cat.ERROR_CATALOG && e.code && cat.ERROR_CATALOG[e.code])));
+}
 
 function createWordDialog(ctx) {
   const model = ctx.model;
@@ -47,6 +57,10 @@ function createWordDialog(ctx) {
   const pickFiles = ctx.pickFiles || (async () => ({ ok: false }));
   const openPath = ctx.openPath || (async () => ({ ok: false }));
   const cancelJob = ctx.cancelJob || (async () => ({ ok: false }));
+  const actionStatus = ctx.actionStatus ||
+    { run: (sel, root, task) => task() };
+  const errText = ctx.errText ||
+    ((e) => (e && (e.message || e.code)) || 'lỗi');
 
   function reasonText(code, message) {
     return WORD_BLOCK_LABEL[code] || message || code || 'lỗi';
@@ -63,6 +77,11 @@ function createWordDialog(ctx) {
       row.append(h('span', 'muted', d.actual_filename || ''));
       if (outPath) {
         row.append(btn('Mở file', '', () => openPath(outPath)));
+      }
+      // W6/W8: dữ kiện thiếu là KẾT QUẢ của file (đã xuất, chỗ đó trống).
+      if (Array.isArray(d.missing) && d.missing.length) {
+        row.append(h('span', 'muted',
+          `thiếu: ${d.missing.join(', ')}`));
       }
     } else if (d.status === 'skipped') {
       row.append(h('span', 'cd-badge', 'Bỏ qua'));
@@ -83,7 +102,7 @@ function createWordDialog(ctx) {
   async function pickDirToken() {
     const r = await pickFiles({ directory: true });
     if (!r.ok) {
-      notify(`${r.error.code}: ${r.error.message}`, true);
+      notify(errText(r.error), true);
       return null;
     }
     const f = (r.data.files || [])[0];
@@ -111,9 +130,9 @@ function createWordDialog(ctx) {
       let checks = [];                       // [{key, cb}]
       let exporting = false;
       let scanning = false;                  // dang quet thu muc mau
-      let savingMeta = false;                // dang luu meta (workspace_update)
       let mappingDirty = false;
       let mappingChoices = [];
+      let applyPendingBindings = null;   // áp lựa chọn mapping (source hiện tại)
 
       const tplLabel = h('span', 'muted', 'Chưa chọn thư mục mẫu');
       const destLabel = h('span', 'muted', 'Chưa chọn thư mục đích');
@@ -142,18 +161,20 @@ function createWordDialog(ctx) {
       const selBar = h('div', 'cd-toolbar');
       selBar.append(selAll, selNone);
 
-      // Khoa Xuat + nut chon khi dang quet folder mau, dang xuat hoac
-      // dang luu meta — options/selection/noi_niem_yet dang doi, khong
-      // cho nguoi dung xuat luc do.
+      // Khoa Xuat + nut chon khi dang quet folder mau hoac dang xuat —
+      // options/selection dang doi. Mapping chua áp KHÔNG khoá Xuất: hành
+      // động xuất tự áp lựa chọn hiện tại trước khi lưu + xuất (W2).
       function refreshScanLock() {
-        go.disabled = scanning || exporting || savingMeta || mappingDirty ||
-          !model.canWrite();
+        go.disabled = scanning || exporting || !model.canWrite();
         selAll.disabled = scanning || exporting || !checks.length;
         selNone.disabled = scanning || exporting || !checks.length;
-        for (const choice of mappingChoices) choice.cb.disabled = scanning || exporting || savingMeta || !choice.proposal.supported;
+        for (const choice of mappingChoices) {
+          choice.cb.disabled = scanning || exporting ||
+            !choice.proposal.supported;
+        }
       }
 
-      function renderDocs() {
+      function renderDocs(confirmedBindingCount = 0) {
         // Doi folder → selection cu mat (checkbox rebuilt tu options moi).
         checks = [];
         listBox.innerHTML = '';
@@ -164,14 +185,20 @@ function createWordDialog(ctx) {
           return;
         }
         for (const d of docs) {
+          // Chỉ mở chọn cục bộ để đi tới Lưu & xuất; model vẫn tải lại
+          // readiness từ server sau khi lưu bindings (W2).
+          const ready = d.ready || (originalSourceId &&
+            d.document_key === 'original.docx' &&
+            d.block_reason === 'word.original_mapping_invalid' &&
+            confirmedBindingCount > 0);
           const lab = h('label', 'cd-check-row');
           const cb = h('input');
           cb.type = 'checkbox';
-          cb.disabled = !d.ready;
-          cb.checked = !!d.ready;
+          cb.disabled = !ready;
+          cb.checked = !!ready;
           cb.setAttribute('aria-label', d.display_name || d.document_key);
           lab.append(cb, h('span', '', d.display_name || d.document_key));
-          if (!d.ready) {
+          if (!ready) {
             lab.append(h('span', 'muted',
               ` — ${WORD_BLOCK_LABEL[d.block_reason] || d.block_reason ||
                 'chưa sẵn sàng'}`));
@@ -182,7 +209,7 @@ function createWordDialog(ctx) {
       }
 
       const pickTpl = btn('Chọn thư mục mẫu…', '', async () => {
-        if (exporting || savingMeta) return;
+        if (exporting) return;
         const f = await pickDirToken();
         if (!f) return;
         tplToken = { file_token: f.file_token };
@@ -205,7 +232,8 @@ function createWordDialog(ctx) {
           tplToken = null;
           checks = [];
           listBox.innerHTML = '';
-          listBox.append(face(L.faceError(r.error)));
+          listBox.append(face({ kind: 'error',
+            title: errText(r.error) }));
           return;
         }
         renderDocs();
@@ -225,20 +253,18 @@ function createWordDialog(ctx) {
       });
       cancelBtn.hidden = true;
 
-      const go = btn('Xuất', 'primary', async () => {
-        if (exporting || scanning || savingMeta) return;
-        if (mappingDirty) { notify('Hãy xác nhận và lưu lựa chọn vị trí trước khi xuất', true); return; }
-        if (postingChanged()) {
-          niemYetMsg.textContent = 'Nơi niêm yết đã thay đổi. Hãy bấm “Lưu nơi niêm yết” trước khi xuất.';
-          niemYetMsg.className = 'error';
-          niemYetInput.focus();
-          return;
-        }
-        const keys = checks.filter((c) => c.cb.checked).map((c) => c.key);
+      const go = btn('Xuất', 'primary js-word-export', async () => {
+        if (exporting || scanning) return;
         if (!tplToken && !originalSourceId) {
           notify('Chưa chọn thư mục chứa file mẫu.', true);
           return;
         }
+        // Lựa chọn mapping chưa áp được ghi trong CÙNG hành động xuất —
+        // user không phải bấm Áp dụng rồi Lưu rồi mở lại (owner 23/10).
+        if (mappingDirty && applyPendingBindings && !applyPendingBindings()) {
+          return;
+        }
+        const keys = checks.filter((c) => c.cb.checked).map((c) => c.key);
         if (!keys.length) {
           notify('Chưa chọn văn bản nào.', true);
           return;
@@ -254,20 +280,21 @@ function createWordDialog(ctx) {
         cancelBtn.hidden = false;
         out.innerHTML = '';
         prog.textContent = 'Đang gửi…';
-        const rr = await model.exportWord(
-          keys, destToken, {
-            templateDir: tplToken,
-            originalSourceId,
-            createCaseSubdir: subdirCb.checked,
-            onJob: (job) => {
-              if (job && job.job_id) jobId = job.job_id;
-              const p = job && job.progress;
-              prog.textContent = p
-                ? `Đang xuất ${p.done ?? 0}/${p.total ?? '?'} — ` +
-                  (p.current_label || '')
-                : 'Đang xuất…';
-            },
-          });
+        const rr = await actionStatus.run('.js-word-export', box,
+          () => model.exportWord(
+            keys, destToken, {
+              templateDir: tplToken,
+              originalSourceId,
+              createCaseSubdir: subdirCb.checked,
+              onJob: (job) => {
+                if (job && job.job_id) jobId = job.job_id;
+                const p = job && job.progress;
+                prog.textContent = p
+                  ? `Đang xuất ${p.done ?? 0}/${p.total ?? '?'} — ` +
+                    (p.current_label || '')
+                  : 'Đang xuất…';
+              },
+            }), { ok: (x) => !!(x && x.ok) });
         if (rr.stale) return;
         jobId = null;
         exporting = false;
@@ -297,7 +324,8 @@ function createWordDialog(ctx) {
               'Đã hủy — phần chưa xuất đánh dấu “Bỏ qua”.'));
           }
         } else if (!rr.ok) {
-          out.append(face(L.faceError(rr.error || { code: 'unknown' })));
+          out.append(face({ kind: 'error',
+            title: errText(rr.error || { code: 'unknown' }) }));
         }
         // Khong tu dong dialog khi con loi/cancel (spec §5) — nguoi
         // dung doc ket qua roi tu dong.
@@ -305,68 +333,21 @@ function createWordDialog(ctx) {
       go.disabled = !model.canWrite();   // export_batch la write (§5.3)
       refreshScanLock();                 // checks rong → nut chon khoa
 
-      // ---- Nơi niêm yết (meta hồ sơ — §6.2 workspace_update) ----
-      // Gia tri khoi tao tu caseInfo da tai qua workspace_get; mo lai
-      // dialog doc lai state moi nhat. Luu loi → hien ro tai cho + notify.
+      // ---- Nơi niêm yết (meta hồ sơ) ----
+      // Giá trị khởi tạo từ caseInfo đã tải qua workspace_get. Sửa ở đây
+      // đi vào buffer meta (updateCaseMeta) và được ghi KÈM trong hành
+      // động xuất — không còn nút "Lưu nơi niêm yết" thứ hai (W4).
       const niemYetInput = h('input');
       niemYetInput.type = 'text';
       niemYetInput.setAttribute('aria-label', 'Nơi niêm yết');
-      const metaCanEdit = model.canWrite() &&
-        typeof model.saveCaseMeta === 'function';
-      niemYetInput.disabled = !metaCanEdit;
+      niemYetInput.disabled = !model.canWrite();
       niemYetInput.value =
         (model.state.caseInfo && model.state.caseInfo.noi_niem_yet) || '';
-      const niemYetMsg = h('span', 'muted', '');
-      function postingChanged() {
-        const committed = model.state.committedCaseInfo || {};
-        return niemYetInput.value.trim() !== (committed.noi_niem_yet || '').trim();
-      }
-      function showPostingDraft() {
-        niemYetMsg.textContent = postingChanged()
-          ? 'Nơi niêm yết đã thay đổi. Hãy bấm “Lưu nơi niêm yết” trước khi xuất.' : '';
-        niemYetMsg.className = postingChanged() ? 'error' : 'muted';
-      }
       niemYetInput.oninput = () => {
-        if (typeof model.updateCaseMeta === 'function') model.updateCaseMeta('noi_niem_yet', niemYetInput.value || null);
-        showPostingDraft();
+        if (typeof model.updateCaseMeta === 'function') {
+          model.updateCaseMeta('noi_niem_yet', niemYetInput.value || null);
+        }
       };
-      showPostingDraft();
-      const niemYetSave = btn('Lưu nơi niêm yết', 'sm', async () => {
-        if (exporting || scanning || savingMeta || !metaCanEdit) return;
-        // Khoa Xuat + input + Luu lap trong luc save pending — batch phai
-        // chay voi gia tri da persist xong, khong phai ban cu (review:
-        // bam Luu roi Xuat ngay truoc day van xuat voi noi cu).
-        savingMeta = true;
-        niemYetInput.disabled = true;
-        niemYetSave.disabled = true;
-        refreshScanLock();
-        niemYetMsg.textContent = '';
-        niemYetMsg.className = 'muted';
-        const v = niemYetInput.value.trim();
-        let r;
-        try {
-          r = await model.saveCaseMeta({ noi_niem_yet: v || null });
-        } finally {
-          savingMeta = false;
-          // Mo lai theo quyen hien tai — save loi locked/conflict co
-          // the doi canWrite (locked → giu khoa luon).
-          const canEdit = metaCanEdit && model.canWrite();
-          niemYetInput.disabled = !canEdit;
-          niemYetSave.disabled = !canEdit;
-          refreshScanLock();
-        }
-        if (!r || !r.ok) {
-          const e = (r && r.error) || {};
-          niemYetMsg.textContent =
-            `Lưu thất bại: ${e.message || e.code || 'lỗi'}`;
-          niemYetMsg.className = 'error';
-          notify(
-            `Lưu nơi niêm yết thất bại: ${e.code || 'lỗi'}`, true);
-          return;
-        }
-        niemYetMsg.textContent = 'Đã lưu.';
-      });
-      niemYetSave.disabled = !metaCanEdit;
       const niemYetRow = h('div', ctx.postingTraButton ? 'cd-slot' : 'cd-toolbar');
       niemYetRow.append(h('span', '', 'Nơi niêm yết:'));
       if (ctx.postingTraButton) {
@@ -374,7 +355,7 @@ function createWordDialog(ctx) {
         niemYetInput.classList.add('cd-cell');
         lookupRow.append(niemYetInput, ctx.postingTraButton(niemYetInput));
         niemYetRow.append(lookupRow);
-      } else niemYetRow.append(niemYetInput, niemYetSave, niemYetMsg);
+      } else niemYetRow.append(niemYetInput);
       if (ctx.postingSuggestionEl) {
         const postingSuggestions = h('div', 'cd-slot');
         let postingSlot;
@@ -382,7 +363,9 @@ function createWordDialog(ctx) {
           postingSlot = model.state.addressSlots && model.state.addressSlots['posting:posting'];
           postingSuggestions.replaceChildren(ctx.postingSuggestionEl(candidate => {
             niemYetInput.value = candidate.address;
-            showPostingDraft();
+            if (typeof model.updateCaseMeta === 'function') {
+              model.updateCaseMeta('noi_niem_yet', candidate.address || null);
+            }
           }));
         }
         refreshPostingSuggestions();
@@ -394,11 +377,6 @@ function createWordDialog(ctx) {
           refreshPostingSuggestions();
         });
       }
-      if (ctx.postingTraButton) {
-        const postingActions = h('div', 'cd-toolbar');
-        postingActions.append(niemYetSave, niemYetMsg);
-        niemYetRow.append(postingActions);
-      }
 
       const tplRow = h('div', 'cd-toolbar');
       tplRow.append(pickTpl, tplLabel);
@@ -406,36 +384,37 @@ function createWordDialog(ctx) {
       for (const source of (model.state.docxImport && model.state.docxImport.sources) || []) {
         const sourceRow = h('div', 'cd-toolbar'); originalBox.append(sourceRow);
         const sourceLabel = source.label || `Nguồn ${source.source_id.slice(0, 8)}`;
-        sourceRow.append(btn('Gỡ nguồn Word: ' + sourceLabel, 'ghost sm', async () => {
-          if (exporting || scanning || savingMeta) return;
-          const previousContext = JSON.parse(JSON.stringify(model.state.docxImport));
-          const previousDirty = model.state.stageDirty;
-          const previousCase = model.state.caseId;
+        sourceRow.append(btn('Gỡ nguồn Word: ' + sourceLabel, 'ghost sm', () => {
+          if (exporting || scanning) return;
+          // Gỡ nguồn chỉ sửa docx_import của bản đang sửa; DB ghi ở lần
+          // Lưu hồ sơ kế tiếp.
           if (!model.detachOriginalSource(source.source_id)) return;
-          savingMeta = true;
-          refreshScanLock();
-          let committed = false;
-          try {
-            const saved = await model.commitStage();
-            if (!saved.ok) { notify(saved.error.message || saved.error.code, true); return; }
-            committed = true;
-            if (model.state.caseId !== previousCase || saved.stale) return;
-            if (originalSourceId === source.source_id) { originalSourceId = null; mappingDirty = false; checks = []; listBox.innerHTML = ''; }
-            sourceRow.remove();
-            notify('Đã gỡ nguồn Word; dữ liệu Stage vẫn được giữ');
-          } catch (error) {
-            notify(error.message || 'Không lưu được việc gỡ nguồn Word', true);
-          } finally {
-            if (!committed && model.state.caseId === previousCase) {
-              model.state.docxImport = previousContext;
-              model.state.stageDirty = previousDirty;
-            }
-            savingMeta = false; refreshScanLock();
+          if (originalSourceId === source.source_id) {
+            originalSourceId = null;
+            mappingDirty = false;
+            checks = [];
+            mappingChoices = [];
+            model.state.wordOptions = null;
+            model.state.wordBindingProposals = [];
+            model.state.wordProposalSnapshot = null;
+            listBox.innerHTML = '';
           }
+          sourceRow.remove();
+          refreshScanLock();
         }));
         sourceRow.append(btn('Dùng hợp đồng Word đã nhập: ' + sourceLabel, 'secondary', async () => {
-          if (exporting || scanning || savingMeta) return;
-          if (model.hasUnsaved()) { notify('Hãy Cập nhật Stage và Lưu sơ đồ trước khi gắn vị trí', true); return; }
+          if (exporting || scanning) return;
+          // Nguồn gốc sống trong DB: hồ sơ chưa lưu/đang dirty được LƯU
+          // ngay trong thao tác này rồi mới tải vị trí (W2) — không còn
+          // câu "Hãy Lưu hồ sơ trước khi…".
+          if (model.state.caseId == null || model.hasUnsaved()) {
+            const saved = typeof model.saveCase === 'function'
+              ? await model.saveCase() : { ok: true };
+            if (!saved || !saved.ok) {
+              notify(errText((saved && saved.error) || {}), true);
+              return;
+            }
+          }
           originalSourceId = source.source_id;
           mappingDirty = false;
           tplToken = null;
@@ -453,13 +432,16 @@ function createWordDialog(ctx) {
           scanning = false;
           if (!r.ok) {
             listBox.innerHTML = '';
-            listBox.append(h('div', 'error', 'Không tải được các vị trí Word; chọn lại nguồn để thử lại.'));
-            notify(r.error.message || r.error.code, true); refreshScanLock(); return;
+            // Mã lỗi không kèm message/catalog vẫn phải nói đúng việc đang hỏng.
+            const e = r.error || {};
+            const known = WORD_ERROR_HAS_TEXT(e);
+            listBox.append(h('div', 'error',
+              known ? errText(e) : 'Không tải được các vị trí Word'));
+            refreshScanLock(); return;
           }
           tplLabel.textContent = 'Mẫu: hợp đồng Word gốc đã lưu trong hồ sơ';
           renderDocs();
           const mappingBox = h('div', 'cd-slot');
-          mappingBox.append(h('div', 'muted', 'Chọn từng vị trí sẽ thay. Chữ gốc → dòng đã lưu → giá trị xuất. Các chỗ không chọn giữ nguyên.'));
           const choices = [];
           mappingChoices = choices;
           for (const proposal of model.state.wordBindingProposals || []) {
@@ -468,70 +450,43 @@ function createWordDialog(ctx) {
             cb.type = 'checkbox';
             cb.disabled = !proposal.supported;
             cb.checked = !!proposal.selected;
-            cb.onchange = () => { if (savingMeta || exporting || scanning) return; mappingDirty = true; refreshScanLock(); };
+            cb.onchange = () => { if (exporting || scanning) return; mappingDirty = true; refreshScanLock(); };
             cb.setAttribute('aria-label', `${proposal.raw_snippet} thành ${proposal.slot}`);
-            lab.append(cb, h('span', '', `${proposal.raw_snippet} → ${proposal.row_label} (${proposal.row_id}) · ${proposal.slot} → ${proposal.value}`));
+            lab.append(cb, h('span', '', `${proposal.raw_snippet} → ${proposal.row_label} · ${proposal.slot} → ${proposal.value}`));
             if (!proposal.supported) lab.append(h('span', 'error', proposal.reason || 'Vùng Word chưa hỗ trợ sửa'));
             mappingBox.append(lab);
             choices.push({ proposal, cb });
           }
-          mappingBox.append(btn('Xác nhận và lưu các vị trí đã chọn', 'primary sm', async () => {
-            if (exporting || scanning || savingMeta || originalSourceId !== source.source_id) return;
+          // Áp lựa chọn hiện tại vào docx_import (chưa ghi DB — lần Lưu
+          // trong hành động xuất mới ghi). Hàm này được cả nút Áp dụng
+          // lẫn nút Xuất dùng (W2: không bắt user bấm Áp dụng trước).
+          function applyChoicesNow() {
+            if (originalSourceId !== source.source_id) return false;
             const bindings = choices.filter((c) => c.cb.checked && !c.cb.disabled).map((c) => c.proposal);
-            const previousContext = JSON.parse(JSON.stringify(model.state.docxImport));
-            const previousDirty = model.state.stageDirty;
-            const previousCase = model.state.caseId;
-            if (!model.confirmOriginalBindings(originalSourceId, bindings)) { notify('Hồ sơ đã đổi; hãy tải lại', true); return; }
-            savingMeta = true;
-            for (const choice of choices) choice.cb.disabled = true;
-            refreshScanLock();
-            let committed = false;
-            try {
-              const saved = await model.commitStage();
-              if (!saved.ok) {
-                notify(saved.error.message || saved.error.code, true); return;
-              }
-              committed = true;
-              if (saved.stale || model.state.caseId !== previousCase) return;
-              mappingDirty = false;
-              const loaded = await model.loadWordOptions(null, source.source_id);
-              if (loaded.stale || model.state.caseId !== previousCase) return;
-              if (!loaded.ok) {
-                checks = []; mappingChoices = [];
-                listBox.innerHTML = '';
-                listBox.append(h('div', 'error', 'Đã lưu vị trí Word, nhưng chưa tải lại được danh sách. Chọn lại nguồn Word để thử lại.'));
-                notify('Đã lưu vị trí Word, nhưng tải lại thất bại; chọn lại nguồn để thử lại', true);
-                return;
-              }
-              renderDocs();
-              for (const choice of choices) {
-                const current = (model.state.wordBindingProposals || []).find((p) => p.occurrence_id === choice.proposal.occurrence_id);
-                choice.proposal = current || { ...choice.proposal, supported: false };
-                choice.cb.checked = !!current?.selected;
-                choice.cb.disabled = !current?.supported;
-              }
-              listBox.append(mappingBox);
-              notify('Đã lưu vị trí Word; có thể xuất vào thư mục đích');
-            } catch (error) {
-              if (model.state.caseId !== previousCase) return;
-              if (committed) {
-                checks = []; mappingChoices = []; mappingDirty = false;
-                model.state.wordOptions = null;
-                model.state.wordBindingProposals = [];
-                listBox.innerHTML = '';
-                listBox.append(h('div', 'error', 'Đã lưu vị trí Word, nhưng chưa tải lại được danh sách. Chọn lại nguồn Word để thử lại.'));
-                notify('Đã lưu vị trí Word, nhưng tải lại thất bại; chọn lại nguồn để thử lại', true);
-              } else notify(error.message || 'Không lưu được vị trí Word', true);
-            } finally {
-              if (!committed && model.state.caseId === previousCase) {
-                model.state.docxImport = previousContext;
-                model.state.stageDirty = previousDirty;
-              }
-              savingMeta = false;
-              for (const choice of choices) choice.cb.disabled = !choice.proposal.supported;
-              refreshScanLock();
+            if (!model.confirmOriginalBindings(originalSourceId, bindings)) {
+              notify('Vị trí Word đã cũ — mở lại nguồn Word để tải lại.', true);
+              return false;
             }
-          }));
+            mappingDirty = false;
+            // DB chưa có bindings mới: chỉ cập nhật selected của proposals
+            // đã tải (khớp occurrence_id + slot); supported/reason/value
+            // vẫn là dữ kiện server đã chứng minh.
+            for (const choice of choices) {
+              choice.cb.checked = bindings.some((b) =>
+                b.occurrence_id === choice.proposal.occurrence_id &&
+                b.slot === choice.proposal.slot);
+            }
+            renderDocs(bindings.length);
+            listBox.append(mappingBox);
+            refreshScanLock();
+            return true;
+          }
+          applyPendingBindings = applyChoicesNow;
+          const applyBindings = btn('Áp dụng vị trí đã chọn', 'primary sm', () => {
+            if (exporting || scanning) return;
+            applyChoicesNow();
+          });
+          mappingBox.append(applyBindings);
           listBox.append(mappingBox);
           refreshScanLock();
         }));

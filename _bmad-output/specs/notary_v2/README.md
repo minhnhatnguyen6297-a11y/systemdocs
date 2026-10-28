@@ -1,131 +1,389 @@
-# notary_v2 — Soạn hồ sơ
+# Soạn thảo hồ sơ
 
-**Trạng thái:** Active · **Phạm vi:** module `notary_v2`
+**Cập nhật:** 17/10/2026. Gỡ cả nhánh Thừa kế **#21B BUILT 17/10/2026**; retained Quick CODE t3 **No actionable findings**, parent chấp nhận AC1–4. Node full 198 passed trước patch bỏ assertion chữ; file bị ảnh hưởng chạy lại 25 passed; service 106 passed (24 warnings hiện có); Source Electron + real IPC/SQLite riêng đạt. Không claim packaged/Word; giữ giới hạn startup toast đã ghi.
 
-## 1. Mục tiêu và flow chính
+## 1. Mục đích và luồng
 
-Biến giấy tờ hoặc chữ người dùng cung cấp thành dữ liệu hồ sơ đã kiểm tra, mô
-tả quan hệ trên Diagram, rồi xuất văn bản Word.
+Giảm đánh máy lại: nhận giấy tờ/chữ, kiểm tra Người/Tài sản, gán quan hệ khi văn bản cần rồi xuất Word. Luồng Input → Stage → Pool/Diagram → Word cho phép làm dở; không bắt hoàn thiện quan hệ không phục vụ văn bản đang soạn.
 
-```text
-Input → gợi ý chờ duyệt → Stage → Pool → Diagram → Word
-```
+Stage giữ thông tin Người/Tài sản; Diagram giữ vai trò/quan hệ. Stage, Pool và Diagram cùng dùng bản đang sửa trong phiên; Word dùng dữ liệu đã lưu. Một phần chưa đủ thông tin phải được chỉ rõ, không tự điền cho đủ. **Owner 23/10/2026:** không có nút Cập nhật/Lưu nháp trong Soạn hồ sơ; chỉ **Lưu hồ sơ** ghi Stage+meta+Diagram, không tự lưu nháp khi rời/đóng. Ngoại lệ Nơi niêm yết trong dialog Word vẫn dùng `saveCaseMeta` → `notary.workspace_update`.
 
-| Bước | Spec | Vai trò |
-|---|---|---|
-| Input | [`input/`](./input/README.md) | Nhận file, text hoặc gói OCR; phân tích thành gợi ý |
-| Stage | [`stage.md`](./stage.md) | Nguồn dữ liệu người/tài sản đã commit của hồ sơ |
-| Pool | [`pool.md`](./pool.md) | Phần tử Stage chưa được gán lên Diagram |
-| Diagram | [`diagram/`](./diagram/README.md) | Quan hệ, vai trò và đầu vào engine |
-| Word | [`word-output.md`](./word-output.md) | Dựng nhiều văn bản từ snapshot đã lưu |
+<a id="context-ho-so-thu"></a>
+### Context theo loại hồ sơ — owner 19/10/2026
 
-Ngoài flow chính, [`fast-text-audit.md`](./fast-text-audit.md) mô tả CLI độc
-lập để so Word với scan. Công cụ này không ghi Stage, Diagram hoặc database.
+Đây là phân loại **nghiệp vụ do owner định hướng**, không phải danh sách loại
+đã được runtime triển khai. Mọi loại dùng dữ liệu chuẩn **Người, Tài sản,
+Hồ sơ**; không tạo bộ trường riêng hoặc tự điền dữ liệu thiếu.
 
-[`administrative-timeline.md`](./administrative-timeline.md) giữ kho local tên
-xã/huyện/tỉnh và lịch sử nhiều bước; Bando là nguồn tên hiện hành, phần chưa rõ
-ngày/danh tính giữ chờ xác nhận.
-Luật tra trên kho là [lõi dùng chung](../shared/administrative-lookup.md);
-[administrative-address.md](./administrative-address.md) mô tả cách hồ sơ gọi
-lõi; TASK-3/TASK-4 đã nghiệm thu 06/10/2026, gồm Word và producer đóng gói.
-Nhập DOCX là luồng độc lập tại
-[input/docx-import.md](./input/docx-import.md).
+**Bổ sung owner 19/10/2026:** **chủ đất thuộc Hồ sơ**, không là thuộc tính cố
+định của Tài sản hoặc mặc định node `owner`/`owner_row_id` Thừa kế. Thông tin
+công chứng thuộc Hồ sơ, độc lập ngày tạo hồ sơ; inventory phải đủ số/ngày công
+chứng, công chứng viên, thư ký và mọi trường Upload, không chỉ workspace Notary.
+Key/kiểu/cardinality và DB-wire-output còn thiếu được chốt trong
+[#41](../../backlog/story-upload-business-field-standardization.md), không tự
+duyệt cột mới hoặc xóa trường cần thiết cho vừa schema hiện tại.
+Không bóc/chuẩn hóa giá/cọc/thuê/vay/lãi/điều khoản thanh toán hoặc thời hạn
+nghiệp vụ; **giữ thời hạn sử dụng đất** đúng cụm và timeout kỹ thuật. Portal
+cần trường bị loại thì ghi xung đột để refine, không bịa/default hoặc tự quyết
+bước nhập tay mới. Không sửa raw/lịch sử/runtime ở lượt tài liệu.
+Một Người nhiều giấy tờ và địa chỉ là
+[#42 riêng](../../backlog/story-person-multiple-identities-addresses.md);
+model hiện hành ô đơn không được tự ép đa trị, model tương lai chưa chọn.
 
-## 2. Bất biến của module
+| Nhóm | Context nghiệp vụ cần giữ |
+|---|---|
+| 1. Chuyển nhượng | Hai bên. |
+| 2. Đặt cọc | Hai bên. |
+| 3. Di chúc | Pháp lý là đơn phương; trong bố trí nghiệp vụ của hệ thống có hai bên vì có người nhận. Owner: **“Người nhận tài sản theo di chúc có vị trí khác so với các văn bản khác”**. Đây là context **cấu trúc văn bản**: LLM đọc mẫu thực để tìm vùng/người nhận và mapping vào dữ liệu chuẩn; vị trí cụ thể chưa được cung cấp. Không diễn giải thành quyết định về ghế Diagram. |
+| 4. Thuê đất, vay tiền, ủy quyền, tặng cho, văn bản cam kết | Theo nhóm hai bên thông thường. Đây không phải phê duyệt thêm enum hoặc khẳng định regex chuyên biệt cho tất cả văn bản này. |
+| 5. Mua bán ô tô/xe máy | Hai bên; trường Tài sản và các biến thể xe chưa được chọn. **Chỉ ghi issue DEFERRED [#29](../../backlog/spike-vehicle-sale-case-scope.md); hiện không làm ca này**, không tự tạo field hoặc hồ sơ thử. |
+| 6. Thế chấp | Ngân hàng cung cấp nội dung; văn phòng **chỉ soạn lời chứng**. Đầu vào **luôn thiếu thông tin tài sản** trong hướng dẫn này; không tưởng tượng tài sản bảo đảm, không tự dựng hợp đồng thế chấp đầy đủ thay ngân hàng. |
+| 7. Thừa kế | Văn bản phụ có thể gồm từ chối nhận di sản, cử đại diện, thông báo niêm yết và tài liệu khác theo hồ sơ; không coi đây là checklist pháp lý bắt buộc/đã khép kín. |
 
-- Input chỉ tạo gợi ý; người dùng phải xác nhận trước khi vào Stage.
-- Stage sở hữu dữ liệu Người và Tài sản của hồ sơ.
-- Pool được tính từ Stage và Diagram; không lưu như nguồn riêng.
-- Diagram chỉ tham chiếu phần tử đã commit trong Stage; không sửa dữ liệu Stage.
-- Python sở hữu tính nghiệp vụ và `renderModel.requiredSlots`; frontend không
-  tự tính kết quả thừa kế.
-- Mọi write dùng `base_revision`; revision cũ phải báo xung đột.
-- Lỗi validate không được lưu nửa chừng hoặc xóa draft người dùng.
+Văn bản phụ điển hình của hồ sơ: **ủy quyền cho người của văn phòng đi làm
+thay khách** (khác việc mặc định bên nhận ủy quyền là khách/bên giao dịch);
+**đơn đăng ký, thường dùng Mẫu 18**, ghi công việc đề nghị cơ quan nhà nước
+giải quyết; **bộ khai thuế gồm ba loại khi đổi chủ sử dụng**. Owner chưa cung
+cấp tên/mẫu của ba loại thuế, không tự đoán hoặc sinh biểu mẫu. Đây là context,
+không quyết định rằng mọi hồ sơ phải có đủ bộ phụ hoặc mọi văn bản phụ đều được
+regex/OCR hỗ trợ.
 
-## 3. Kiến trúc module
+Runtime hiện chỉ có `inheritance/{khai_nhan, thoa_thuan}` và
+`two_party/{chuyen_nhuong, tang_cho, cho_thue, dat_coc}` theo contract hiện hành.
+Nhận diện regex, phân loại nghiệp vụ và khả năng tạo/sửa/xuất hồ sơ là ba trục
+khác nhau; không đổi enum, schema hoặc bỏ gate xuất để làm chúng có vẻ trùng nhau.
+Di chúc, vay tiền, ủy quyền, cam kết, thế chấp và xe không được ghi là runtime
+mới đã hỗ trợ chỉ vì có context trên.
 
-Electron renderer hiển thị và nhận thao tác. Electron main giữ quyền hệ thống
-như chọn file. Sidecar chuyển `notary.*` command tới dịch vụ Python. Python đọc,
-validate, tính và ghi database. Contract được duyệt tại
-[`contracts/notary-case-drafting.md`](../../../contracts/notary-case-drafting.md).
+Folder owner chuẩn bị là `D:\testcase`; đọc
+[README chung](file:///D:/testcase/README.md) trước khi làm việc với bộ hồ sơ.
+Hiện chỉ ghi context/README theo định hướng, **chưa tạo Word/corpus hoặc chạy
+test/E2E**, chờ owner chỉ dẫn tiếp. Đề xuất mười bundle và bản nháp trong
+`testdata/notary-e2e/v1/` trước lệnh dừng không phải nguồn triển khai được duyệt.
+[Quyết định và phần chưa chốt](../../decisions/decision-owner-case-context-standard-data-20261019.md).
 
-Hai domain hiện có:
+**Gate trước mọi lượt quét/đọc mẫu thực mới, corpus và E2E theo mẫu:** chờ #41
+được nghiệm thu đầy đủ chuẩn DB/contract đã duyệt, cutover consumer và proof
+luồng thật, không chỉ lập bảng mapping. Proof riêng #41 có thể dùng input
+tổng hợp/kiểm soát và DB/profile cô lập khi được giao, không cần quét corpus
+owner để đóng issue. #42 không tự là prerequisite; Scan/Upload production
+không bị tắt. Sau gate vẫn chờ được giao thực thi.
 
-- `inheritance`: đã có engine, Stage/Pool/Diagram và Word.
-- `two_party`: contract v2 định nghĩa layout 30 vị trí; engine nghiệp vụ đầy đủ
-  chưa được suy ra từ thừa kế.
+Sau gate #41 và khi được giao chạy, theo vòng **LLM đọc hàng loạt mẫu thực → nhận diện cấu trúc
+trước → so code → điều chỉnh code → test lại → sai thì lặp**; mục tiêu xuất đủ,
+đúng thông tin hợp đồng trong ba đối tượng chuẩn. Các cấu trúc/mapping chưa chốt
+có issue riêng theo loại ở [catalog #30–#38](../../backlog/README.md).
+Văn bản lạ hoặc phần không tự quyết được vào
+[#39 — tổng hợp xem sau](../../backlog/spike-unfamiliar-document-review-queue.md),
+giữ nguồn và pending, tiếp tục các file đã rõ; không dừng cả lô hoặc tự thêm
+field/nghiệp vụ. Đây mới là quy trình được ghi lại, chưa bắt đầu đọc mẫu/sửa
+code/test. Chi tiết [vòng theo mẫu thực](../shared/extraction-rules.md#sample-iteration).
+Trước mỗi lô đọc [báo cáo ổn định](file:///D:/testcase/BAO_CAO_KHAO_SAT.md),
+sau mỗi lô cập nhật và giữ kết quả cũ. Chỉ claim chuẩn trường/mapping đủ sau
+audit có tên/kiểu/format/nhóm/thứ tự/đích DB-wire/ràng buộc/nguồn canonical;
+tách defined/Draft/unmapped, không suy mọi biến thể đã rõ từ key có sẵn.
+Audit catalog nền đã ghi trong báo cáo; bộ trường Hồ sơ/Upload xuyên module
+và mapping từng biến thể **chưa khép kín**; #41 đóng thiếu định nghĩa/mapping,
+không coi catalog local Draft là implementation xong.
+Riêng serial GCN có chuẩn nguyên văn/rỗng/trùng đã chốt nhưng có
+[gap validation/persistence source tĩnh #40](../../backlog/bug-stage-raw-gcn-serial-contract.md).
+Chưa có runtime reproduction, không phải yêu cầu owner chọn lại serial và
+không phải record văn bản lạ trong #39.
 
-## 4. Trạng thái và dữ liệu
+## 2. Danh sách hồ sơ
 
-- `row_id`: định danh ổn định của dòng Stage qua commit/reload.
-- `revision`: phiên bản workspace; tăng sau write thành công.
-- `case_state_json`: snapshot Stage, Diagram input và kết quả backend cho hồ sơ
-  thừa kế hiện hành.
-- `engine_state_json`: chỉ là nguồn đọc legacy khi cần migrate; không phải SOT
-  mới.
-- Contract v2 dùng `notary.case-drafting.v2`; trường legacy như
-  `isLandOwner`/`willReceive` không được tự mang sang shape v3 nếu schema cấm.
+**Hồ sơ nháp — owner 21/10; phạm vi Soạn hồ sơ làm rõ 23/10/2026:**
+Nháp đã tồn tại trong database qua lệnh tạo/nhân bản vẫn mở lại làm tiếp được,
+kể cả mới nhập 2/6 trường Người; không ép đủ bộ trường hoặc tự điền dữ liệu.
+Trạng thái **Nháp** phải được giữ khi đọc lại và thể hiện rõ khi hiển thị,
+thống kê hoặc báo cáo có chứa Hồ sơ nháp, tránh gộp mất phân biệt.
+Trong Soạn hồ sơ, tạo bản mới chỉ khởi tạo bộ nhớ phiên; chưa tạo dòng DB.
+**Lưu hồ sơ** là điểm ghi nội dung duy nhất: flush ô đang sửa, gửi toàn bộ
+Stage+meta+Diagram qua `workspace_save_case` nguyên tử và chuyển Nháp→Done.
+Lần lưu đầu dùng nhánh tạo mới, giữ `draftId`/`idempotency_key` cho cùng ý
+định khi thử lại sau timeout; lỗi giữ bản đang sửa, không tạo qua một lệnh
+Lưu nháp ngầm. Done vẫn sửa được; chỉ Lưu hồ sơ thành công mới thay snapshot
+hiện hành, không giữ bản Done cũ riêng. Done không có nghĩa đủ sáu trường
+hay đã công chứng (dòng case-owned, `draft`/`done`, bỏ `locked`; B6 modal đất
+còn pending).
+**Bằng chứng vòng 2 ngày 22/10/2026 (lịch sử; `test_issue13_partial_draft.py`,
+`test_issue13_storage_b_proof.py`):** `workspace_create` hỗ trợ nháp ít dữ
+liệu — 0 Người/0 Tài sản, tên `null`, owner inheritance `null`, row thiếu
+số/ngày. Command này vẫn có cho consumer khác, không phải thao tác của Soạn
+hồ sơ. Từ **23/10/2026**, `workspace_save_case` cũng đi theo đường điền
+dần: không bắt ≥1 Người/≥1 Tài sản và không bắt Chủ đất; mức tối thiểu là
+họ tên mỗi dòng Người và số thửa + số tờ mỗi dòng Tài sản, chuỗi rỗng ghi
+null. `workspace_commit_stage` và chuyển loại (consumer khác) vẫn **strict**:
+cần tên và owner hợp lệ; không có cờ partial cho các đường này.
+Nhãn hiển thị dùng `trang_thai`: `draft` = **Nháp**, `done` = **Đã lưu**; nhãn
+này độc lập với chấm dirty (Done vẫn Đã lưu khi có sửa chưa ghi). Resolver
+nguồn Done lưu gần nhất và **Nhân bản** đã triển khai vòng 2 22/10/2026
+(proof: `test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`);
+xem luật ở mục Luồng Người/Tài sản. Từng báo cáo có tính Nháp hay không và bộ lọc mặc
+định **chưa chốt**; B6 modal đất vẫn pending.
+[Quyết định](../../decisions/decision-owner-persistent-case-drafts-20261021.md).
 
-## 5. Giao diện chung
+Tên mong muốn là Danh sách hồ sơ. Người dùng xem danh sách, tìm/lọc, tạo nháp và mở hồ sơ. Nhãn trạng thái, người tạo, tên/ngày tạo là hướng mô tả; danh sách nhãn, nguồn tìm kiếm và trường lọc chưa chốt đầy đủ. Chức năng sẽ **làm lại** — **DEFERRED 17/10/2026** (owner tự triển khai spec sau); hướng trường hiển thị/tìm/lọc owner ghi là **Draft chưa duyệt**, chưa phải quy tắc. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
 
-- Stage luôn sửa trực tiếp được; không tạo modal cho thao tác thường xuyên.
-- Pool và Diagram phản ánh dữ liệu đã commit, đồng thời giữ draft Diagram riêng.
-- Nút phải nói đúng tác dụng: `Cập nhật` commit Stage; `Lưu sơ đồ` lưu Diagram;
-  `Xuất Word` chỉ xuất từ trạng thái hợp lệ.
-- Lỗi xuất hiện gần nơi gây lỗi, không làm mất dữ liệu vừa nhập.
+**Nhân bản (vòng 2 ĐÃ TRIỂN KHAI 22/10/2026; proof:
+`test_issue13_workspace_duplicate.py`)** là **thao tác nhỏ trên từng dòng của
+danh sách hiện có**, không phải redesign/filter deferred: mỗi dòng có nút
+**Nhân bản** riêng (không lồng trong nút mở hồ sơ), xác nhận bỏ sửa chưa lưu
+như khi mở/tạo nháp. Nhân bản copy **toàn bộ nội dung đã lưu** của nguồn —
+Người/Tài sản/đất, meta, bảy scalar, participant tay, Diagram, provenance
+DOCX — không copy buffer editor chưa lưu và không đổi nguồn. Bản sao lần
+tạo đầu là **`draft`, revision 1 — chốt kỹ thuật vòng 2, chưa được owner xác
+nhận** (toàn bộ nội dung copy đã là yêu cầu owner). Retry cùng ý định dùng
+cùng khóa idempotency và trả bản sao đã tạo, không tạo trùng; bản sao và nguồn
+độc lập sau đó.
 
-Quy tắc màu, chữ, khoảng cách và thao tác dùng chung nằm tại
-[`../ui/`](../ui/README.md). Quy tắc riêng phải ghi ngay trong spec feature.
+Chọn loại sơ đồ (Thừa kế/Hai bên) ở **header vùng Sơ đồ** cho cả hồ sơ mới và hồ sơ đã lưu — cùng một vị trí, cùng một dạng điều khiển. Loại không hỗ trợ hiện lý do và khóa thao tác không có khả năng, không tự chuyển sang Thừa kế. Khởi tạo bản đang sửa chưa cần Diagram; intake/evaluate không ghi database. Đổi loại của hồ sơ **đã lưu** chỉ qua đường chuyển loại đã duyệt (`inheritance` ↔ `two_party`): giữ ID + giá trị Người/Tài sản của Stage, reset Diagram theo domain mới (Thừa kế: seed **chỉ** node `owner` mới chọn — không seed khung 7 slot mặc định, không giữ quan hệ/dấu cũ, nhưng vẫn **đủ key bắt buộc** với `parentSlotIds`/`ownPositions`/`receivePositions` rỗng, `spouseSlotId:null`; Hai bên: 30 slot trống), buộc chọn `document_type` hợp lệ của loại mới và xác nhận phần Diagram mất trước khi ghi; chuyển vào Thừa kế cần `owner_row_id` từ Stage, vào Hai bên cấm trường đó. Không suy việc chọn loại lúc tạo bản mới thành quyền tự đổi domain; `case_type`/`document_type` vẫn bất biến ngoài đường này ([decision](../../decisions/decision-owner-saved-case-type-conversion-20261016.md), contract §13.18).
 
-## 6. Câu hỏi và lịch sử module
+Chọn loại khác loại hiện tại ở dropdown header Sơ đồ để mở dialog đổi loại.
+Dialog chỉ còn **ba hạng mục**, mỗi hạng mục một câu ngắn: (1) văn bản mới;
+(2) người để lại — chỉ khi đích là Thừa kế; (3) xác nhận xóa sơ đồ cũ.
+Văn bản mới và người để lại ban đầu chưa chọn. Buffer Stage/meta đang sửa
+**không chặn** đổi loại: lần ghi đi kèm trong cùng hành động trước khi convert,
+nên chữ vừa nhập không mất; xung đột revision thật vẫn theo luồng conflict.
+Nháp Diagram chỉ bị reset khi chuyển loại ghi thành công. Hủy/Escape/nền
+trước Áp dụng không ghi; lỗi/xung đột giữ nháp và các lựa chọn. Sau Áp dụng
+chờ kết quả nguyên tử, không đóng dialog giữa ghi. Command riêng
+`notary.workspace_convert_type` giữ commit/update thường bất biến loại.
 
-### Đã chốt
+Chỉ hồ sơ `draft` được xóa. Xóa trong một lần ghi trọn vẹn: dọn dữ liệu thuộc hồ sơ nếu không còn được hồ sơ khác, participant, liên kết tài sản hoặc snapshot tham chiếu. Danh bạ người nhận ủy quyền tái dùng không bị xóa theo hồ sơ; không quét danh bạ mồ côi ngoài phạm vi. Lỗi phải khôi phục toàn bộ.
 
-- Flow Electron giữ Stage/Pool/Diagram, không port engine Python sang JavaScript.
-- Stage commit gồm Người + Tài sản trong một transaction.
-- Xóa phần tử Stage rồi commit phải prune tham chiếu Diagram trong cùng
-  transaction.
-- **Từ điển dữ liệu Người, Tài sản, Hồ sơ và quy tắc suy ra (Owner chốt 01/10/2026):**
-  * **Người (`customers`):** 6 trường nghiệp vụ chính (`ten`, `ngaysinh`, `ngaychet`, `sogiayto`, `ngaycap`, `diachi`); DB còn giữ giới tính và cột kỹ thuật. Người sống suy loại giấy tờ/nơi cấp/nhãn cư trú theo ngày cấp, mốc 01/10/2024; thiếu ngày để trống. Người chết dùng bằng chứng đã xác nhận trong snapshot cho loại giấy tờ/nơi cấp, nhãn địa chỉ là `Nơi chết`. Quê quán chỉ lưu snapshot hồ sơ.
-  * **Tài sản (`properties`):** Bỏ trường lẻ `thoi_han` mồ côi; lưu theo cụm `(loaidat, dientich, thoihan)` 1..20; đa tài sản đánh số kết hợp như `loaidat12`.
-  * **Hồ sơ (`inheritance_cases`):** Bổ sung `noiniemyet` (nhập tay; gợi ý theo [tra cứu địa chỉ](./administrative-address.md) đang triển khai), `nguoinhanuyquyen` (danh mục quen/tạo mới), `noidungviec` (cụm text thủ công); UI hiển thị 3 dòng dưới tài sản, giảm 10% chiều cao ô nhập.
-  * **Rule chung:** Đặt tên tiếng Việt không dấu, viết liền số nếu có (`loaidat1`). Xem chi tiết tại `contracts/entities.md` §8–§9.
-- **Xóa hồ sơ nháp (MIN-141 đợt 4):** chỉ hồ sơ `draft` được xóa; xóa kèm dọn master (`customers`/`properties`) "thuộc hồ sơ" — người chết, tài sản chính, participant kể cả `parent_customer_id`, tài sản link phụ — nhưng CHỈ khi master đó không còn tham chiếu từ hồ sơ khác (`nguoi_chet_id`/`tai_san_id`/`nguoi_nhan_uy_quyen_id`), participant còn lại, `inheritance_case_properties` còn lại, hoặc snapshot `case_state_json`/`engine_state_json` của hồ sơ còn tồn tại. Người nhận ủy quyền là danh bạ tái dùng — không bị xóa theo hồ sơ; không quét danh bạ mồ côi ngoài phạm vi hồ sơ. Toàn bộ trong một transaction, lỗi → rollback.
-- **Thống kê (`/api/stats`):** `customers`/`properties` đếm DISTINCT master thực sự gắn hồ sơ qua case/participant/link/snapshot — danh bạ trơ chưa gắn hồ sơ không tính; tài sản vừa primary vừa link đếm một lần. `cases`/`locked` đếm số hồ sơ như cũ.
+Thống kê Người/Tài sản đếm mỗi bản ghi thực sự gắn hồ sơ một lần, không đếm danh bạ rời; tài sản vừa chính vừa liên kết không đếm hai lần.
+Đây là quy tắc chống đếm lặp; phạm vi tính Hồ sơ Nháp trong từng báo cáo
+còn chờ chốt, không suy từ việc đã lưu database rằng Nháp được tính chung.
 
-- **Gộp MIN-141 (Owner xác nhận 03/10/2026):** giữ hành vi cuối 14 commit worker; các quy tắc Stage thay MIN-140 ghi tại [`stage.md`](./stage.md) §5.
+<a id="input"></a>
+## 3. Input — đọc và kiểm tra nguồn
 
-### Còn mở
+Nhận ảnh/PDF, DOCX, XLSX và chữ dán; tạo gợi ý có nguồn, không tự ghi hồ sơ, gán quan hệ hoặc chọn người nhận. Zalo đang tách riêng, không phải đầu vào đã tích hợp.
 
-- Quy tắc per-asset, contract A/B và owner scope chưa được suy từ các flag cũ.
-- Tích hợp bảng tra địa chỉ vào hồ sơ (NAIA-9): kho lịch sử đã có tại
-  [`administrative-timeline.md`](./administrative-timeline.md), luồng sử dụng tại
-  [`administrative-address.md`](./administrative-address.md), luật tra tại
-  [lõi dùng chung](../shared/administrative-lookup.md); ngày hiệu lực và
-  danh tính cũ còn chờ nguồn, không gán chung 01/07/2025.
+Giới hạn intake: tối đa 8 nguồn/lượt, 20 MB/file, PDF 50 trang, chữ 100.000 ký tự. Backend có thể siết chặt hơn, không tự nới. DOCX giữ vị trí đoạn/bảng theo XML; XLSX đọc bảng; ảnh qua OCR Qwen đã duyệt, không tự dùng QR/local OCR cứu lỗi.
 
-## 7. Nguồn khi sửa code
+Người dùng thấy nguồn, giá trị đọc được/chuẩn hóa, cảnh báo và lỗi từng nguồn. Sửa gợi ý rồi Đưa vào Stage chỉ tạo bản nháp. Phân tích thêm không làm mất gợi ý đang sửa; lỗi một nguồn vẫn giữ kết quả nguồn khác và báo kết quả một phần. Phản hồi đến muộn của hồ sơ cũ bị bỏ.
 
-Các phụ lục lớn lưu chi tiết có nguồn của một giai đoạn triển khai; quy tắc
-hiện hành vẫn nằm ở spec của feature và contract được dẫn từ đó:
+Không chắc ranh người/tài sản thì giữ nguồn và báo mơ hồ; nhiều giá trị phải chọn/sửa trước khi nhận. Trùng giấy tờ/serial chỉ cảnh báo, không tự gộp. Không suy giới tính từ tên, vai trò/quan hệ/sở hữu từ lời văn. Một file nhiều người/tài sản không mặc định là một hồ sơ.
 
-- [`workspace-detail.md`](./workspace-detail.md): bản chi tiết MIN-104 về
-  Stage/Pool/Diagram và lệnh Electron, kèm bảng so web cũ với đích.
-- [`visual-reference.md`](./visual-reference.md): bố cục Notary theo ảnh được
-  duyệt; giá trị chưa có nguồn duyệt vẫn là đề xuất.
-- [`diagram/inheritance/web-workflow.md`](./diagram/inheritance/web-workflow.md):
-  hành vi màn web thừa kế còn dùng để đối chiếu cho tới cutover.
-- [`word-output-detail.md`](./word-output-detail.md): placeholder và khác biệt
-  giữa web cũ với xuất nhiều file trên Electron.
-- [`input/ocr-detail.md`](./input/ocr-detail.md): endpoint OCR upload thủ công
-  và lịch sử lựa chọn Qwen; phần Zalo trong đó là ghi nhận thiết kế Draft.
+Nhập Word giữ chữ lấy được ở đúng ô để sửa, kể cả lỗi gõ/dính chữ; không thêm ô nguyên văn hoặc tự sửa tên cơ quan. Ngày sai lịch, diện tích âm/không hữu hạn phải sửa; không lấy riêng năm để che ngày sai. Diện tích `1.234,5` đọc được; chỉ `1.234` thì giữ nguyên + báo mơ hồ. Thiếu trường vẫn cho kiểm tra/bổ sung; không vượt giới hạn khi nhận vào Stage.
 
-- Intake: [`input/`](./input/README.md).
-- Workspace: [`stage.md`](./stage.md), [`pool.md`](./pool.md) và
-  [`diagram/`](./diagram/README.md).
-- Thừa kế: [`diagram/inheritance/`](./diagram/inheritance/README.md).
-- Word: [`word-output.md`](./word-output.md).
-- Contract máy đọc: [`contracts/notary-case-drafting.md`](../../../contracts/notary-case-drafting.md).
+Ảnh nhập tay được xem lại đúng nguồn. Không lưu bản nháp giấy tờ vào localStorage/log. Đưa vào Stage chỉ đổi bản đang sửa; chỉ Lưu hồ sơ thành công mới ghi nội dung Soạn hồ sơ vào DB (ngoại lệ metadata Nơi niêm yết trong Word ở §6).
 
-Source và test chỉ chứng minh hiện trạng. Nếu chúng mâu thuẫn với spec, dừng và
-sửa mâu thuẫn trong cùng task; không tạo lại một cây tài liệu dưới module.
+<a id="stage"></a>
+## 4. Stage — sửa thông tin và Lưu hồ sơ
+
+Người sửa theo dòng; tài sản theo cột. Thêm/sửa/xóa/sắp xếp chỉ đổi bản đang sửa, đồng bộ ngay Pool, nhãn và dữ kiện Diagram; không chờ một lần ghi trung gian. Mỗi dòng có `row_id` ổn định; ID database có thể chưa có trước lần lưu đầu. Sửa Người/Tài sản tại Stage, không sửa từ Pool hoặc Diagram.
+
+| Nhóm | Quy tắc |
+|---|---|
+| Người | Sáu trường nghiệp vụ chính: tên, sinh, chết, số giấy tờ, ngày cấp, địa chỉ; có giới tính và trường kỹ thuật. Chỉ họ tên bắt buộc. Giới tính Nam/Nữ/trống; ngày đúng lịch hoặc năm riêng. Độ đầy đủ ngày giữ theo bằng chứng đã lưu của hồ sơ: `2010` vẫn là năm riêng, phân biệt với `01/01/2010`; đọc lại và xuất dùng giá trị đã commit, master danh bạ không đệm lại. Giấy tờ/địa chỉ có thể trống. |
+| Giấy tờ | Người sống suy loại/nơi cấp/nhãn cư trú theo ngày cấp và mốc 01/10/2024; thiếu ngày để trống. Người chết dùng bằng chứng giấy tờ đã xác nhận, không mặc định nơi cấp. Nhãn nơi cấp phải phân biệt CCCD và giấy khai tử; địa chỉ người chết mang nhãn Nơi chết theo quy tắc đã có. Nhãn hiển thị theo bằng chứng: chỉ khi `loai_giay_to` là giấy chứng tử/khai tử mới mang nhãn `Nơi cấp giấy khai tử`, còn lại (kể cả người đã mất chưa có bằng chứng) là `Nơi cấp giấy tờ`; ô địa chỉ mang nhãn `Nơi chết` khi `loai_dia_chi` là Nơi chết; giữ nguyên giá trị `dia_chi`/`noi_cap` đã lưu và binding. |
+| Tài sản | Tối đa 5; thứ tự 1..5 có ý nghĩa với dấu Chủ/Nhận. Serial nguyên văn, có thể trống/trùng, không ép mẫu hoặc thay mã XX. **Số thửa đất + số tờ bản đồ bắt buộc có nội dung**; địa chỉ và các trường còn lại để trống được, chuỗi rỗng ghi null. Ngày cấp nhận chỉ-năm như Người. |
+| Loại đất | Không còn trần 20 cụm khi Lưu hồ sơ; có thể để danh sách trống. Giữ vị trí trống; bỏ thời hạn lẻ cấp tài sản, không tự đắp vào cụm. Alias cũ–mới mâu thuẫn ghi theo key canonical mới; diện tích không đọc được thành số ghi null, không chặn Lưu. |
+| Hồ sơ | Nơi niêm yết nhập tay; người nhận ủy quyền từ danh mục/tạo mới; nội dung việc nhập tay. Ba dòng đặt dưới tài sản. |
+
+**Người chết — owner 21/10/2026 đã chốt và giao runtime hẹp:** `Nơi chết` và nơi thường
+trú/cư trú cuối cùng dùng cùng `dia_chi` hiện có, không thêm field/đổi câu Word
+hoặc tự chọn giá trị mâu thuẫn. Ba loại là `Trích lục khai tử`,
+`Trích lục khai tử (bản sao)`, `Giấy chứng tử`; nguồn `Giấy chứng tử (bản sao)`
+quy về `Giấy chứng tử`. Số giữ nguyên giá trị, kể cả dấu phẩy/quyển; ngày cấp
+là ngày của chính giấy, giữ độ đầy đủ. Cơ quan giữ xã/phường/thị trấn đúng
+nguồn tại ngày cấp, không ép xã hoặc suy lịch sử chưa xác nhận.
+
+Mỗi văn bản độc lập: **không đề xuất bổ sung hoặc tự ghép giữa văn bản**, kể
+cả cùng bộ hồ sơ; không lấy bản đầy nhất/mới nhất. **Không gợi ý** trường
+sinh/chết/giấy tờ Người từ `Đơn xin xác nhận`. Thiếu ngày chết chỉ là không
+có thông tin: giữ `null`/rỗng, các trường có căn cứ được phép vẫn điền độc lập,
+không chặn Người vì thiếu ngày/giấy, không tự coi còn sống hoặc tạo ngày giả/
+Boolean/status. Địa chỉ chung rõ phạm vi và nhắc lại cùng người trong một
+văn bản vẫn theo nguồn khi không mâu thuẫn; không suy chung giấy.
+Luật nội dung giấy tờ này không cấm gom ID theo điểm neo bên dưới; không
+cho phép mượn trường thiếu giữa văn bản hoặc tự đổi Hồ sơ đã lưu.
+Raw/history/liên kết đã có giữ nguyên. Runtime hiện tại lưu số giấy nguyên
+giá trị, không UNIQUE/tự ghép theo số, cho số CCCD trùng. Cập nhật theo ID
+chọn rõ hoặc row_id của chính hồ sơ; đây chưa phải UX liên kết mới.
+Snapshot giữ bằng chứng loại/nơi cấp/nhãn, kể cả chết thiếu ngày.
+Migration/consumer đã được actual proof synthetic (fresh+migrated DB, exact
+Word; UI legacy giới hạn); **BUILT bounded**, chưa nghiệm thu toàn #41.
+
+**Luồng Người/Tài sản owner duyệt 21/10 mới nhất — vòng 2 ĐÃ TRIỂN KHAI 22/10/2026:**
+1. Người có **tên + số giấy tờ đồng thời giống nhau** → tự dùng cùng ID.
+   Ngày cấp/địa chỉ khác vẫn cùng ID; đổi tên hoặc số thì chấp nhận ID khác.
+2. Tài sản cùng **serial** → dùng cùng ID; serial giữ nguyên văn, giữ đủ các
+   hàng thửa/cụm đất. Dòng case-owned (phương án B) đã có ở vòng 1.
+3. Khi lấy Người/Tài sản vào Hồ sơ mới → lấy **toàn bộ một bộ** từ Hồ sơ
+   `done` lưu gần nhất, không bắt chọn liên kết/phiên bản và không trộn từng
+   trường giữa các Hồ sơ. Người dùng vẫn sửa thông tin của Hồ sơ đang soạn.
+4. Hồ sơ đã lưu giữ snapshot riêng; dữ liệu mới nơi khác không tự cập nhật
+   ngược. Tìm Người để xem đã làm những Hồ sơ gì, không trải mọi lần đổi trường
+   thành danh sách phiên bản Người.
+5. **Owner 22/10:** lấy theo Hồ sơ lưu gần nhất, chỉ nguồn `done`. Tên đối chiếu
+   không phân biệt dấu/hoa-thường, giữ nguyên tên hiển thị/xuất. Thiếu điểm neo
+   không gom; ID trùng cũ giữ nguyên, không tự hợp nhất, lấy bộ cuối cùng.
+   Cùng serial vẫn gom cùng ID dù khác thửa; Nhân bản toàn bộ nội dung.
+   **Vòng 2 (ĐÃ TRIỂN KHAI 22/10/2026; proof: `test_issue13_source_latest.py`):**
+   chọn nguồn theo `updated_at` microsecond,
+   `id` case lớn hơn khi tie, null-last; không theo ngày giấy/độ đầy đủ.
+   `workspace_source_latest` trả **chỉ Stage** của đúng một case Done (Người +
+   Tài sản/cụm đất, giữ thứ tự/null/identity), cấp `row_id` UUID mới và remap
+   owner; không trả meta/Diagram/provenance nguồn và không ghi DB. Đọc lại
+   không tạo case, không tự refresh khi người dùng đang sửa.
+6. **Owner chốt 22/10/2026:** đổi **Lưu sơ đồ** thành **Lưu hồ sơ**, ghi Diagram
+   và toàn bộ Stage/thông tin hồ sơ đang sửa, gồm ô đang sửa, trong cùng
+   một lượt; chuyển `draft` → `done`. **Owner 23/10:** bỏ Cập nhật/Lưu nháp
+   trong Soạn hồ sơ; chỉ Lưu hồ sơ thành công mới thay snapshot Done. Vòng 1 có code Storage
+   B case-owned, `draft`/`done`, bỏ `locked`; nút Lưu hồ sơ gọi
+   `workspace_save_case` ghi Stage+meta+Diagram nguyên tử. Vòng 2 **ĐÃ TRIỂN
+   KHAI 22/10/2026**: resolver nguồn Done (`test_issue13_source_latest.py`),
+   Nhân bản (`test_issue13_workspace_duplicate.py`), lát nháp ít dữ liệu + nhãn
+   trạng thái (`test_issue13_partial_draft.py`); B6 modal đất vẫn pending.
+   **Nhân bản khác lấy nguồn:** copy **toàn bộ nội dung đã lưu** — Stage,
+   meta + bảy scalar, participant tay, Diagram, provenance DOCX — thành case
+   mới độc lập (UUID/PK mới, identity giữ); bản sao lần tạo đầu là `draft`
+   revision 1 (chốt kỹ thuật chờ owner, không phải owner duyệt); retry cùng
+   khóa không tạo trùng.
+
+Một bảng Người cho sống/chết. Luồng gợi ý CCCD/user chọn/bỏ qua tạo ID mới và
+“thông tin liên kết” cũ ở [#44](../../backlog/story-person-cccd-suggestion-link.md)
+đã bị thay thế, không mang thành thao tác mặc định. Không khôi phục CCCD UNIQUE
+hoặc tự ghép trường giữa văn bản. Địa chỉ cũ–mới do sáp nhập tạm giữ cách hiện
+tại; chưa chọn mô hình mới hoặc duyệt đề xuất mã tham chiếu từ các ô địa chỉ.
+#41 OPEN/gate mẫu ĐÓNG, #42 độc lập; giữ nguồn và dữ liệu đã có.
+[Quyết định](../../decisions/decision-owner-entity-anchors-case-snapshots-20261021.md).
+[Làm rõ và rà soát 22/10](../../decisions/decision-owner-data-entry-save-rules-20261022.md).
+
+Tên và định dạng trường giữ chuẩn DB; alias cũ cần ánh xạ. Hai alias của cùng trường trái nhau phải báo lỗi, không chọn ngầm. Cụm đất lưu `case_asset_land_rows` theo dòng tài sản của Hồ sơ + vị trí (vòng 1 có code); `property_land_rows`/JSON cũ chỉ là lịch sử, không phải SOT. `null`, `[]` và hàng trống giữ đúng nghĩa. Tên token cụm viết đủ `loaidat<M><N>`, `dientich<M><N>`, `thoihan<M><N>`: M là cụm, N là tài sản; không thêm dạng rút gọn gây lẫn cụm 12 với tài sản 2.
+
+Thừa kế **không bắt** `owner_row_id` khi Lưu hồ sơ (owner 23/10/2026) — chưa chọn Chủ đất vẫn lưu được; owner **non-null** phải là row trong Stage. Chuyển loại vào Thừa kế vẫn cần owner hợp lệ; lệnh `workspace_create` cho consumer khác cũng nhận owner `null/absent`. Hai bên không nhận trường đó, tối đa 30 người. Trần 5 tài sản áp mọi tầng server; hồ sơ cũ hơn 5 vẫn đọc đủ và cảnh báo, Lưu/commit chặn đến khi còn tối đa 5 (client/Word cập nhật ở lát riêng).
+
+**Lưu hồ sơ:** flush ô đang nhập → đồng bộ mặc định vị trí tài sản còn chưa
+được user chỉnh → gửi Stage+meta+Diagram và provenance Word đang sửa →
+validate/tính lại → ghi nguyên tử, tăng revision. Giữ chuẩn hóa `stageForWire`
+và các hint identity khi gửi Stage. Một dòng lỗi thì không lưu nửa chừng;
+báo đúng ô hoặc cảnh báo cấp danh sách/field ẩn và giữ bản đang sửa. Lỗi của
+lần ghi mới thay loại lỗi cũ, sửa dữ liệu liên quan thì dọn lỗi tương ứng;
+không để lỗi cũ che kết quả mới (G2/G3/G5 vòng 1).
+
+**Hiển thị lỗi và trạng thái thao tác (owner 23/10/2026):** mỗi lỗi hiện
+đúng **một chỗ** — lỗi gắn ô thì ô đỏ + một dòng trong card chứa ô; lỗi sơ
+đồ/engine thì một dòng trong vùng Sơ đồ; lỗi không gắn ô/thẻ thì một dòng
+trong Stage. Không banner/toast/dòng thứ hai cùng nói một lỗi. Mỗi dòng chỉ
+một câu nói chuyện gì xảy ra: không hint dạy thao tác, không in mã lỗi.
+Vùng chứa lỗi có chỗ dành sẵn (chiều cao cố định, cuộn bên trong) nên lỗi
+xuất hiện/biến mất không đẩy bố cục vùng khác. Sau thao tác thành công
+không hiện câu chữ chúc mừng: nút/vùng thao tác hiện spinner khi chạy, dấu
+tích xanh ngắn khi xong, trở về trạng thái thường. Áp dụng cho ít nhất:
+Lưu hồ sơ, Xem cách tính, phân tích intake và Xuất Word.
+
+Trên Done, Lưu hồ sơ ghi đúng dòng đổi và thay snapshot hiện hành, giữ Done.
+Word và lấy làm nguồn cho Hồ sơ mới dùng bản đã lưu hiện tại, không có bản
+Done cũ riêng để dùng thay. Không báo lưu xong nếu nội dung mới gõ chưa ghi.
+`workspace_commit_stage` ở server/adapter/REST vẫn dành cho consumer khác;
+Soạn hồ sơ không gọi đường này hay `workspace_create` để lưu ngầm.
+
+Mọi ghi gửi phiên bản đã đọc (`base_revision`); nếu server có bản khác, báo xung đột và cho tải bản mới hoặc giữ bản đang sửa để sao chép, không ghi đè cưỡng bức. Done không phải khóa chỉ đọc; sửa rồi Lưu hồ sơ vẫn được.
+
+Không chặn chuyển tab chỉ vì đang nhập. Chuyển module/sidebar giữ buffer
+phiên hiện có; quay lại tiếp tục sửa, không phải ghi DB hay lưu bền.
+Giữ `canLeave` khi thực sự bỏ hồ sơ (mở/tạo hồ sơ khác) và cảnh báo đóng
+cửa sổ nếu có thay đổi chưa lưu: hủy giữ bản đang sửa, xác nhận bỏ không
+ghi DB. Không tự lưu nháp khi rời/đóng; buffer không sống qua đóng app và
+không thêm localStorage/file phục hồi. Cập nhật nền không ghi đè ô đang sửa.
+Nút `Hủy thay đổi` của Stage đã bỏ cùng cơ chế khôi phục riêng; dirty và
+nhánh bỏ nháp khi mở hồ sơ khác vẫn giữ.
+
+**Snapshot — owner 21/10/2026:** mỗi Hồ sơ chỉ có một snapshot hiện hành,
+kể cả Nháp đã lưu DB. Lưu lại cùng Hồ sơ thay snapshot hiện hành, không
+tạo record nghiệp vụ mới hoặc giữ snapshot theo từng lần lưu/sửa ô.
+Lịch sử Người/Tài sản là các Hồ sơ liên quan cùng ID theo điểm neo ở trên;
+mở Hồ sơ nào đọc snapshot Hồ sơ đó, lấy vào Hồ sơ mới mặc định bộ từ Hồ sơ
+done lưu mới nhất, không lấy draft. Các bộ thông tin khác nhau vẫn được giữ
+qua những Hồ sơ đó. **Owner chốt 22/10/2026 — phương án B:** mỗi Người/Tài sản
+một dòng thuộc Hồ sơ, ghi đúng dòng đổi, không bản đã chốt riêng. Revision
+chỉ phục vụ kiểm tra xung đột, không là kho snapshot các lần Lưu. Giữ raw/
+nguồn/history kỹ thuật đã có. Vòng 1 đã cutover dòng case-owned; vòng 2 ĐÃ
+TRIỂN KHAI 22/10/2026 resolver nguồn Done + Nhân bản (proof:
+`test_issue13_source_latest.py`, `test_issue13_workspace_duplicate.py`).
+[Quyết định](../../decisions/decision-owner-case-snapshot-as-history-20261021.md).
+
+<a id="pool"></a>
+## 5. Pool và Diagram — gán quan hệ
+
+Pool = người trong Stage đang sửa − người đã gán trên node active của Diagram đang xem. Người vừa thêm dùng được ngay; sửa tên/ngày/thuộc tính phản ánh ngay trên Pool/nhãn sơ đồ và lần evaluate kế tiếp, không đọc bản committed để khóa thao tác. Bản đã lưu chỉ là mốc dirty/revision và nguồn khi mở lại. Pool không có bảng dữ liệu hoặc nút lưu riêng.
+
+Kéo người vào vị trí để gán; gỡ thẻ trả người về Pool nhưng không xóa Stage. Một người không xuất hiện ở nhiều vị trí xung đột. Xóa ở Stage dọn tham chiếu Diagram trong bản đang sửa ngay; chưa đổi DB đến khi Lưu hồ sơ thành công.
+
+Hai bên có 30 vị trí cố định: p1..p15 Bên A, p16..p30 Bên B. Giữ ghế trống; thả lên ghế có người thì hoán đổi, không dồn danh sách. Thừa kế biểu diễn cha/mẹ, vợ/chồng, con và nhánh thế vị; dấu Chủ/Nhận (sở hữu/nhận tài sản) chỉ thuộc Thừa kế, chọn theo vị trí tài sản 1..5; đổi thứ tự/xóa tài sản phải cảnh báo đổi nghĩa.
+
+Diagram là phần của trạng thái đang sửa chung. **Lưu hồ sơ** ghi Stage+meta+Diagram, cả ô đang sửa, trong một lượt trọn vẹn và chuyển draft→done; không chỉ lưu riêng Diagram. `saveDiagram` là API cho consumer khác, không phải đường ghi của Soạn hồ sơ. Xem cách tính gửi Diagram và Stage đang sửa cho Python, kể cả hồ sơ đã có ID; read-only, không ghi DB, không tính lại bằng JavaScript. Quan hệ sai/vòng lặp/người ngoài Stage bị chặn; cấu trúc hợp lệ nhưng thiếu dữ liệu vẫn cho lưu, hiện rõ phần còn thiếu. Lỗi giữ bản đang sửa và snapshot DB cũ; giữ revision/xung đột.
+
+**Gỡ cả nhánh Thừa kế — owner 17/10/2026: “B - gỡ cả nhánh”.** Xóa node gỡ cả node đó và mọi hậu duệ active theo cạnh cha/mẹ → con ở mọi độ sâu, kể cả slot trống/ẩn hoặc con còn cha/mẹ khác. Không gỡ spouse chỉ vì quan hệ vợ/chồng, không giữ ô trung gian rỗng và không tự nối lại cha/mẹ. Trước khi đổi draft, liệt kê đúng node sẽ gỡ và quan hệ sẽ ngắt, báo phần hưởng có thể đổi. Hủy/Escape/đóng không đổi draft/dirty/revision và không phát evaluate/save do thao tác này. Xác nhận áp một mutation draft rồi evaluate theo luồng có sẵn, chưa tự lưu.
+
+Người vẫn ở Stage, về Pool theo gán trên node active. Giữ tombstone `deleted:true` trong Node v3 canonical; xóa quan hệ đi ra và tham chiếu đi vào phần bị gỡ, kể cả trên tombstone, để không còn parent sai hoặc spouse lệch hai chiều. Giữ ID/giá trị/thứ tự Người/Tài sản và mọi node, dấu Chủ/Nhận, quan hệ không bị tác động. Save tiếp tục nguyên tử/revision hiện có; lỗi giữ draft/bản lưu cũ; mở lại đọc đúng canonical đã lưu. [Quy tắc chi tiết](diagram-rules.md#branch-removal) · [Decision](../../decisions/decision-owner-inheritance-remove-entire-branch-20261017.md). Đây là spec đã chốt, chưa phải bằng chứng #21B built.
+
+<a id="word"></a>
+## 6. Xuất Word và quản lý mẫu
+
+Chọn thư mục mẫu, các văn bản và thư mục đích; mỗi văn bản tạo một DOCX riêng. Không chọn lại Người/Tài sản ở màn xuất. Dữ liệu Người/Tài sản lấy Stage đã lưu; vai trò/quan hệ từ Diagram, kết quả tính từ Python.
+
+Định hướng owner: trường có dữ liệu thì điền; trường hợp lệ chưa có dữ liệu để trống, không bắt hoàn thành sơ đồ nếu mẫu không cần. Lỗi mẫu, token không hỗ trợ, nguồn hỏng hoặc nguy cơ dùng dữ liệu khác với phần đang sửa phải báo rõ.
+
+**Đã chốt phần W (owner 23/10/2026): có gì xuất đó.** Thiếu Chủ/Nhận/Stage/tài sản không chặn xuất; phần thiếu để trống và ghi “thiếu: …” trong kết quả từng file. Readiness chỉ còn gate kỹ thuật (vượt trần slot, thiếu/không mở được mẫu, thư mục đích lỗi) — chi tiết ở [mẫu Word](word-templates.md#3-chọn-mẫu-và-xuất-văn-bản).
+
+Xuất là một hành động **Lưu & xuất**: hồ sơ chưa lưu thì tạo, đang sửa dở thì lưu, rồi render trên snapshot vừa ghi trong cùng lần bấm. Nơi niêm yết sửa tại dialog đi vào buffer meta và được ghi kèm lần lưu đó — không còn nút “Lưu nơi niêm yết” riêng hay câu chặn “lưu trước khi xuất”. Lỗi lưu thật dừng hành động và báo tại chỗ. Một file lỗi không làm mất file khác; báo Đã lưu/Lỗi/Bỏ qua theo từng file. Không ghi đè file có sẵn, tên trùng thêm số. Hủy giữ file đã tạo, dọn file đang ghi dở khi có thể.
+
+Nhập DOCX có thể xuất theo bản gốc: chọn nguồn, tải đề xuất rồi chọn đúng từng vị trí cần thay. Hành động xuất tự áp lựa chọn, tự lưu provenance/vị trí, nạp lại (bindings/revision/slot/hash) trên bản vừa lưu rồi mới render — không phải đóng/mở lại dialog. Lệch cấu trúc thật vẫn báo `word.original_mapping_invalid`. Không thay mọi chuỗi giống nhau; không sửa file nguồn. Tab Word tự tạo/quản lý mẫu l…
+
+**Tab Word tạo/lưu mẫu DEFERRED — owner 17/10/2026:** owner tự làm sau, cần spec chi tiết trước implementation tương lai; không giao đặc tả/triển khai trong lượt này. Nguồn/bố cục, catalog/lưu và nghiệm thu chưa được chọn. Xuất Word và intake bản gốc hiện có không bị hoãn. [Decision](../../decisions/decision-owner-word-authoring-deferred-20261017.md).
+
+<a id="address"></a>
+## 7. Tra địa chỉ ngay khi nhập
+
+Tra địa chỉ Người/Tài sản hoặc chính ô Nơi niêm yết bằng chữ đang nhập. Lookup
+v2 hiện chỉ trả tên **hiện hành**, không nhận ngày giấy và không tra được tên
+lịch sử tại ngày cấp; tra kho cục bộ, không gửi địa chỉ khách hàng lên website.
+**Nơi cấp giấy chết** phải theo cơ quan tại ngày cấp chính giấy, không suy từ
+địa chỉ người chết hoặc copy tên hiện hành làm tên lịch sử. Lịch sử chưa đủ
+xác nhận thì không tự điền; đây là yêu cầu nghiệp vụ, không claim lookup v2
+đã có chức năng theo ngày hoặc thêm quy trình nhập tay mới.
+
+Máy chỉ trả kết quả để Copy; không tự sửa, nối “nay là” hoặc lưu Stage. Hơn 10 kết quả thì hỏi mở danh sách đầy đủ. Cửa sổ đầy đủ cho sửa câu tìm, bấm Tra và Copy từng dòng; đóng về đúng ô/con trỏ/vùng chọn/cuộn, không mất nháp. Đổi hồ sơ/ô/chuỗi tìm thì bỏ phản hồi cũ. Copy lỗi phải báo lỗi.
+
+<a id="layout"></a>
+## 8. Bố cục và thao tác
+
+Tài sản bên trái, Người bên phải; phía dưới là Pool và Diagram. Tài sản dùng bảng cột, Người dùng bảng dòng; danh sách dài cuộn trang. Dialog Loại đất sửa cụm, Áp dụng chỉ về nháp, Lưu hồ sơ mới ghi DB. Có đường bàn phím thay kéo thả; lỗi đặt ngay ô/thẻ liên quan.
+
+**Giao diện tối giản (owner 23/10/2026):** không có chữ hướng dẫn tĩnh trên
+màn hình (đoạn giới thiệu danh sách, câu dạy trên ô trống, placeholder dạng
+ví dụ/“VD: …”, “Chọn từ danh bạ hoặc nhập tên”). Placeholder mặt nạ định dạng
+ngày `dd/mm/yyyy hoặc năm` được giữ vì là khuôn nhập, không phải bài giảng.
+Nút Zalo xám thường trực bị gỡ — chức năng chưa ban hành thì không hiện nút.
+Một lỗi chỉ hiện một chỗ và không đẩy bố cục; thành công dùng spinner/tích
+xanh tại nút, không toast chữ (chi tiết ở mục Lưu hồ sơ).
+
+Mốc bố cục: Stage 35:65 (38:62 ở màn ≥1920), Pool nội dung 224 px (khung ngoài 240), node có người 173 px (173 = 163 nội dung 2 hàng chip + 2×5 padding; bỏ 144 vì flex ép chip 22→15 px rồi bị `overflow:hidden` cắt, không click được), node trống 88×24. Ô Hai bên: rộng −30%, cao +100% so với số đo thật trước thay đổi (288×26 → 202×52), JS/CSS đồng bộ; giữ đủ `p1..p30` và đường bàn phím. Màn ≤900 px xếp các vùng dọc; không thu chữ/node đến khó đọc. Canvas pan/zoom; Mở rộng là lớp phủ trong ứng dụng. Dấu chưa lưu của Stage và Diagram tách riêng. Thông báo tạm (`notice`) nằm trong khoảng trống sẵn có của thanh trên (cạnh các pill trạng thái): không đổi vị trí vùng Sơ đồ và không che drop target/điều khiển; thanh trên bám trên cùng khi vùng nội dung cuộn nên thông báo vẫn trong tầm nhìn; banner lỗi/khoá vẫn trong luồng. Thông báo dài quá một dòng được cắt bằng ellipsis nhưng luôn đọc được đầy đủ bằng bàn phím: nút nội dung (Tab tới được) mở dialog `Thông báo` của module (Esc/×/click-outside, focus trả về nút).
+
+Yêu cầu tăng vùng sơ đồ +50% (report 802) đã chốt theo quyết định owner (`decision-owner-802-diagram-height-20261016`): tăng CHIỀU CAO vùng Sơ đồ + Pool, mục tiêu 726px tại viewport report (1920×983) từ baseline đo 484px (×1.5), không đổi chiều rộng; viewport thấp thì trang cuộn/pan, không thu chữ. Vùng Sơ đồ + Pool vì vậy có sàn chiều cao 726px; nội dung lớn hơn (ô Hai bên) vẫn cao theo quy tắc hiện có và không bị thu nhỏ — phần tăng do nội dung không tính là fix 802. Canvas vẫn là khung cuộn/pan; giữ đủ `p1..p30` và xếp dọc ≤900px.
+
+## 9. Tiêu chí kiểm và phần chưa chốt
+
+- Lưu/mở lại giữ đúng Người/Tài sản/quan hệ; lỗi hoặc xung đột không mất nháp, không lưu nửa chừng.
+- Gỡ thẻ không xóa người; xóa Stage dọn tham chiếu đúng; reorder giữ ID và báo đổi nghĩa vị trí.
+- Nhập nhiều nguồn giữ phần đã sửa, lỗi từng nguồn rõ ràng; dữ liệu mơ hồ không tự được xác nhận.
+- Xuất dùng đúng bản đã lưu, không sửa nguồn hoặc ghi đè đầu ra; kiểm văn bản có trường trống và văn bản chỉ cần Stage khi triển khai định hướng mới.
+- Chuyển loại hồ sơ đã lưu: Người/Tài sản giữ ID + giá trị; Diagram reset rỗng theo domain mới; buộc chọn `document_type` mới kèm xác nhận; lỗi/xung đột/khóa không đổi state/revision.
+- Danh sách hồ sơ: **làm lại — DEFERRED 17/10/2026**; owner tự triển khai spec sau. Hướng trường hiển thị/search/filter là Draft chưa duyệt, chưa phải quy tắc hiện hành. [Decision](../../decisions/decision-owner-case-list-redesign-deferred-20261017.md).
+- Gỡ cả nhánh Thừa kế: cảnh báo liệt kê đúng node/quan hệ trước mutation; con có parent khác vẫn gỡ, spouse không tự gỡ; Hủy/Escape/đóng không mutate/evaluate/save; xác nhận một mutation draft, lưu/mở lại giữ đúng tombstone và graph còn lại, Stage/ID/vị trí tài sản không đổi.
+- Chưa chốt: tab Word tạo mẫu; phạm vi thay các điều kiện chặn hiện hành. Quy tắc tính thừa kế Draft không tự được duyệt.
+- Tab Word tạo/lưu mẫu: giữ Draft, **DEFERRED 17/10/2026**, cần spec kỹ khi làm sau; không phải câu hỏi phạm vi đang chờ owner và không phải feature built.
+
+## 10. Tra cứu chuyên sâu
+
+[Quy tắc sơ đồ](diagram-rules.md), [Word và nguồn DOCX](word-templates.md), [bóc tách dùng chung](../shared/extraction-rules.md), [tra địa chỉ](../shared/administrative-lookup.md#lookup). Các file này bổ sung chi tiết; luồng thường dùng đã được mô tả đầy đủ ở trên.
+
+Hai bên không chạy engine chia di sản; evaluate trả unsupported, còn xuất Word có đường hỗ trợ riêng. Không thêm nghiệp vụ mới vào web cũ; nếu cần tương thích thì gọi dịch vụ chung.
+
+Code bắt đầu tại `shell/src/renderer/notary/` và `notary_v2/routers/cases.py`; contract giao tiếp tại `contracts/notary-case-drafting.md`. Spec quyết định hành vi, code/test chứng minh hiện trạng, không tự đổi quy tắc theo code.

@@ -1,0 +1,28 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "S1/S2 23/10/2026: Lưu hồ sơ mới cho 0 Người/0 Tài sản và owner null; Diagram thiếu Chủ đất lưu ở trạng thái incomplete."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-0002-4002-8002-000000000022",
+  "command": "notary.workspace_save_case",
+  "payload": {
+    "idempotency_key": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "case": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan"
+    },
+    "stage": {
+      "owner_row_id": null,
+      "people": [],
+      "assets": []
+    },
+    "diagram": {
+      "state": {
+        "version": 3,
+        "domain": "inheritance",
+        "nodes": []
+      }
+    }
+  }
+}

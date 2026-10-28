@@ -104,7 +104,7 @@
             "land_rows": [
               {
                 "loai_dat": "CLN",
-                "dien_tich": 120.0,
+                "dien_tich": 120,
                 "thoi_han": null
               }
             ]
@@ -127,7 +127,11 @@
               ],
               "receivePositions": [],
               "hidden": false,
-              "deleted": false
+              "deleted": false,
+              "spouseSlotIds": [
+                "spouse"
+              ],
+              "spouseSuggestionId": null
             },
             {
               "id": "spouse",
@@ -140,7 +144,11 @@
                 2
               ],
               "hidden": false,
-              "deleted": false
+              "deleted": false,
+              "spouseSlotIds": [
+                "owner"
+              ],
+              "spouseSuggestionId": null
             },
             {
               "id": "child_1",
@@ -155,7 +163,9 @@
                 1
               ],
               "hidden": false,
-              "deleted": false
+              "deleted": false,
+              "spouseSlotIds": [],
+              "spouseSuggestionId": null
             }
           ]
         },

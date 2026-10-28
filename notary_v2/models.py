@@ -1,25 +1,40 @@
 import uuid
-from sqlalchemy import Column, Integer, String, Date, Boolean, Float, ForeignKey, Text, DateTime, JSON, UniqueConstraint, Index, text
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, Integer, String, Date, Boolean, Float, ForeignKey, Text, DateTime, JSON, UniqueConstraint, Index, CheckConstraint, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
 
-def derive_person_fields(ngay_chet, ngay_cap):
+def case_saved_at():
+    """Mốc lưu kỹ thuật của Hồ sơ: Python UTC-naive, đủ microsecond.
+
+    Dùng cho `InheritanceCase.updated_at` (resolver nguồn Done chọn theo
+    mốc này) và mọi writer case. `func.now()` của SQLite chỉ tới giây nên
+    không đủ phân định hai lần lưu trong cùng giây (contract §2.2/§13.20).
+    Không làm tròn: `Diagram.updatedAt` trên wire mới là ISO tới giây.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def derive_person_fields(ngay_chet, ngay_cap, loai_giay_to=None, loai_dia_chi=None):
     """Trường suy ra của Người từ input nguồn → tuple
     `(loai_giay_to, noi_cap, loaicutru, loai_dia_chi)`.
 
     Mốc phân biệt giấy tờ cũ/mới = 01/10/2024 (owner chốt 29/09/2026).
-    Người chết (có `ngay_chet`) không suy loại giấy tờ/nơi cấp — đó là
-    bằng chứng người dùng xác nhận, sống trong snapshot hồ sơ; nhãn địa
-    chỉ = "Nơi chết". Người sống thiếu `ngay_cap` → None (chưa xác định,
-    không tự suy cơ quan cụ thể).
+    Ngày chết hoặc loại giấy/nhãn Nơi chết đã xác nhận trong snapshot cho
+    biết ngữ cảnh chết, kể cả thiếu ngày. Không suy loại giấy/nơi cấp cho
+    ngữ cảnh này; nhãn địa chỉ = "Nơi chết". Master không có các bằng chứng
+    snapshot không thể tự khôi phục chúng. Thiếu ngày cấp → không suy cơ quan.
 
     Đây là SOT của rule suy ra: property Customer.* gọi hàm này, và
     case_workspace dùng nó để tính lại giá trị suy ra từ input nguồn
     đã commit trong snapshot — không qua master live (MIN-141 review)."""
     from datetime import date as _date
-    if ngay_chet is not None:
+    if (ngay_chet is not None or loai_dia_chi == "Nơi chết"
+            or loai_giay_to in ("Trích lục khai tử",
+                                "Trích lục khai tử (bản sao)", "Giấy chứng tử")):
         return None, None, "Nơi chết", "Nơi chết"
     if not ngay_cap:
         return None, None, None, None
@@ -41,11 +56,19 @@ class Customer(Base):
     ho_ten       = Column(String(200), nullable=False)
     gioi_tinh    = Column(String(10),  nullable=True)           # Nam / Nữ
     ngay_sinh    = Column(Date,        nullable=True)
-    ngay_chet    = Column(Date,        nullable=True)            # NULL = còn sống
-    so_giay_to   = Column(String(50),  nullable=True,  unique=True)
+    ngay_chet    = Column(Date,        nullable=True)            # NULL = không có thông tin
+    so_giay_to   = Column(String(50),  nullable=True, index=True)
     ngay_cap     = Column(Date,        nullable=True)
     dia_chi      = Column(Text,        nullable=True)
+    # Neo identity Storage B (tên/số đã chuẩn hóa) — resolver match theo cặp
+    # này; KHÔNG UNIQUE: danh bạ cũ/trùng neo vẫn tồn tại hợp lệ.
+    name_anchor     = Column(Text,     nullable=True)
+    document_anchor = Column(Text,     nullable=True)
     created_at   = Column(DateTime,    server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_customers_identity_anchor", "name_anchor", "document_anchor"),
+    )
 
     # Quan hệ
     participations   = relationship(
@@ -101,11 +124,11 @@ class Property(Base):
     __tablename__ = "properties"
 
     id                = Column(Integer, primary_key=True, index=True)
-    so_serial         = Column(String(100), nullable=False, unique=True)
+    so_serial         = Column(String(100), nullable=True, index=True)  # identity nguyên văn
     so_vao_so         = Column(String(100), nullable=True)
     so_thua_dat       = Column(String(100), nullable=True)
     so_to_ban_do      = Column(String(100), nullable=True)
-    dia_chi           = Column(Text,        nullable=False)
+    dia_chi           = Column(Text,        nullable=True)   # N: resolver serial không cần địa chỉ
     loai_dat          = Column(String(100), nullable=True)
     dien_tich         = Column(Float,        nullable=True)
     loai_so           = Column(String(200), nullable=True)   # Loại GCN (3 loại)
@@ -132,11 +155,11 @@ class InheritanceCase(Base):
     __tablename__ = "inheritance_cases"
 
     id               = Column(Integer, primary_key=True, index=True)
-    nguoi_chet_id    = Column(Integer, ForeignKey("customers.id"), nullable=False)
-    tai_san_id       = Column(Integer, ForeignKey("properties.id"), nullable=False)
-    ngay_lap_ho_so   = Column(Date,    nullable=False)
+    nguoi_chet_id    = Column(Integer, ForeignKey("customers.id"), nullable=True)   # projection identity vị trí 1
+    tai_san_id       = Column(Integer, ForeignKey("properties.id"), nullable=True)  # projection identity tài sản 1
+    ngay_lap_ho_so   = Column(Date,    nullable=True)   # null khi nháp chưa nhập, không default hôm nay
     loai_van_ban     = Column(String(50), default="khai_nhan")   # khai_nhan / thoa_thuan
-    trang_thai       = Column(String(20), default="draft")       # draft / locked
+    trang_thai       = Column(String(20), nullable=False, default="draft", server_default=text("'draft'"))  # draft / done
     noi_niem_yet     = Column(String(200), nullable=True)        # Tên xã/thị trấn nơi lập văn bản / nơi có đất
     nguoi_nhan_uy_quyen = Column(String(200), nullable=True)     # Người nhận ủy quyền (tên hiển thị — denormalized)
     nguoi_nhan_uy_quyen_id = Column(Integer, ForeignKey("customers.id"), nullable=True)  # Tham chiếu ổn định tới danh bạ (MIN-141 đợt 3)
@@ -145,8 +168,10 @@ class InheritanceCase(Base):
     engine_state_json = Column(Text,   nullable=True)            # JSON state cua engine/sơ đồ thừa kế mới
     case_state_json   = Column(Text,   nullable=True)            # JSON SSoT V2 cho stage/pool/diagram
     workspace_revision = Column(Integer, nullable=False, default=1, server_default=text("1"))  # revision workspace (notary.case-drafting.v2)
-    workspace_idempotency_key = Column(String(64), nullable=True, index=True)  # idempotency_key của notary.workspace_create
-    updated_at       = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    workspace_idempotency_key = Column(String(64), nullable=True, index=True, unique=True)  # key tạo case — unique nullable
+    workspace_creation_hash = Column(String(64), nullable=True)  # SHA-256 payload tạo chuẩn hóa
+    updated_at       = Column(DateTime, default=case_saved_at,
+                              onupdate=case_saved_at)
     created_at       = Column(DateTime, server_default=func.now())
 
     # Quan hệ
@@ -154,10 +179,18 @@ class InheritanceCase(Base):
     tai_san      = relationship("Property", back_populates="inheritance_cases")
     property_links = relationship("InheritanceCaseProperty", back_populates="case", cascade="all, delete-orphan")
     participants = relationship("InheritanceParticipant", back_populates="ho_so", cascade="all, delete-orphan")
+    # Storage B: dòng dữ kiện case-owned, thứ tự wire = vitri.
+    person_rows = relationship("CasePersonRow", back_populates="case",
+                               cascade="all, delete-orphan",
+                               order_by="CasePersonRow.vitri")
+    asset_rows = relationship("CaseAssetRow", back_populates="case",
+                              cascade="all, delete-orphan",
+                              order_by="CaseAssetRow.vitri")
 
-    @property
-    def is_locked(self):
-        return self.trang_thai == "locked"
+    __table_args__ = (
+        CheckConstraint("trang_thai IN ('draft', 'done')",
+                        name="ck_inheritance_case_status"),
+    )
 
     @property
     def tong_ty_le(self):
@@ -170,13 +203,117 @@ class InheritanceCaseProperty(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     case_id = Column(Integer, ForeignKey("inheritance_cases.id"), nullable=False)
-    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False)
+    # Storage B: link theo DÒNG tài sản; property_id chỉ projection identity.
+    case_asset_row_id = Column(String(36), ForeignKey("case_asset_rows.row_id"), nullable=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=True)
     is_primary = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     case = relationship("InheritanceCase", back_populates="property_links")
     property = relationship("Property", back_populates="case_links")
+
+
+class CasePersonRow(Base):
+    """Dòng Người của một Hồ sơ (Storage B) — SOT dữ kiện Stage.
+
+    `customer_id` chỉ là identity dùng chung nullable; sửa dữ kiện một Hồ sơ
+    KHÔNG UPDATE danh bạ. Dòng thiếu neo vẫn lưu được (customer_id=null).
+    `vitri` 1-based giữ đúng thứ tự mảng wire."""
+    __tablename__ = "case_person_rows"
+
+    row_id      = Column(String(36), primary_key=True)  # UUID v4, ổn định
+    case_id     = Column(Integer, ForeignKey("inheritance_cases.id", ondelete="CASCADE"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="RESTRICT"), nullable=True)
+    vitri       = Column(Integer, nullable=False)
+
+    ho_ten          = Column(String(200), nullable=True)
+    gioi_tinh       = Column(String(10),  nullable=True)   # Nam / Nữ / null
+    ngay_sinh       = Column(String(10),  nullable=True)   # YYYY hoặc YYYY-MM-DD
+    ngay_chet       = Column(String(10),  nullable=True)
+    so_giay_to      = Column(String(50),  nullable=True)
+    ngay_cap        = Column(String(10),  nullable=True)
+    noi_cap         = Column(Text,        nullable=True)
+    dia_chi         = Column(Text,        nullable=True)
+    place_of_origin = Column(Text,        nullable=True)
+    loai_giay_to    = Column(String(200), nullable=True)   # giá trị hiệu lực sau rule suy ra
+    loai_dia_chi    = Column(String(200), nullable=True)
+
+    case     = relationship("InheritanceCase", back_populates="person_rows")
+    identity = relationship("Customer")
+
+    __table_args__ = (
+        Index("ix_case_person_rows_case_vitri", "case_id", "vitri"),
+        Index("ix_case_person_rows_customer", "customer_id"),
+        UniqueConstraint("case_id", "row_id", name="uq_case_person_row_case_row"),
+        CheckConstraint("vitri > 0", name="ck_case_person_row_vitri"),
+    )
+
+
+class CaseAssetRow(Base):
+    """Dòng Tài sản của một Hồ sơ (Storage B) — SOT dữ kiện Stage.
+
+    `property_id` là identity dùng chung nullable theo serial nguyên văn;
+    hai dòng cùng identity vẫn giữ hai bộ dữ kiện/đất độc lập.
+    `land_rows_present` phân biệt null (False) với [] (True, không con)."""
+    __tablename__ = "case_asset_rows"
+
+    row_id      = Column(String(36), primary_key=True)  # UUID v4
+    case_id     = Column(Integer, ForeignKey("inheritance_cases.id", ondelete="CASCADE"), nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="RESTRICT"), nullable=True)
+    vitri       = Column(Integer, nullable=False)
+
+    so_serial         = Column(String(100), nullable=False, default="", server_default="")  # nguyên văn
+    so_vao_so         = Column(String(100), nullable=True)
+    so_thua_dat       = Column(String(100), nullable=True)
+    so_to_ban_do      = Column(String(100), nullable=True)
+    dia_chi           = Column(Text,        nullable=True)
+    loai_so           = Column(String(200), nullable=True)
+    hinh_thuc_su_dung = Column(String(100), nullable=True)
+    thoi_han          = Column(String(100), nullable=True)
+    nguon_goc         = Column(Text,        nullable=True)
+    # S5c (23/10/2026): giữ nguyên độ đầy đủ như trường ngày của Người —
+    # 'YYYY' vẫn là năm riêng, không đệm 01/01.
+    ngay_cap          = Column(String(10),  nullable=True)
+    co_quan_cap       = Column(String(200), nullable=True)
+    land_rows_present = Column(Boolean, nullable=False, default=False, server_default=text("0"))
+
+    case     = relationship("InheritanceCase", back_populates="asset_rows")
+    identity = relationship("Property")
+    land_rows = relationship("CaseAssetLandRow", back_populates="asset_row",
+                             cascade="all, delete-orphan",
+                             order_by="CaseAssetLandRow.vitri")
+
+    __table_args__ = (
+        Index("ix_case_asset_rows_case_vitri", "case_id", "vitri"),
+        Index("ix_case_asset_rows_property", "property_id"),
+        UniqueConstraint("case_id", "row_id", name="uq_case_asset_row_case_row"),
+        CheckConstraint("vitri BETWEEN 1 AND 5", name="ck_case_asset_row_vitri"),
+    )
+
+
+class CaseAssetLandRow(Base):
+    """Một cụm đất của DÒNG tài sản trong Hồ sơ (Storage B).
+
+    Diff theo (case_asset_row_id, vitri); hàng trống vẫn giữ vị trí."""
+    __tablename__ = "case_asset_land_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_asset_row_id = Column(
+        String(36), ForeignKey("case_asset_rows.row_id", ondelete="CASCADE"),
+        nullable=False)
+    vitri = Column(Integer, nullable=False)
+    loaidat = Column(String(200), nullable=True)
+    dientich = Column(Float, nullable=True)
+    thoihan = Column(String(200), nullable=True)
+
+    asset_row = relationship("CaseAssetRow", back_populates="land_rows")
+
+    __table_args__ = (
+        UniqueConstraint("case_asset_row_id", "vitri",
+                         name="uq_case_asset_land_row_vitri"),
+        CheckConstraint("vitri >= 1", name="ck_case_asset_land_row_vitri"),
+    )
 
 
 class PropertyLandRow(Base):
@@ -215,12 +352,15 @@ class InheritanceParticipant(Base):
 
     id               = Column(Integer, primary_key=True, index=True)
     ho_so_id         = Column(Integer, ForeignKey("inheritance_cases.id"),  nullable=False)
-    customer_id      = Column(Integer, ForeignKey("customers.id"),          nullable=False)
+    # Storage B: participant neo DÒNG người của case; customer chỉ projection.
+    case_person_row_id = Column(String(36), ForeignKey("case_person_rows.row_id"), nullable=True)
+    customer_id      = Column(Integer, ForeignKey("customers.id"),          nullable=True)
     vai_tro          = Column(String(50),  nullable=False)   # Vợ/Chồng, Con, Cha/Mẹ, Anh/Chị/Em
     hang_thua_ke     = Column(Integer,     default=1)        # Hàng thừa kế 1, 2, 3
     co_nhan_tai_san  = Column(Boolean,     default=True)     # True = nhận, False = từ chối
     ty_le            = Column(Float,       default=0.0)      # Tỷ lệ % sở hữu sau phân chia
     ghi_chu          = Column(Text,        nullable=True)
+    parent_case_person_row_id = Column(String(36), ForeignKey("case_person_rows.row_id"), nullable=True)
     parent_customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
 
     # Quan hệ

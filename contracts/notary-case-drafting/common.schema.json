@@ -152,7 +152,7 @@
         "so_vao_so": { "$ref": "#/definitions/nullable_string" },
         "so_thua_dat": { "$ref": "#/definitions/nullable_string" },
         "so_to_ban_do": { "$ref": "#/definitions/nullable_string" },
-        "dia_chi": { "$ref": "#/definitions/non_empty_string" },
+        "dia_chi": { "$ref": "#/definitions/nullable_string" },
         "loai_so": { "$ref": "#/definitions/nullable_string" },
         "hinh_thuc_su_dung": { "$ref": "#/definitions/nullable_string" },
         "thoi_han": { "$ref": "#/definitions/nullable_string" },
@@ -273,16 +273,30 @@
     },
     "required_slot": {
       "type": "object",
-      "required": ["anchorSlotId", "reason", "slotTypes", "minimumEmptyChildSlots"],
+      "required": ["anchorSlotId", "reason", "slotTypes", "minimumEmptyChildSlots", "minimumEmptySpouseSlots", "slots"],
       "additionalProperties": false,
       "properties": {
         "anchorSlotId": { "type": "string" },
-        "reason": { "enum": ["active_estate", "representation_branch"] },
+        "reason": { "enum": ["active_estate", "representation_branch", "living_owner"] },
         "slotTypes": {
           "type": "array",
           "items": { "enum": ["father", "mother", "spouse", "child"] }
         },
-        "minimumEmptyChildSlots": { "type": "integer", "minimum": 0 }
+        "minimumEmptyChildSlots": { "type": "integer", "minimum": 0 },
+        "minimumEmptySpouseSlots": { "type": "integer", "minimum": 0 },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "role", "ordinal"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "role": { "enum": ["father", "mother", "spouse", "child"] },
+              "ordinal": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
       }
     },
     "engine_error": {
@@ -473,8 +487,7 @@
         "code": {
           "enum": [
             "required", "invalid_type", "invalid_enum", "invalid_date",
-            "invalid_format", "duplicate_row_id", "primary_count",
-            "duplicate_entity"
+            "invalid_format", "duplicate_row_id", "primary_count"
           ]
         },
         "message": { "type": "string" }
@@ -494,10 +507,8 @@
         "display_name": { "$ref": "#/definitions/non_empty_string" },
         "ready": { "type": "boolean" },
         "block_reason": {
+          "description": "Chỉ còn lý do KỸ THUẬT (vượt trần slot, thiếu/không mở được mẫu). Thiếu dữ kiện không chặn: dữ kiện rỗng và nằm trong `missing` của kết quả từng file.",
           "enum": [
-            "word.no_people", "word.no_diagram",
-            "word.no_assets", "word.no_landowner",
-            "word.no_deceased_landowner", "word.no_receiver",
             "word.too_many_assets", "word.too_many_people",
             "word.too_many_signers", "word.template_missing", null
           ]
@@ -538,6 +549,11 @@
             },
             { "type": "null" }
           ]
+        },
+        "missing": {
+          "description": "Dữ kiện còn thiếu của file đã xuất (owner 23/10/2026 phần W): phần đó để trống trong DOCX; đây là kết quả, không phải lý do chặn. Vắng mặt = không có ghi chú.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       },
       "allOf": [

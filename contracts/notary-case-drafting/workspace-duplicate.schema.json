@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/workspace-duplicate.schema.json",
+  "title": "notary.workspace_duplicate — payload + result.data (§13.21, vòng 2 đang triển khai)",
+  "description": "Nhân bản toàn bộ nội dung đã lưu thành case mới. Payload chỉ có source_case_id + idempotency_key; cấm case_id/base_revision/case/stage/diagram/status/field override. Result là workspace result v2 + source_case_id + created. Không const draft/rev1 trên mọi result vì replay có thể trả bản sao đã sửa/Done; first-created semantics kiểm ở validator/service. Normative text: contracts/notary-case-drafting.md §13.21.",
+  "definitions": {
+    "payload": {
+      "type": "object",
+      "required": ["source_case_id", "idempotency_key"],
+      "additionalProperties": false,
+      "properties": {
+        "source_case_id": { "type": "integer", "minimum": 1 },
+        "idempotency_key": { "$ref": "common.schema.json#/definitions/uuid4" }
+      }
+    },
+    "result_data": {
+      "type": "object",
+      "required": [
+        "schema_version", "case", "stage", "diagram", "capabilities",
+        "source_case_id", "created"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "$ref": "draft-v2.schema.json#/definitions/schema_version_v2"
+        },
+        "backend_mode": { "enum": ["real", "mock"] },
+        "case": {
+          "$ref": "workspace.schema.json#/definitions/result_data_v2/properties/case"
+        },
+        "stage": {
+          "$ref": "workspace.schema.json#/definitions/result_data_v2/properties/stage"
+        },
+        "diagram": {
+          "$ref": "workspace.schema.json#/definitions/result_data_v2/properties/diagram"
+        },
+        "capabilities": {
+          "$ref": "workspace.schema.json#/definitions/result_data_v2/properties/capabilities"
+        },
+        "docx_import": {
+          "$ref": "common.schema.json#/definitions/docx_import"
+        },
+        "source_case_id": { "type": "integer", "minimum": 1 },
+        "created": { "type": "boolean" }
+      }
+    }
+  }
+}

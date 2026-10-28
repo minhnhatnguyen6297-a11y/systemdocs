@@ -201,6 +201,33 @@ function captureClient(getResponse) {
           capabilities: { intake: [], diagram: true, word_export: true },
         } };
       }
+      if (command === 'notary.workspace_source_latest') {
+        return { ok: true, data: { ...okData } };
+      }
+      if (command === 'notary.workspace_save_case') {
+        const c = payload.case || {};
+        const caseId = payload.case_id != null ? payload.case_id : 42;
+        return { ok: true, data: {
+          ...okData,
+          created: payload.case_id == null,
+          case: { id: caseId, case_type: c.case_type,
+                  document_type: c.document_type, status: 'done',
+                  locked: false,
+                  revision: payload.case_id != null
+                    ? payload.base_revision + 1 : 1,
+                  ngay_lap_ho_so: c.ngay_lap_ho_so ?? null,
+                  noi_niem_yet: c.noi_niem_yet ?? null,
+                  nguoi_nhan_uy_quyen: c.nguoi_nhan_uy_quyen ?? null,
+                  nguoi_nhan_uy_quyen_id: c.nguoi_nhan_uy_quyen_id ?? null,
+                  noi_dung_viec: c.noi_dung_viec ?? null,
+                  ghi_chu: c.ghi_chu ?? null },
+          stage: payload.stage,
+          diagram: { domain: 'inheritance',
+                     state: payload.diagram.state,
+                     render_model: null, warnings: [] },
+          capabilities: { intake: [], diagram: true, word_export: true },
+        } };
+      }
       if (command === 'notary.diagram_evaluate') {
         return { ok: true, data: { ...okData, evaluated_revision: null,
                                    render_model: null } };
@@ -249,7 +276,8 @@ function legacyGetResponse() {
     diagram: { domain: 'inheritance',
                state: { version: 3, domain: 'inheritance', nodes: [
                  { id: 'owner', personId: ownerId, parentSlotIds: [],
-                   spouseSlotId: null, ownPositions: [1],
+                   spouseSlotIds: [], spouseSlotId: null,
+                   spouseSuggestionId: null, ownPositions: [1],
                    receivePositions: [], hidden: false, deleted: false },
                ] },
                render_model: null, warnings: [] },
@@ -259,28 +287,32 @@ function legacyGetResponse() {
 
 // ---------- tests ----------
 
-test('wire: saveDraft (workspace_create) — payload thật khớp '
-     + 'payload_workspace_create_v2, không gửi thoi_han lẻ', async () => {
+test('wire: saveCase tạo mới — payload thật khớp payload workspace_save_case, '
+     + 'không gửi thoi_han lẻ', async () => {
   const client = captureClient();
   const model = M.createModel({ client, uuid });
-  model.newDraft();
+  await model.newDraft();
   const p = model.addPerson({ ho_ten: 'Nguyễn Văn Chết',
                               ngay_chet: '2011-05-15' });
   const a = model.addAsset({ so_serial: 'MM000001',
+                             so_thua_dat: '99', so_to_ban_do: '9',
                              dia_chi: 'Thửa 99, xã Y' });
   model.updateAssetField(a.row_id, 'land_rows',
                          [{ loai_dat: 'ODT', dien_tich: 85.5,
                             thoi_han: 'Lâu dài' }]);
   model.setOwnerRow(p.row_id);
-  const r = await model.saveDraft();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
 
   const call = client.calls.find(
-    (c) => c.command === 'notary.workspace_create');
+    (c) => c.command === 'notary.workspace_save_case');
   assert.ok(call);
-  // Validate FULL payload thật vs contract v2 — kể cả block case meta đợt 3.
-  assertValid(call.payload, '#/definitions/payload_workspace_create_v2',
-              'draft-v2.schema.json', 'workspace_create payload');
+  // Validate FULL payload thật vs contract — kể cả block case meta đợt 3.
+  assertValid(call.payload, '#/definitions/payload',
+              'workspace-save-case.schema.json', 'save_case payload');
+  assert.ok(call.payload.idempotency_key, 'case mới giữ key phiên nháp');
+  assert.equal('case_id' in call.payload, false);
+  assert.equal('base_revision' in call.payload, false);
   for (const asset of call.payload.stage.assets) {
     assert.equal('thoi_han' in asset, false,
       'asset không được mang key thoi_han lẻ trên wire');
@@ -289,26 +321,30 @@ test('wire: saveDraft (workspace_create) — payload thật khớp '
                'Lâu dài', 'thời hạn mới chỉ thuộc cụm đất');
 });
 
-test('wire: commitStage trên case mở lại — asset mang thoi_han lịch sử '
-     + 'bị strip, payload khớp payload_commit_stage_v2', async () => {
+test('wire: saveCase trên case mở lại — asset mang thoi_han lịch sử '
+     + 'bị strip, payload khớp schema save_case', async () => {
   const client = captureClient(() => legacyGetResponse());
   const model = M.createModel({ client, uuid });
   await model.openCase(42);
   // Row load từ server VẪN mang thoi_han (emit giữ lịch sử).
   assert.equal(model.state.stage.assets[0].thoi_han, 'Lâu dài');
-  // Sửa một field để stage dirty → commit gửi stage; sửa meta để
+  // Sửa một field để stage dirty → save_case gửi stage; sửa meta để
   // payload.case (đợt 3) cũng xuất hiện và được validate.
   model.updateAssetField(
     model.state.stage.assets[0].row_id, 'dia_chi', 'Địa chỉ mới');
   model.updateCaseMeta('ghi_chu', 'Ghi chú thử');
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
 
   const call = client.calls.find(
-    (c) => c.command === 'notary.workspace_commit_stage');
+    (c) => c.command === 'notary.workspace_save_case');
   assert.ok(call);
-  assertValid(call.payload, '#/definitions/payload_commit_stage_v2',
-              'draft-v2.schema.json', 'commit_stage payload');
+  assertValid(call.payload, '#/definitions/payload',
+              'workspace-save-case.schema.json', 'save_case payload');
+  assert.equal(call.payload.case_id, 42);
+  assert.equal(call.payload.base_revision, 7);
+  assert.equal('idempotency_key' in call.payload, false,
+    'case cũ cấm key');
   assert.equal(call.payload.case.ghi_chu, 'Ghi chú thử');
   for (const asset of call.payload.stage.assets) {
     assert.equal('thoi_han' in asset, false);
@@ -318,11 +354,11 @@ test('wire: commitStage trên case mở lại — asset mang thoi_han lịch s�
   }
 });
 
-test('wire: evaluateDiagram nháp — stage kèm theo không có thoi_han lẻ, '
-     + 'khớp stage_v2', async () => {
+test('wire: evaluateDiagram — stage kèm theo không có thoi_han lẻ, '
+     + 'khớp stage_v2 và không gửi case_id', async () => {
   const client = captureClient();
   const model = M.createModel({ client, uuid });
-  model.newDraft();
+  await model.newDraft();
   const p = model.addPerson({ ho_ten: 'Người Chết' });
   const a = model.addAsset({ so_serial: 'MM000001', dia_chi: 'Xã Y' });
   model.updateAssetField(a.row_id, 'land_rows',
@@ -341,6 +377,19 @@ test('wire: evaluateDiagram nháp — stage kèm theo không có thoi_han lẻ, 
   for (const asset of call.payload.stage.assets) {
     assert.equal('thoi_han' in asset, false);
   }
+  // Case đã có ID cũng evaluate trên buffer: case hint + stage, KHÔNG
+  // case_id/base_revision (adapter nhánh draft).
+  model.state.caseId = 42;
+  client.calls.length = 0;
+  await model.evaluateDiagram();
+  const saved = client.calls.find(
+    (c) => c.command === 'notary.diagram_evaluate');
+  assert.ok(saved);
+  assert.equal('case_id' in saved.payload, false);
+  assert.equal('base_revision' in saved.payload, false);
+  assert.equal(saved.payload.case.case_type, 'inheritance');
+  assertValid(saved.payload.stage, '#/definitions/stage_v2',
+              'draft-v2.schema.json', 'diagram_evaluate saved stage');
 });
 
 test('schema: tách input/emit — asset_row_input không bắt buộc thoi_han '

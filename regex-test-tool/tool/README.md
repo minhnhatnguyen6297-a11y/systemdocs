@@ -40,16 +40,32 @@ Không phải cài lại gì thêm (trừ khi được dặn riêng).
 - File `mo-phong-may-trang.bat`: giả lập máy chưa cài Python
   (chạy `run.bat` như trên máy trắng) để kiểm tra nhanh đường
   cài đặt. Chỉ dùng để test, nhân viên không cần.
-- Engine: `extract_contract.py` ngay trong `tool/` (bản chụp từ
-  `upload_lab`, có `ENGINE_VERSION`). Mỗi dòng log đóng dấu phiên bản engine.
-- Đổi engine: copy file mới ghi đè `extract_contract.py` +
-  `kiem_tra_trich_xuat.py`, tăng `ENGINE_VERSION` (ví dụ ngày + tên vòng).
+- Lõi luật (engine): một đường luật duy nhất trong repo —
+  `tools/regex_workbench/engine/contract_extract.py` (danh tính
+  `contract_word` + `ENGINE_VERSION` của lõi). Tool **không giữ bản luật
+  riêng**: nó gọi lõi chung qua consumer `upload_lab/extraction_adapter.py`
+  (đọc file Word + gọi lõi + giữ shape payload), rồi kiểm tra payload bằng
+  `upload_lab/kiem_tra_trich_xuat.py`. Mỗi dòng log đóng dấu
+  `ENGINE_VERSION` của lõi — cả repo dùng đúng một danh tính engine.
+- Đóng gói bản cho nhân viên: chạy `build_release.ps1` (trong
+  `regex-test-tool/`). Script gom đúng 3 nguồn vào `tool/vendor/`:
+  `vendor/tools/regex_workbench/engine/**`,
+  `vendor/upload_lab/extraction_adapter.py`,
+  `vendor/upload_lab/kiem_tra_trich_xuat.py`; thiếu nguồn là báo lỗi ngay.
+  Khi có `tool/vendor/`, tool tự ưu tiên bản này.
+  `tool/vendor/` là artifact build (đã gitignore), **không commit**.
+- Chạy trong repo (dev/test): không có `tool/vendor/` thì tool tự trỏ về
+  `tools/` + `upload_lab/` của repo (đường đi từ `regex-test-tool/tool/`).
+- Sửa luật: sửa ở lõi `tools/regex_workbench/engine/contract_extract.py`,
+  tăng `ENGINE_VERSION` trong lõi, rồi chạy lại `build_release.ps1`
+  trước khi phát hành. Không copy file luật vào tool.
 - Đọc log: tab **Xem log** trong tool (lọc theo loại văn bản,
   ô thiếu tô vàng) hoặc đọc trực tiếp file `.jsonl`
   (1 dòng = 1 file đã test).
 - Test tự động: `python -B -X utf8 -m pytest tests/ -q -p no:cacheprovider`
-  trong folder này; đây là lệnh chuẩn, thu cả hàm test và lớp unittest.
-  `tests/fixtures/word_field_cases.json` giữ đáp án Closed và đầu vào Pending;
-  Pending chưa có đáp án được duyệt nên không tính đạt.
+  trong folder `tool/` này (chạy từ đây để `ket_qua_log` import được).
+  Test ở đây kiểm tra phần tool (log/kết quả); test giữ hành vi lõi luật
+  và bộ đáp án Word (`tests/fixtures/word_field_cases.json`) nằm ở bộ
+  chuẩn `upload_lab/tests/` — tool không giữ bản chép.
 - Log chứa họ tên + CCCD thật: chỉ lưu máy nội bộ, gửi trực
   tiếp cho nhau, không đăng lên mạng.

@@ -14,9 +14,9 @@ trái với yêu cầu "tự động, tôi không cần quan tâm".
 
 ## Decision
 
-- **Chấp nhận mất 11 file `.agents/`** — đó là file tạm theo luật cũ; nội dung
-  quan trọng nhất (kế hoạch task-3) còn lại trong `removed-agents-files.md` dưới
-  dạng tóm tắt vị trí. Không đi khôi phục từ Thùng rác/backup.
+- **Chấp nhận mất 11 file `.agents/`** — đó là file tạm theo luật cũ; `removed-agents-files.md`
+  chỉ liệt kê tên/đường dẫn đã mất, gồm kế hoạch task-3; không lưu nội dung hoặc
+  bản tóm tắt kế hoạch. Đính chính mô tả nguồn ngày 15/10/2026. Không đi khôi phục từ Thùng rác/backup.
 - **Sửa `_bmad/config.toml`: `project_knowledge` → `{project-root}/_bmad-output/specs`.**
   Kèm theo: `bmad-spec` vốn đã ghi spec vào `{output_folder}/specs` (cùng nơi),
   AGENTS.md §2 chỉ SOT cho mọi agent. Từ giờ BMAD đọc lẫn ghi đều ở

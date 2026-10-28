@@ -1,0 +1,37 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.6: partial chỉ nới null/rỗng — ngày sai định dạng vẫn stage_validation_error."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-203a-403a-803a-000000000040",
+  "command": "notary.workspace_create",
+  "payload": {
+    "idempotency_key": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "case": {
+      "case_type": "inheritance",
+      "document_type": "khai_nhan"
+    },
+    "stage": {
+      "people": [
+        {
+          "row_id": "44444444-cccc-4ccc-8ccc-444444444444",
+          "entity_id": null,
+          "ho_ten": null,
+          "gioi_tinh": null,
+          "ngay_sinh": "01/01/1950",
+          "ngay_chet": null,
+          "so_giay_to": "001199000001",
+          "ngay_cap": null,
+          "noi_cap": null,
+          "dia_chi": null,
+          "place_of_origin": null,
+          "loai_giay_to": null,
+          "loai_dia_chi": null
+        }
+      ],
+      "assets": []
+    }
+  },
+  "expected_error": "stage_validation_error"
+}

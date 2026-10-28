@@ -306,7 +306,12 @@ def test_authorized_block_with_word_breaks_keeps_exact_oracle(tmp_path, monkeypa
             token = '[Dòng người được ủy quyền 1]'
             old = e2e.PROXY_NAME if mutation == 'person' else '1975'
             new = 'Người Sai' if mutation == 'person' else '1999'
-            assert old in mapping[token]
+            # Hồ sơ phản ví dụ (không người được ủy quyền) giờ cũng build
+            # mapping (W6/W8) -> chỉ đột biến hồ sơ có đại diện; hiệu lực
+            # đột biến vẫn được kiểm bằng failures batch.* bên dưới.
+            if old not in mapping[token]:
+                assert e2e.PROXY_NAME not in mapping[token]
+                return mapping
             mapping[token] = mapping[token].replace(old, new)
             return mapping
 

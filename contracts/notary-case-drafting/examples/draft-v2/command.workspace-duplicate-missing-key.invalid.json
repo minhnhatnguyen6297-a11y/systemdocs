@@ -1,0 +1,13 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.21: idempotency_key bắt buộc cho duplicate."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2031-4031-8031-000000000031",
+  "command": "notary.workspace_duplicate",
+  "payload": {
+    "source_case_id": 48
+  },
+  "expected_error": "validation_error"
+}

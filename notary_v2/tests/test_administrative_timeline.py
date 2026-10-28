@@ -48,6 +48,20 @@ def bando_fixture():
     return raw, {"01": table}
 
 
+def demo_owner_patch(base_revision=1):
+    """Patch tất định: unit `owner:demo` đổi tên A → B mốc 2005-01-01.
+
+    Giữ nguyên ngữ nghĩa của ví dụ JSON từng nằm trong spec Markdown
+    `_bmad-output/specs/notary_v2/administrative-timeline.md` (spec đã bị
+    gỡ) để test CLI/query vẫn kiểm hành vi thật, không phụ thuộc tài liệu.
+    """
+    return {"base_revision": base_revision, "upsert": {
+        "sources": fixture()["sources"],
+        "units": [unit("owner:demo")],
+        "names": [name("owner:demo", "A", "2000-01-01", "2005-01-01"),
+                  name("owner:demo", "B", "2005-01-01")]}}
+
+
 def test_a_b_c_d_rename_same_identity_dates_and_query():
     ledger = fixture()
     ledger["units"] = [unit("stable")]
@@ -308,14 +322,11 @@ def test_reimport_older_snapshot_keeps_history_without_duplicate_ids(tmp_path):
     assert validate(ledger, tmp_path)["valid"]
 
 
-def test_spec_json_patch_is_valid_and_cli_query_semantics(tmp_path):
-    import re
-    text = (Path(__file__).resolve().parents[2] / "_bmad-output/specs/notary_v2/administrative-timeline.md").read_text(encoding="utf8")
-    example = json.loads(re.search(r"```json\n(.*?)\n```", text, re.S).group(1))
+def test_manual_patch_update_and_query_semantics(tmp_path):
     ledger = empty_ledger()
     ledger["revision"] = 1
     atomic_write(tmp_path, ledger)
-    manual_update(tmp_path, example)
+    manual_update(tmp_path, demo_owner_patch(1))
     answer = query(read_ledger(tmp_path), "owner:demo", "2007-01-01")
     assert answer["confirmed_name_at_date"][0]["value"] == "B"
 
@@ -659,12 +670,10 @@ def test_assertion_confidence_does_not_promote_pending_event():
 
 
 def test_actual_cli_update_query_date_boundary_and_errors(tmp_path):
-    import re
     import subprocess
     import sys
     root = Path(__file__).resolve().parents[2]
-    text = (root / "_bmad-output/specs/notary_v2/administrative-timeline.md").read_text(encoding="utf8")
-    example = json.loads(re.search(r"```json\n(.*?)\n```", text, re.S).group(1))
+    example = demo_owner_patch()
     ledger = empty_ledger()
     ledger["revision"] = example["base_revision"]
     atomic_write(tmp_path, ledger)

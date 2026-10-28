@@ -1,96 +1,50 @@
-# notaryoffice — Theo dõi hồ sơ trong văn phòng
+# NotaryOffice — hỗ trợ theo dõi công việc văn phòng
 
-**Trạng thái:** Draft `[CONFIRM]`; chưa có runtime · **Nguồn:**
-[`intent-source.md`](./intent-source.md) v1.0, 10/09/2026 · **Owner duyệt:** chưa thấy bằng
-chứng duyệt toàn bộ thiết kế
+**Cập nhật:** 17/10/2026. **DEFERRED theo owner:** “notaryoffice để lại, tôi sẽ làm sau”. Giữ toàn bộ thiết kế Draft, chưa có runtime được nghiệm thu; không giao pilot, phép đo A1/A3/A4, code, schema hoặc runtime Office lúc này. Không xóa spec/công việc, không tự đặt hạn mở lại hoặc triển khai các con số đề xuất. [Quyết định owner](../../decisions/decision-owner-notaryoffice-deferred-20261017.md).
 
-## 1. Mục tiêu
+## 1. Vấn đề và mục đích
 
-Trả lời nhanh: hồ sơ nào đang được xử lý, ai đang giữ, đang ở đâu, bị chặn bởi
-việc gì và bước tiếp theo là gì. Hệ thống thu dấu vết công việc để dựng ứng viên;
-không biến suy đoán thành hồ sơ đã xác nhận.
+Một người/tài sản có thể liên quan tới nhiều việc kéo dài: soạn văn bản, nộp hồ sơ chuyển nhượng, chỉnh lý giấy chứng nhận, đo đạc, đổi địa chỉ. Thông tin rải trong file và trí nhớ; khi hỏi “Hồ sơ đang ở đâu?” khó nhìn lại toàn bộ diễn biến.
 
-## 2. Flow dự kiến
+Module gom dấu vết công việc để hỗ trợ nhân viên và quản lý. Không ép nhập một quy trình quản lý doanh nghiệp cứng nhắc, không dùng dấu vết để chấm công hay phán quyết pháp lý.
 
-```text
-Dấu vết Word/in/nguồn được phép
-→ Evidence Record
-→ nhóm phiên làm việc
-→ Draft Case và xếp hạng ứng viên
-→ chuyên viên xác nhận/sửa/gộp/bỏ qua
-→ Case vận hành đã xác nhận
-→ tìm kiếm và timeline
-```
+## 2. Luồng dự kiến
 
-Điểm số chỉ xếp thứ tự ứng viên, không loại Evidence và không tự ghép cứng.
+Thay đổi nội dung Word trong phạm vi được phép → đọc chữ bằng IFilter/công cụ đã chốt → bóc Người/Tài sản/Hồ sơ → tạo dấu vết có nguồn → nhóm thành ứng viên công việc → hiện thẻ ngắn cho nhân viên xác nhận/sửa/gộp/bỏ qua → lưu vào dòng thời gian → tìm lại.
 
-## 3. Nguồn và ranh giới
+Thay đổi file chưa chứng minh đã hoàn thành thủ tục. Chỉ dữ liệu được người có quyền xác nhận mới mang nhãn đã xác nhận. Điểm tin cậy chỉ xếp thứ tự gợi ý, không tự loại bằng chứng hoặc gộp hồ sơ.
 
-- Word text diff: nhận biết thay đổi CCCD, GCN, thửa/tờ, tiền, diện tích.
-- Print event: tín hiệu tiến trình; không cung cấp số copies đáng tin cậy.
-- Zalo: chỉ tài khoản chung văn phòng theo ranh giới hệ thống.
-- Không quay màn hình, ghi phím hoặc dùng dữ liệu để chấm công.
-- Trước thử nghiệm phải thông báo nhân viên và bổ sung nội quy phù hợp.
+## 3. Dữ liệu và ranh giới
 
-## 4. Dữ liệu chính dự kiến
+Mỗi dấu vết cần nguồn, thời gian, máy trạm và Người/Tài sản/Hồ sơ có căn cứ; thiếu thì để trống/cảnh báo. Giữ nguồn gốc và các thay đổi, không sửa raw để khớp kết luận. Hồ sơ vận hành không mặc định tương ứng một-một với hồ sơ soạn thảo.
 
-- `evidence_records`: dấu vết có nguồn.
-- `draft_cases`: ứng viên chưa xác nhận.
-- `cases`, `case_entities`, `work_items`: hồ sơ vận hành đã xác nhận.
-- `artifacts`, `document_snapshots`, `document_deltas`, `print_jobs`.
-- `calibration_logs`: phản hồi xác nhận để đo chất lượng.
-- `case_timeline_events`: lịch sử bất biến.
+Mô hình dự kiến gồm nguồn tài liệu/snapshot/thay đổi, bằng chứng, ứng viên, hồ sơ xác nhận, đối tượng liên quan, công việc, sự kiện dòng thời gian và phản hồi hiệu chỉnh. Các tên bảng cũ như evidence_records, draft_cases, cases, case_entities, work_items, artifacts, document_snapshots, document_deltas, calibration_logs, case_timeline_events chỉ là thiết kế logic chưa cấp quyền tạo DB production.
 
-Đây là thiết kế logic, chưa cho phép tạo schema production. Aggregate theo dõi
-công việc không mặc định 1:1 với case soạn thảo của `notary_v2`.
+Zalo hiện nghiên cứu tách riêng, không nối vào flow. Nếu sau này được cho phép dùng, trùng GCN chỉ tạo gợi ý; chuyên viên xác nhận mới gắn vào hồ sơ. Không đọc tin riêng/tài khoản riêng của nhân viên.
 
-## 5. Xác nhận và chống làm phiền
+## 4. Thẻ xác nhận và tìm kiếm
 
-- Tối đa 3 popup/người/ngày chỉ áp dụng khi A4 xác nhận mỗi người có định danh
-  Windows riêng; nếu dùng chung tài khoản, cách tính quota vẫn là câu hỏi mở.
-- Bấm dưới 1,5 giây liên tục là tín hiệu cần kiểm tra, không tự kết tội.
-- Popup hiển thị bằng chứng và cho `Đúng`, `Bỏ qua`, `Sửa/Gộp`.
-- Trạng thái dự đoán luôn có nhãn; chỉ người dùng mới xác nhận.
+Thẻ hiển thị việc được đề xuất, Người/Tài sản/Hồ sơ liên quan và bằng chứng. Có Đúng, Bỏ qua, Sửa/Gộp; trạng thái dự đoán luôn có nhãn. Tìm kiếm dự kiến theo tên, giấy tờ, GCN, thửa/tờ hoặc chuyên viên; kết quả phân biệt đã xác nhận với dự đoán.
 
-**Tại sao:** nhiều popup làm người dùng bấm theo phản xạ. Dữ liệu nhìn có vẻ
-đầy đủ nhưng sai, rồi hệ thống học từ sai lệch đó.
+Giảm làm phiền để tránh nhân viên bấm theo phản xạ. Mốc tối đa 3 popup/người/ngày và bấm dưới 1,5 giây là đề xuất cũ có điều kiện, không phải quy tắc đã duyệt toàn bộ. Dùng chung tài khoản Windows thì không tự nhận diện người thao tác. Không suy việc bấm nhanh là hành vi gian dối.
 
-## 6. Kiến trúc dự kiến
+## 5. Hướng kỹ thuật và phần chưa chốt
 
-- Agent mỏng trên máy trạm ghi dấu vết được phép và cache FIFO khi mất LAN.
-- Hub trong LAN chuẩn hóa, diff, dựng ứng viên và phục vụ tìm kiếm.
-- Rule tất định xử lý phần lớn; AI chỉ hỗ trợ ca mơ hồ và không giữ state riêng.
-- Tìm kiếm ưu tiên tên, CCCD, GCN, thửa/tờ và chuyên viên; kết quả phân biệt
-  `ĐÃ XÁC NHẬN` với `DỰ ĐOÁN`.
+Đề xuất máy trạm thu dấu vết, giữ hàng chờ khi mất LAN; Hub trong LAN chuẩn hóa, so thay đổi và dựng ứng viên. Rule xử lý phần chắc chắn, AI chỉ hỗ trợ mơ hồ; không có state nghiệp vụ riêng trong AI. Máy trạm không gọi Internet.
 
-Các phương án đã loại:
+Phương án xử lý tất cả tập trung hoặc tất cả tại máy con từng được cân nhắc; lý do và phương án bỏ nằm trong hồ sơ quyết định. Thiết kế hybrid hiện cũng chưa được duyệt toàn bộ.
 
-- FileWatcher tập trung: không thấy đầy đủ hành vi trên máy trạm.
-- Xử lý toàn bộ trên máy con: khó quản trị phiên bản và hợp nhất dữ liệu.
-- Tự ghép bằng điểm: rủi ro mất hoặc gán sai hồ sơ; điểm chỉ được xếp hạng.
+| Cần xác minh/chốt | Vì sao |
+|---|---|
+| IFilter đọc file Word đang mở (A1) | Không giả định file khóa vẫn luôn đọc được |
+| Sự kiện trên ổ mạng (A3) | Không giả định nhận đủ mọi thay đổi |
+| Tài khoản riêng trên sáu máy (A4) | Quyết định có thể nhận biết người làm hay phải bỏ phần đó |
+| Ghép phiên và dấu vết thành công việc | Tránh cùng người/tài sản bị nối sai hồ sơ |
+| Thời điểm/thông tin popup, lịch nhắc | Cần kiểm thực tế, không mặc định các ngưỡng cũ |
+| Schema, lưu giữ, quyền xác nhận | Chưa là hợp đồng triển khai production |
 
-## 7. Câu hỏi phải đo
+## 6. Cách đánh giá khi triển khai
 
-| Mã | Câu hỏi | Trạng thái |
-|---|---|---|
-| A1 | IFilter đọc ổn định khi Word đang mở? | Cần đo máy thật |
-| A2 | Print Spooler báo chính xác số bản in? | Đã chốt: không |
-| A3 | Ổ mạng chung báo sự kiện đầy đủ? | Cần đo máy thật |
-| A4 | Sáu máy dùng tài khoản Windows riêng? | Cần khảo sát |
+Đo bằng câu hỏi thực tế “hồ sơ ở đâu/chờ gì”, độ đúng định danh và công sức xác nhận. Các mốc cũ 8/10 câu hỏi, gần 0 ghép sai, một thao tác ngắn/ngày là mục tiêu Draft; chưa phải kết quả đo hoặc điều kiện đã được duyệt. Tập mẫu và tiêu chí phải chốt trước nghiệm thu.
 
-A2 cấm dùng số copies làm điều kiện phân loại. Nếu A4 dùng chung tài khoản,
-phải bỏ tính năng theo dõi người làm cụ thể.
-
-## 8. Nghiệm thu dự kiến
-
-- Trả lời “hồ sơ đang ở đâu” đúng ít nhất 8/10 lần hỏi.
-- Bóc đúng định danh chính trên tập đo đã duyệt.
-- Tỷ lệ ghép sai gần 0 nhờ giữ Draft Case tới khi xác nhận.
-- Người dùng tốn tối đa một thao tác ngắn mỗi ngày theo thiết kế thông báo.
-
-## 9. Nguồn
-
-- Lập luận, thiết kế chi tiết và ví dụ ngành gốc:
-  [`intent-source.md`](./intent-source.md). Đây là phụ lục Draft để tra nguồn,
-  không phải spec thứ hai hoặc quyền triển khai schema production.
-- Định danh chung: `contracts/entities.md`.
+Code menu hiện chỉ là điểm vào thông báo; không suy có UI đầy đủ từ việc có module trong thanh bên. Bản ý tưởng cũ được lưu trong archive để tra cứu, không phải spec bắt buộc đọc đầu phiên.

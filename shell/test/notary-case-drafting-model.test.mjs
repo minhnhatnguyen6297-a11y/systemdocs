@@ -89,14 +89,25 @@ function fakeClient(seed) {
   const catalog = JSON.parse(
     JSON.stringify((seed && seed.__customers) || []));
   for (const [cid, c] of Object.entries(seed)) {
-    if (cid === '__customers') continue;
+    if (cid.startsWith('__')) continue;
     cases[Number(cid)] = JSON.parse(JSON.stringify(c));
     cases[Number(cid)].id = Number(cid);
   }
   let nextEid = 900;
   let nextCid = 1000;
   const idem = {};                        // idempotency_key → case_id
+  const saveIdem = {};                    // save_case key → {digest, caseId}
   const calls = [];
+  let latestSource = null;
+  const duplicateIdem = {};            // key → {digest, caseId}
+  const setSourceLatest = (value) => { latestSource = value; };
+  const emptySource = () => ({
+    schema_version: SCHEMA,
+    backend_mode: 'mock',
+    source_case_id: null,
+    source_status: null,
+    stage: { people: [], assets: [] },
+  });
 
   const ok = (data, extra = {}) => ({ ok: true, data, ...extra });
   const fail = (code, message, details) => ({
@@ -145,6 +156,8 @@ function fakeClient(seed) {
       },
       stage: JSON.parse(JSON.stringify(c.stage)),
       diagram: diagramOut(c),
+      docx_import: JSON.parse(JSON.stringify(
+        c.docx_import || { version: 1, sources: [] })),
       capabilities: {
         intake: sup ? ['image', 'pdf', 'docx', 'xlsx', 'text'] : [],
         diagram: sup,
@@ -220,9 +233,10 @@ function fakeClient(seed) {
                   code: 'required', message: 'bat buoc' });
       }
     }
-    if (assets.length > 3) {
-      fe.push({ row_id: assets[3].row_id, field: 'assets',
-                code: 'asset_limit', message: 'toi da 3' });
+    if (assets.length > M.MAX_ASSETS) {
+      fe.push({ row_id: assets[M.MAX_ASSETS].row_id, field: 'assets',
+                code: 'asset_limit',
+                message: `toi da ${M.MAX_ASSETS}` });
     }
     const pLimit = isTp(c) ? 30 : 20;
     if (people.length > pLimit) {
@@ -232,13 +246,330 @@ function fakeClient(seed) {
     return fe;
   }
 
+  const UUID4 =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  function checkSaveStage(ct, stage, requireRows) {
+    if (!stage || typeof stage !== 'object' ||
+        !Array.isArray(stage.people) || !Array.isArray(stage.assets)) {
+      return fail('validation_error', 'stage khong dung shape');
+    }
+    const ownerErr = checkOwnerPointer({ case_type: ct }, stage);
+    if (ownerErr) return ownerErr;
+    const fe = stageFieldErrors({ case_type: ct }, stage);
+    if (requireRows) {
+      if (!stage.people.length) {
+        fe.push({ row_id: null, field: 'people', code: 'required',
+                  message: 'can it nhat 1' });
+      }
+      if (!stage.assets.length) {
+        fe.push({ row_id: null, field: 'assets', code: 'required',
+                  message: 'can it nhat 1' });
+      }
+    }
+    if (fe.length) {
+      return fail('stage_validation_error', 'loi field',
+                  { field_errors: fe });
+    }
+    return null;
+  }
+
+  // Kiểm Diagram theo Stage cùng payload. Ref của row đã lưu nhưng bị
+  // xóa trong payload được prune (giống server); UUID chưa từng thuộc
+  // bản cũ/payload là outside_stage.
+  function checkSaveDiagram(ct, state, stage, oldPeople) {
+    if (!state || typeof state !== 'object' || !Array.isArray(state.nodes)) {
+      return fail('validation_error', 'diagram.state khong dung shape');
+    }
+    if (state.domain !== ct) {
+      return fail('diagram_domain_mismatch',
+                  `domain ${state.domain} != ${ct}`,
+                  { expected: ct, got: state.domain });
+    }
+    const valid = new Set(stage.people.map((p) => p.row_id));
+    const previous = new Set(oldPeople || []);
+    for (const n of state.nodes) {
+      if (n.personId && !valid.has(n.personId)) {
+        if (!previous.has(n.personId)) {
+          return fail('diagram_reference_outside_stage',
+                      'personId ngoai stage', { personId: n.personId });
+        }
+        n.personId = null;                 // prune ref tới row đã xóa
+      }
+    }
+    if (ct !== 'two_party') {
+      const oid = stage.owner_row_id;
+      const ownerNode = state.nodes.find(
+        (n) => n.id === 'owner' && !n.deleted && n.personId != null);
+      if (ownerNode && ownerNode.personId !== oid) {
+        return fail('diagram_owner_mismatch',
+                    'owner node != owner_row_id',
+                    { owner_row_id: oid ?? null,
+                      node_person_id: ownerNode.personId });
+      }
+    } else {
+      state.nodes = canonicalTwoParty(state.nodes);
+    }
+    return null;
+  }
+
+  function applyCaseMeta(c, cm) {
+    if (cm == null) return null;
+    if (typeof cm !== 'object' || Array.isArray(cm)) {
+      return fail('validation_error', 'payload.case phai la object');
+    }
+    if (cm.case_type !== undefined && cm.case_type !== c.case_type) {
+      return fail('validation_error',
+                  'case_type immutable', { expected: c.case_type });
+    }
+    if (cm.document_type !== undefined &&
+        cm.document_type !== c.document_type) {
+      return fail('validation_error',
+                  'document_type immutable',
+                  { expected: c.document_type });
+    }
+    const uid = cm.nguoi_nhan_uy_quyen_id;
+    if (uid !== undefined && uid !== null &&
+        (!Number.isInteger(uid) || uid < 1)) {
+      return fail('validation_error',
+                  'nguoi_nhan_uy_quyen_id phai la int >= 1/null');
+    }
+    if (uid != null) {
+      const cust = catalog.find((x) => x.id === uid);
+      if (!cust) {
+        return fail('validation_error',
+                    `nguoi_nhan_uy_quyen_id ${uid} khong ton tai`);
+      }
+      if (cm.nguoi_nhan_uy_quyen !== undefined &&
+          cm.nguoi_nhan_uy_quyen !== null &&
+          cm.nguoi_nhan_uy_quyen !== cust.ho_ten) {
+        return fail('validation_error',
+                    'nguoi_nhan_uy_quyen vs id mau thuan');
+      }
+      c.nguoi_nhan_uy_quyen = cust.ho_ten;
+      c.nguoi_nhan_uy_quyen_id = cust.id;
+    } else if ('nguoi_nhan_uy_quyen' in cm) {
+      c.nguoi_nhan_uy_quyen = cm.nguoi_nhan_uy_quyen;
+      c.nguoi_nhan_uy_quyen_id = null;
+    }
+    for (const f of ['noi_niem_yet', 'noi_dung_viec', 'ghi_chu']) {
+      if (f in cm) c[f] = cm[f];
+    }
+    if (cm.ngay_lap_ho_so !== undefined &&
+        cm.ngay_lap_ho_so !== null) {
+      c.ngay_lap_ho_so = cm.ngay_lap_ho_so;
+    }
+    return null;
+  }
+
+  function applySavedStage(c, stage, state) {
+    c.stage = JSON.parse(JSON.stringify(stage));
+    for (const row of [...c.stage.people, ...c.stage.assets]) {
+      if (row.entity_id == null) row.entity_id = nextEid++;
+    }
+    c.diagram = c.diagram || { domain: c.case_type, warnings: [] };
+    c.diagram.domain = c.case_type;
+    c.diagram.state = JSON.parse(JSON.stringify(state));
+    const pruneWarn = pruneDiagram(c);
+    c.diagram.render_model =
+      isTp(c) ? unsupportedRender() : fakeRenderModel(c.diagram.state);
+    return pruneWarn;
+  }
+
+  function checkDocxImport(value) {
+    if (value === undefined) return null;
+    if (!value || typeof value !== 'object' ||
+        !Array.isArray(value.sources)) {
+      return fail('validation_error', 'docx_import khong dung shape');
+    }
+    return null;
+  }
+
+
   async function run(command, payload) {
     calls.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
     switch (command) {
+      case 'notary.workspace_save_case': {
+        const hasId = Object.prototype.hasOwnProperty.call(payload, 'case_id');
+        const key = payload.idempotency_key;
+        if (!hasId) {
+          if (typeof key !== 'string' || !UUID4.test(key)) {
+            return fail('validation_error', 'idempotency_key khong hop le');
+          }
+          if ('base_revision' in payload) {
+            return fail('validation_error', 'base_revision cam khi tao moi');
+          }
+          const digest = JSON.stringify({
+            command: 'workspace_save_case', case: payload.case,
+            stage: payload.stage, diagram: payload.diagram,
+            docx_import: payload.docx_import ?? null,
+          });
+          if (saveIdem[key]) {
+            if (saveIdem[key].digest !== digest) {
+              return fail('idempotency_conflict', 'key da dung');
+            }
+            const replay = cases[saveIdem[key].caseId];
+            return ok({ ...workspaceData(replay), created: false });
+          }
+          const cm = payload.case;
+          if (!cm || typeof cm !== 'object' || Array.isArray(cm)) {
+            return fail('validation_error', 'payload.case phai la object');
+          }
+          const ct = cm.case_type;
+          if (!['inheritance', 'two_party'].includes(ct)) {
+            return fail('validation_error', `case_type la: ${ct}`);
+          }
+          if (!cm.document_type ||
+              !(isTp({ case_type: ct })
+                ? ['chuyen_nhuong', 'tang_cho', 'cho_thue', 'dat_coc']
+                : ['khai_nhan', 'thoa_thuan']).includes(cm.document_type)) {
+            return fail('validation_error', 'document_type khong hop le');
+          }
+          const dxErr = checkDocxImport(payload.docx_import);
+          if (dxErr) return dxErr;
+          const stageErr = checkSaveStage(ct, payload.stage, true);
+          if (stageErr) return stageErr;
+          const state = payload.diagram && payload.diagram.state;
+          const dgErr = checkSaveDiagram(ct, state, payload.stage, []);
+          if (dgErr) return dgErr;
+          const c = {
+            id: nextCid++, case_type: ct,
+            document_type: cm.document_type,
+            status: 'done', locked: false, revision: 1,
+            ngay_lap_ho_so: cm.ngay_lap_ho_so ?? null,
+            noi_niem_yet: cm.noi_niem_yet ?? null,
+            nguoi_nhan_uy_quyen: cm.nguoi_nhan_uy_quyen ?? null,
+            nguoi_nhan_uy_quyen_id: cm.nguoi_nhan_uy_quyen_id ?? null,
+            noi_dung_viec: cm.noi_dung_viec ?? null,
+            ghi_chu: cm.ghi_chu ?? null,
+            stage: { people: [], assets: [] },
+            diagram: { domain: ct, warnings: [] },
+            docx_import: JSON.parse(JSON.stringify(
+              payload.docx_import || { version: 1, sources: [] })),
+          };
+          const metaErr = applyCaseMeta(c, cm);
+          if (metaErr) return metaErr;
+          applySavedStage(c, payload.stage, state);
+          cases[c.id] = c;
+          saveIdem[key] = { digest, caseId: c.id };
+          return ok({ ...workspaceData(c), created: true });
+        }
+        if ('idempotency_key' in payload) {
+          return fail('validation_error', 'idempotency_key cam voi case cu');
+        }
+        if (!Number.isInteger(payload.case_id) || payload.case_id < 1) {
+          return fail('validation_error', 'case_id khong hop le');
+        }
+        if (!Number.isInteger(payload.base_revision) ||
+            payload.base_revision < 1) {
+          return fail('validation_error', 'base_revision bat buoc');
+        }
+        const { c, err } = getCase(payload);
+        if (err) return err;
+        if (c.locked) return fail('workspace_locked', 'da khoa');
+        if (!supported(c)) {
+          return fail('case_type_unsupported', 'chua ho tro');
+        }
+        if (payload.base_revision !== c.revision) {
+          return fail('workspace_conflict', 'revision khac',
+                      { server_revision: c.revision });
+        }
+        const cm = payload.case;
+        if (!cm || typeof cm !== 'object' || Array.isArray(cm)) {
+          return fail('validation_error', 'payload.case phai la object');
+        }
+        const dxErr = checkDocxImport(payload.docx_import);
+        if (dxErr) return dxErr;
+        const stageErr = checkSaveStage(c.case_type, payload.stage, false);
+        if (stageErr) return stageErr;
+        const state = payload.diagram && payload.diagram.state;
+        const oldPeople = (c.stage.people || []).map((p) => p.row_id);
+        const dgErr = checkSaveDiagram(
+          c.case_type, state, payload.stage, oldPeople);
+        if (dgErr) return dgErr;
+        const metaErr = applyCaseMeta(c, cm);
+        if (metaErr) return metaErr;
+        applySavedStage(c, payload.stage, state);
+        if (payload.docx_import !== undefined) {
+          c.docx_import = JSON.parse(JSON.stringify(payload.docx_import));
+        }
+        c.status = 'done';
+        c.revision += 1;
+        return ok({ ...workspaceData(c), created: false });
+      }
+      case 'notary.workspace_source_latest': {
+        if (!payload || Object.keys(payload).length) {
+          return fail('validation_error', 'payload phai la object rong');
+        }
+        return ok(latestSource
+          ? { ...JSON.parse(JSON.stringify(latestSource)),
+              schema_version: SCHEMA, backend_mode: 'mock' }
+          : emptySource());
+      }
       case 'notary.workspace_get': {
         const { c, err } = getCase(payload);
         if (err) return err;
         return ok(workspaceData(c));
+      }
+      case 'notary.workspace_duplicate': {
+        const extra = Object.keys(payload || {})
+          .filter((k) => !['source_case_id', 'idempotency_key'].includes(k));
+        if (extra.length) return fail('validation_error', 'key ngoai schema');
+        const sid = payload.source_case_id;
+        if (!Number.isInteger(sid) || sid < 1) {
+          return fail('validation_error', 'source_case_id khong hop le');
+        }
+        const key = payload.idempotency_key;
+        if (typeof key !== 'string' || !new RegExp(
+          '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          'i').test(key)) {
+          return fail('validation_error', 'idempotency_key khong hop le');
+        }
+        const digest = JSON.stringify({
+          command: 'workspace_duplicate', source_case_id: sid });
+        if (duplicateIdem[key]) {
+          if (duplicateIdem[key].digest !== digest) {
+            return fail('idempotency_conflict', 'key da dung');
+          }
+          const replay = cases[duplicateIdem[key].caseId];
+          return ok({ ...workspaceData(replay), source_case_id: sid,
+                      created: false });
+        }
+        const source = cases[sid];
+        if (!source) {
+          return fail('case_not_found', 'khong tim thay',
+                      { source_case_id: sid });
+        }
+        if (!supported(source)) {
+          return fail('case_type_unsupported', 'khong ho tro',
+                      { case_type: source.case_type });
+        }
+        const fresh = JSON.parse(JSON.stringify(source));
+        const personMap = {};
+        fresh.stage.people = (fresh.stage.people || []).map((row) => {
+          const rid = crypto.randomUUID();
+          personMap[row.row_id] = rid;
+          return { ...row, row_id: rid };
+        });
+        fresh.stage.assets = (fresh.stage.assets || []).map((row) => ({
+          ...row, row_id: crypto.randomUUID() }));
+        if (fresh.case_type === 'inheritance') {
+          fresh.stage.owner_row_id = personMap[
+            source.stage.owner_row_id] ?? null;
+        } else {
+          delete fresh.stage.owner_row_id;
+        }
+        fresh.diagram.state.nodes = (fresh.diagram.state.nodes || []).map(
+          (node) => (node.personId
+            ? { ...node, personId: personMap[node.personId] ?? null }
+            : node));
+        fresh.id = nextCid++;
+        fresh.status = 'draft';
+        fresh.revision = 1;
+        cases[fresh.id] = fresh;
+        duplicateIdem[key] = { digest, caseId: fresh.id };
+        return ok({ ...workspaceData(fresh), source_case_id: sid,
+                    created: true });
       }
       case 'notary.workspace_commit_stage': {
         const { c, err } = getCase(payload);
@@ -352,11 +683,6 @@ function fakeClient(seed) {
           if (!p.ho_ten || !String(p.ho_ten).trim()) {
             fieldErrors.push({ row_id: p.row_id, field: 'ho_ten',
                                code: 'required', message: 'bat buoc' });
-          }
-          if (p.entity_id != null) {
-            fieldErrors.push({ row_id: p.row_id, field: 'entity_id',
-                               code: 'invalid_format',
-                               message: 'phai null' });
           }
         }
         if (!stage.people.length) {
@@ -653,13 +979,31 @@ function fakeClient(seed) {
         });
       }
       case 'notary.word_export_options': {
+        // NAIA-8 folder mode: template_dir co mat → nguon mau la cac
+        // .docx trong thu muc (fake tra tap co dinh, key = basename).
+        // W1: hồ sơ chưa lưu (case_id null) vẫn quét được — readiness
+        // chỉ còn mức mẫu.
+        if (payload.case_id == null) {
+          if (!payload.template_dir) {
+            return fail('validation_error', 'can case_id');
+          }
+          return ok({
+            schema_version: SCHEMA,
+            documents: [
+              { document_key: 'Mau thue nha.docx',
+                display_name: 'Mau thue nha',
+                ready: true, block_reason: null },
+              { document_key: 'To cam ket.docx',
+                display_name: 'To cam ket',
+                ready: true, block_reason: null },
+            ],
+          });
+        }
         const { c, err } = getCase(payload);
         if (err) return err;
         if (!supported(c)) {
           return fail('case_type_unsupported', 'case type khong ho tro');
         }
-        // NAIA-8 folder mode: template_dir co mat → nguon mau la cac
-        // .docx trong thu muc (fake tra tap co dinh, key = basename).
         if (payload.template_dir) {
           return ok({
             schema_version: SCHEMA,
@@ -715,12 +1059,22 @@ function fakeClient(seed) {
         return fail('command_unknown', `khong biet ${command}`);
     }
   }
-  return { run, calls, cases };
+  return { run, calls, cases, setSourceLatest };
 }
 
 function seedCases(...names) {
   const cases = {};
   for (const n of names) {
+    // 0a58acc (issue 13) bỏ fixture 'locked' khỏi mock/sidecar: backend không
+    // khóa soạn nữa. Model vẫn giữ nhánh `locked` (schema wire vẫn có cờ) nên
+    // test client dựng case 44 khóa từ 'done' — chỉ trong JS, không dùng chung.
+    if (n === 'locked') {
+      const doc = loadFixture('done');
+      for (const [id, c] of Object.entries(doc.cases)) {
+        cases[id] = { ...c, status: 'locked', locked: true };
+      }
+      continue;
+    }
     const doc = loadFixture(n);
     Object.assign(cases, doc.cases);
   }
@@ -731,6 +1085,37 @@ function makeModel(seed) {
   const client = fakeClient(seed);
   const model = M.createModel({ client, uuid });
   return { model, client };
+}
+
+// Nhu makeModel, nhung notary.diagram_evaluate tra promise do test
+// resolve thu cong — de dieu khien thu tu response ve (T1/T2 §7.1).
+function makeDeferredModel(seed) {
+  const base = fakeClient(seed);
+  const pending = [];
+  const client = {
+    calls: base.calls,
+    run(command, payload) {
+      if (command === 'notary.diagram_evaluate') {
+        return new Promise((resolve) => pending.push({ payload, resolve }));
+      }
+      return base.run(command, payload);
+    },
+  };
+  const model = M.createModel({ client, uuid });
+  return { model, pending };
+}
+
+function evaluateOk(entry) {
+  return { ok: true,
+    data: { schema_version: SCHEMA,
+      evaluated_revision: null,
+      render_model: fakeRenderModel(entry.payload.diagram.state) } };
+}
+
+function evaluateFail(code) {
+  return { ok: false,
+    error: { code, message: code, retryable: false,
+      next_action: null, details: null } };
 }
 
 // ---------- load workspace ----------
@@ -831,9 +1216,9 @@ test('openCase: locked → status locked, write bi tu choi o model', async () =>
   assert.equal(s.status, 'locked');
   assert.equal(s.locked, true);
   assert.equal(model.canWrite(), false);
-  // commit tren case locked: model khong gui command, tra loi locked
+  // saveCase tren case locked: model khong gui command, tra loi locked
   const before = client.calls.length;
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'workspace_locked');
   assert.equal(client.calls.length, before);   // khong goi wire
@@ -852,7 +1237,7 @@ test('openCase: case_type ngoai CASE_TYPES → unsupported', async () => {
 
 // ---------- dirty Stage + commit ----------
 
-test('addPerson/setOwnerRow/update/remove → stageDirty; commit reset', async () => {
+test('addPerson/setOwnerRow/update/remove → stageDirty; saveCase reset', async () => {
   const { model, client } = makeModel(seedCases('empty'));
   await model.openCase(43);
   assert.equal(model.state.stageDirty, false);
@@ -871,11 +1256,12 @@ test('addPerson/setOwnerRow/update/remove → stageDirty; commit reset', async (
   model.updatePersonField(row.row_id, 'ngay_sinh', '1999');
   assert.equal(model.state.stage.people[0].ngay_sinh, '1999');
 
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
   const s = model.state;
   assert.equal(s.stageDirty, false);
   assert.equal(s.revision, 2);                   // 1 → 2
+  assert.equal(s.caseInfo.status, 'done');
   assert.equal(s.stage.people[0].entity_id, 900); // backend gan entity_id
   // payload gui di co base_revision + toan bo stage snapshot + owner_row_id
   const sent = client.calls.at(-1).payload;
@@ -890,28 +1276,28 @@ test('addPerson/setOwnerRow/update/remove → stageDirty; commit reset', async (
   assert.equal(model.state.stage.owner_row_id, null);
 });
 
-test('commitStage: thieu owner_row_id → workspace_owner_required, draft giu nguyen', async () => {
+test('saveCase: thieu owner_row_id → workspace_owner_required, draft giu nguyen', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.openCase(43);
   model.addPerson({ ho_ten: 'Chưa chọn owner' });
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'workspace_owner_required');
-  assert.equal(model.state.stageDirty, true);    // van dirty — chua commit
+  assert.equal(model.state.stageDirty, true);    // van dirty — chua luu
   assert.equal(model.state.revision, 1);
 });
 
-test('commitStage: stage_validation_error → fieldErrors theo row_id, stage giu draft', async () => {
+test('saveCase: stage_validation_error → fieldErrors theo row_id, stage giu draft', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.openCase(43);
   const row = model.addPerson({ ho_ten: '' });   // rong → required
   model.setOwnerRow(row.row_id);                  // pointer hop le → den
                                                 // duoc field check
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'stage_validation_error');
   const s = model.state;
-  assert.equal(s.stageDirty, true);              // van dirty — chua commit
+  assert.equal(s.stageDirty, true);              // van dirty — chua luu
   assert.equal(s.revision, 1);                   // revision khong doi
   assert.equal(s.stage.people.length, 1);        // draft con nguyen
   const errs = model.fieldErrorsFor(row.row_id);
@@ -922,14 +1308,45 @@ test('commitStage: stage_validation_error → fieldErrors theo row_id, stage giu
   assert.equal(model.fieldErrorsFor(row.row_id).length, 0);
 });
 
-test('commitStage: asset_limit — dong thu 4 bi tu choi o client', async () => {
+test('asset_limit — cho phép 5 tài sản, từ chối tài sản thứ 6 ở client', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.openCase(43);
-  assert.ok(model.addAsset({ so_serial: 'MM000001' }));
-  assert.ok(model.addAsset({ so_serial: 'MM000002' }));
-  assert.ok(model.addAsset({ so_serial: 'MM000003' }));
-  assert.equal(model.addAsset({ so_serial: 'MM000004' }), null);  // MAX_ASSETS=3
-  assert.equal(model.state.stage.assets.length, 3);
+  for (let i = 1; i <= M.MAX_ASSETS; i += 1) {
+    assert.ok(model.addAsset({ so_serial: `MM${String(i).padStart(6, '0')}` }));
+  }
+  assert.equal(model.addAsset({ so_serial: 'MM000006', so_thua_dat: '1', so_to_ban_do: '1' }), null);
+  assert.equal(model.state.stage.assets.length, M.MAX_ASSETS);
+});
+
+test('asset serial: new/cleared rỗng giữ "" và wire gửi chuỗi rỗng', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.openCase(43);
+  const person = model.addPerson({ ho_ten: 'Chủ đất' });
+  model.setOwnerRow(person.row_id);
+
+  const asset = model.addAsset({ so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.equal(asset.so_serial, '');
+
+  model.updateAssetField(asset.row_id, 'so_serial', '  RAW  ');
+  assert.equal(model.state.stage.assets[0].so_serial, '  RAW  ');
+
+  model.updateAssetField(asset.row_id, 'so_serial', '');
+  assert.equal(model.state.stage.assets[0].so_serial, '');
+
+  const r = await model.saveCase();
+  assert.equal(r.ok, true);
+  const sent = client.calls.at(-1).payload;
+  assert.equal(sent.stage.assets[0].so_serial, '');
+  assert.notEqual(sent.stage.assets[0].so_serial, null);
+});
+
+test('openCase: serial null từ server được map thành chuỗi rỗng', async () => {
+  const seed = seedCases('ready');
+  seed[42].stage.assets[0].so_serial = null;
+  const { model } = makeModel(seed);
+  await model.openCase(42);
+  assert.equal(model.state.stage.assets[0].so_serial, '');
+  assert.equal(model.state.committed.assets[0].so_serial, '');
 });
 
 test('moveAsset: doi thu tu = doi nghia vi tri, clamp index', async () => {
@@ -977,100 +1394,100 @@ test('setOwnerRow: no-op tren two_party', async () => {
   assert.equal('owner_row_id' in model.state.stage, false);
 });
 
-test('commitStage giu draft diagram dirty: khong mat assignment, prune personId ngoai stage moi', async () => {
-  // Review MIN-112: commit stage khong duoc xoa ngam draft diagram —
-  // assignment chua luu phai con, diagramDirty giu true.
-  const { model } = makeModel(seedCases('diagram-warning'));
+test('saveCase stage+diagram cung dirty: baseline giu truoc Luu, payload du assignment, hydrate ca hai', async () => {
+  const { model, client } = makeModel(seedCases('diagram-warning'));
   await model.openCase(46);
   const s = model.state;
   assert.equal(s.diagram.nodes.length, 2);      // owner, spouse
+  const baselineNodes = JSON.stringify(s.committedDiagram);
 
-  // Draft dirty: gan E (dang o Pool) vao slot moi.
+  // Draft dirty ca hai: gan E (dang o Pool) vao slot moi + sua ten.
   const node = model.addSlot();
-  const e = s.committed.people.find((p) => p.ho_ten === 'Người Mẫu E');
+  const e = s.stage.people.find((p) => p.ho_ten === 'Người Mẫu E');
   assert.ok(model.assignPerson(node.id, e.row_id));
-  assert.equal(s.diagramDirty, true);
-  // Gia lap tham chieu stale trong draft (personId khong con trong stage
-  // committed sau commit) — server _prune_diagram se bo no.
-  const staleNode = model.addSlot();
-  staleNode.personId = '99999999-9999-4999-8999-999999999999';
-  const beforeCount = s.diagram.nodes.length;
-
-  // Stage dirty bang edit field (khong xoa dong) → commit.
   model.updatePersonField(s.stage.people[0].row_id, 'ho_ten',
                           'Người Mẫu A đổi');
-  const r = await model.commitStage();
+  assert.equal(s.stageDirty, true);
+  assert.equal(s.diagramDirty, true);
+  // Truoc Luu: baseline va revision khong doi.
+  assert.equal(JSON.stringify(s.committedDiagram), baselineNodes);
+  assert.equal(s.revision, 5);
+
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
   assert.equal(s.revision, 6);                    // 5 → 6
   assert.equal(s.stageDirty, false);
-  assert.equal(s.diagramDirty, true);             // draft KHONG bi xoa
-  assert.equal(s.diagram.nodes.length, beforeCount); // node giu nguyen
-  // assignment hop le con nguyen
-  const kept = s.diagram.nodes.find((n) => n.id === node.id);
-  assert.equal(kept.personId, e.row_id);
-  // assignment cu tren owner/spouse con nguyen (khong bi reset bang
-  // server state — server state giong vi khong prune gi them)
-  assert.equal(
-    s.diagram.nodes.find((n) => n.id === 'owner').personId,
-    '11111111-1111-4111-8111-111111111111');
-  // tham chieu stale bi prune (mirror _prune_diagram client-side)
-  assert.equal(
-    s.diagram.nodes.find((n) => n.id === staleNode.id).personId, null);
-  // baseline committed nap theo server (2 node, khong co slot draft)
-  assert.equal(s.committedDiagram.nodes.length, 2);
-  // renderModel/ref moi tu commit van cap nhat
-  assert.ok(s.renderModel);
-  // evaluatedRevision giu nguyen (null — chua evaluate) de badge stale
-  // co the bao: rm hien thi mo ta committed, chua mo ta draft.
-  assert.equal(s.evaluatedRevision, null);
+  assert.equal(s.diagramDirty, false);
+  assert.equal(s.caseInfo.status, 'done');
+  // Payload chứa tất cả gán hợp lệ trong một snapshot.
+  const sent = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case').at(-1).payload;
+  assert.equal(sent.base_revision, 5);
+  const sentNode = sent.diagram.state.nodes.find((n) => n.id === node.id);
+  assert.equal(sentNode.personId, e.row_id);
+  assert.equal(sent.stage.people[0].ho_ten, 'Người Mẫu A đổi');
+  // Hydrate cả hai từ workspace server.
+  assert.equal(s.diagram.nodes.find((n) => n.id === node.id).personId,
+               e.row_id);
+  assert.equal(s.committedDiagram.nodes.length, s.diagram.nodes.length);
+
+  // UUID chưa từng thuộc Stage bị validation từ chối, không fake-prune.
+  const staleNode = model.addSlot();
+  staleNode.personId = '99999999-9999-4999-8999-999999999999';
+  model.state.diagramDirty = true;
+  const bad = await model.saveCase();
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error.code, 'diagram_reference_outside_stage');
+  assert.equal(model.state.diagramDirty, true);
+  assert.equal(s.diagram.nodes.find((n) => n.id === staleNode.id).personId,
+               '99999999-9999-4999-8999-999999999999');
 });
 
-test('commitStage khi diagram sach: nap state server + evaluatedRevision = revision moi', async () => {
+test('saveCase khi diagram sach: hydrate workspace server, khong gia revision evaluate', async () => {
   const { model } = makeModel(seedCases('diagram-warning'));
   await model.openCase(46);
   const s = model.state;
   assert.equal(s.diagramDirty, false);
   model.updatePersonField(s.stage.people[0].row_id, 'ho_ten', 'Đổi tên');
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
   assert.equal(s.diagramDirty, false);
   assert.equal(s.revision, 6);
-  // rm tu commit evaluate tren stage@6 → khong con "stale"
-  assert.equal(s.evaluatedRevision, 6);
+  // evaluate draft tra evaluated_revision null; save khong gia revision DB.
+  assert.equal(s.evaluatedRevision, null);
+  assert.ok(s.renderModel);
 });
 
-test('commitStage voi draft dirty: xoa person khoi stage → draft prune personId do', async () => {
-  // removeStageRow da mirror prune ngay luc xoa; commit-time prune la
-  // lop thu hai khi server tra committed stage khac draft (dedupe/merge).
+test('saveCase voi stage dirty: xoa person → persist node da prune + flag khac', async () => {
   const { model } = makeModel(seedCases('diagram-warning'));
   await model.openCase(46);
   const s = model.state;
-  const b = s.committed.people.find((p) => p.ho_ten === 'Người Mẫu B');
+  const b = s.stage.people.find((p) => p.ho_ten === 'Người Mẫu B');
   // draft dirty bang flag hidden tren node spouse
   assert.ok(model.setNodeFlag('spouse', 'hidden', true));
   // xoa B khoi stage draft → mirror prune spouse.personId ngay
   model.removeStageRow(b.row_id);
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
-  assert.equal(s.diagramDirty, true);             // draft van chua luu
+  assert.equal(s.stageDirty, false);
+  assert.equal(s.diagramDirty, false);
   assert.equal(
     s.diagram.nodes.find((n) => n.id === 'spouse').personId, null);
-  // flag hidden=true (thay doi draft) van giu — draft khong bi thay
-  // bang ban server
+  // flag hidden=true (thay doi draft) da duoc persist cung snapshot
   assert.equal(
     s.diagram.nodes.find((n) => n.id === 'spouse').hidden, true);
-  // B khong con trong committed stage moi
+  // B khong con trong stage da luu
   assert.equal(
     s.committed.people.some((p) => p.row_id === b.row_id), false);
 });
 
-test('commitStage: workspace_conflict → status conflict + server_revision', async () => {
+test('saveCase: workspace_conflict → status conflict + server_revision', async () => {
   const { model, client } = makeModel(seedCases('ready'));
   await model.openCase(42);
   model.addPerson({ ho_ten: 'X' });
   // gia lap server revision doi (tab khac da ghi)
   client.cases[42].revision = 9;
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'workspace_conflict');
   assert.equal(model.state.status, 'conflict');
@@ -1084,7 +1501,7 @@ test('resolveConflict: reload tai ban moi, keep giu draft de sao chep', async ()
   await model.openCase(42);
   model.addPerson({ ho_ten: 'Nháp giữ' });
   client.cases[42].revision = 9;
-  await model.commitStage();
+  await model.saveCase();
   assert.equal(model.state.status, 'conflict');
 
   // keep → tro lai ready, draft nguyen, stale flag
@@ -1094,7 +1511,7 @@ test('resolveConflict: reload tai ban moi, keep giu draft de sao chep', async ()
   assert.equal(model.state.stage.people.length, 5);
 
   // conflict lai → reload → draft bi thay bang ban server moi
-  const r2 = await model.commitStage();
+  const r2 = await model.saveCase();
   assert.equal(r2.ok, false);
   await model.resolveConflict('reload');
   const s = model.state;
@@ -1122,12 +1539,18 @@ test('pool = committed Stage − personId dang gan tren draft Diagram', async ()
   assert.equal(model.pool().people.length, 2);
 });
 
-test('pool: person draft chua commit KHONG xuat hien trong pool', async () => {
+test('pool: person vua them tren case da luu xuat hien ngay va gan duoc truoc Luu', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.openCase(43);
-  model.addPerson({ ho_ten: 'Draft chưa commit' });
-  assert.equal(model.pool().people.length, 0);
+  const row = model.addPerson({ ho_ten: 'Draft chưa lưu', ngay_chet: '2021-01-01' });
+  assert.equal(model.pool().people.length, 1);
+  assert.equal(model.pool().people[0].row_id, row.row_id);
   assert.equal(model.isStageEmpty(), false);
+  // Case đã lưu vẫn gán được người mới trước khi Lưu hồ sơ.
+  const node = model.addSlot('owner');
+  assert.equal(model.assignPerson(node.id, row.row_id), true);
+  assert.equal(model.pool().people.length, 0);
+  assert.equal(model.state.stage.owner_row_id, row.row_id);
 });
 
 test('assignPerson: gan vao node → ra khoi pool; node khac bi clear de tranh duplicate', async () => {
@@ -1163,9 +1586,9 @@ test('assignPerson owner: rowId dang o node khac → clear node cu', async () =>
 
 // ---------- draft Diagram (v3) ----------
 
-test('diagram draft: addSlot/togglePosition/removeNode → diagramDirty; save reset', async () => {
-  const { model, client } = makeModel(seedCases('empty'));
-  await model.openCase(43);
+test('diagram draft: addSlot/togglePosition/removeNode → diagramDirty; saveCase reset', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
   assert.equal(model.state.diagramDirty, false);
 
   const node = model.addSlot();
@@ -1184,13 +1607,14 @@ test('diagram draft: addSlot/togglePosition/removeNode → diagramDirty; save re
   assert.equal(model.setNodeFlag(node.id, 'isLandOwner', true), false);
   assert.equal(model.setNodeFlag(node.id, 'willReceive', true), false);
 
-  const r = await model.saveDiagram();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
   const s = model.state;
   assert.equal(s.diagramDirty, false);
-  assert.equal(s.revision, 2);                    // save tang revision
-  const sent = client.calls.at(-1).payload;
-  assert.equal(sent.base_revision, 1);
+  assert.equal(s.revision, 8);                    // 7 → 8
+  const sent = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case').at(-1).payload;
+  assert.equal(sent.base_revision, 7);
   assert.equal(sent.diagram.state.version, 3);    // v3 tren wire
   assert.equal(sent.diagram.state.domain, 'inheritance');
 
@@ -1201,7 +1625,147 @@ test('diagram draft: addSlot/togglePosition/removeNode → diagramDirty; save re
   assert.equal(model.state.diagramDirty, true);
 });
 
-test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..3}', async () => {
+test('branch removal: active parent closure, reciprocal tombstones, one draft mutation', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const node = (id, parents = [], spouse = null, extra = {}) => ({
+    id, personId: `person-${id}`, parentSlotIds: parents, spouseSlotId: spouse,
+    ownPositions: [1], receivePositions: [2], hidden: false, deleted: false,
+    ...extra,
+  });
+  const nodes = [
+    node('owner'), node('B', ['owner'], 'S'), node('S', [], 'B'),
+    node('C', ['B', 'S']), node('D', ['C']),
+    node('empty', ['B'], null, { personId: null }),
+    node('hidden', ['empty'], null, { hidden: true }),
+    node('U', ['owner'], 'V'), node('V', [], 'U'),
+    node('old', ['B'], 'B', { deleted: true }),
+    node('behind-old', ['old']),
+  ];
+  const s = model.state;
+  s.diagram.nodes = nodes;
+  s.stage.people = nodes.filter(n => n.personId).map(n => ({
+    row_id: n.personId, ho_ten: n.id,
+  }));
+  s.committed = structuredClone(s.stage);
+  const stage = structuredClone(s.stage);
+  const before = structuredClone(s.diagram);
+  let notifications = 0;
+  const unsubscribe = model.subscribe(() => { notifications += 1; });
+  const impact = model.nodeRemovalImpact('B');
+  assert.deepEqual(impact.nodeIds, ['B', 'C', 'empty', 'D', 'hidden']);
+  assert.equal(impact.relations.filter(r => r.kind === 'spouse').length, 2);
+  assert.ok(impact.relations.some(r => r.from === 'S' && r.to === 'C'));
+  assert.ok(impact.relations.some(r => r.from === 'B' && r.to === 'old'));
+  assert.deepEqual(s.diagram, before, 'preview is read-only');
+  assert.equal(notifications, 0);
+  assert.equal(model.removeNode('B'), true);
+  assert.equal(notifications, 1, 'subscribers see only the completed cutover');
+  unsubscribe();
+  assert.deepEqual(s.stage, stage);
+  assert.deepEqual(s.committed, stage);
+  assert.deepEqual(nodes.map(n => n.id), before.nodes.map(n => n.id));
+  for (const id of impact.nodeIds) {
+    const n = nodes.find(n => n.id === id);
+    const original = before.nodes.find(n => n.id === id);
+    assert.deepEqual(n, {
+      ...original, deleted: true, parentSlotIds: [], spouseSlotId: null,
+    });
+  }
+  assert.equal(nodes.find(n => n.id === 'S').spouseSlotId, null);
+  assert.deepEqual(nodes.find(n => n.id === 'old').parentSlotIds, []);
+  assert.equal(nodes.find(n => n.id === 'old').spouseSlotId, null);
+  for (const id of ['owner', 'U', 'V', 'behind-old']) {
+    assert.deepEqual(nodes.find(n => n.id === id), before.nodes.find(n => n.id === id));
+  }
+  const pool = new Set(model.pool().people.map(p => p.row_id));
+  for (const id of ['B', 'C', 'D', 'hidden', 'old']) {
+    assert.ok(pool.has(`person-${id}`), `${id} must not be assigned by a tombstone`);
+  }
+  assert.equal(pool.has('person-S'), false);
+  assert.equal(s.diagramDirty, true);
+  assert.equal(model.removeNode('B'), false);
+  assert.equal(model.nodeRemovalImpact('missing'), null);
+});
+
+test('branch removal does not remove canonical two-party slots', async () => {
+  const { model } = makeModel(seedCases('empty'));
+  await model.newDraft('two_party');
+  const before = structuredClone(model.state.diagram);
+  const dirty = model.state.diagramDirty;
+  assert.equal(model.nodeRemovalImpact('p1'), null);
+  assert.equal(model.removeNode('p1'), false);
+  assert.deepEqual(model.state.diagram, before);
+  assert.equal(model.state.diagramDirty, dirty);
+});
+
+test('lastOwnerCascadeNodes: pre-check N khong touch draft, khong goi engine', () => {
+  const client = { calls: [], async run(command) {
+    client.calls.push(command);
+    return { ok: true, data: {} };
+  } };
+  const model = M.createModel({ client, uuid });
+  const s = model.state;
+  s.status = 'ready';
+  s.caseId = 43;
+  s.caseInfo = { id: 43, case_type: 'inheritance',
+                 document_type: 'khai_nhan', status: 'draft',
+                 locked: false, revision: 1, ngay_lap_ho_so: null,
+                 noi_niem_yet: null, ghi_chu: null,
+                 nguoi_nhan_uy_quyen: null,
+                 nguoi_nhan_uy_quyen_id: null, noi_dung_viec: null };
+  s.backendMode = 'real';
+  s.locked = false;
+  s.unsupported = false;
+  s.capabilities = { intake: [], diagram: true, word_export: true };
+  s.committed = { people: [
+    { row_id: 'c1', ho_ten: 'Owner' },
+    { row_id: 'c2', ho_ten: 'Con' },
+    { row_id: 'c3', ho_ten: 'Chau' }],
+    assets: [{ row_id: 'a1', so_serial: 'MM000001',
+               so_thua_dat: '12', so_to_ban_do: '3' }] };
+  s.stage = structuredClone(s.committed);
+  s.stage.owner_row_id = 'c1';
+  s.committedDiagram = { version: M.DIAGRAM_VERSION, domain: 'inheritance',
+    nodes: [
+      { id: 'owner', personId: 'c1', parentSlotIds: [], spouseSlotId: null,
+        ownPositions: [1], receivePositions: [], hidden: false, deleted: false },
+      { id: 'p2', personId: 'c2', parentSlotIds: ['owner'],
+        spouseSlotId: null, ownPositions: [], receivePositions: [1],
+        hidden: false, deleted: false },
+      { id: 'p3', personId: 'c3', parentSlotIds: ['p2'],
+        spouseSlotId: null, ownPositions: [], receivePositions: [1],
+        hidden: false, deleted: false }] };
+  s.diagram = structuredClone(s.committedDiagram);
+  s.diagramDirty = false;
+  s.positionTouched = new Set();
+  const before = JSON.stringify(model.state.diagram);
+  const touchedBefore = [...model.state.positionTouched];
+  // Pre-check: cay bi don het requirements → chi con node owner;
+  // con (c2) va chau (c3) ve Pool (2 nguoi). Owner giu node owner
+  // (chidao owner_row_id khong doi khi bo tick chip).
+  const impacted = model.lastOwnerCascadeNodes('owner');
+  assert.ok(Array.isArray(impacted) && impacted.length === 2,
+    `expected 2 impacted, got ${JSON.stringify(impacted)}`);
+  assert.ok(impacted.includes('c2') && impacted.includes('c3'),
+    `expected c2+c3, got ${JSON.stringify(impacted)}`);
+  // Khong lam loi draft: diagram, dirty, touched giu nguyen
+  assert.equal(JSON.stringify(model.state.diagram), before);
+  assert.equal(model.state.diagramDirty, false);
+  assert.deepEqual([...model.state.positionTouched], touchedBefore);
+  // Khong goi engine trong pre-check
+  assert.deepEqual(client.calls, []);
+  // Node khong co nguoi → null
+  assert.equal(model.lastOwnerCascadeNodes('spouse-slot-xyz'), null);
+  // Sau pre-check luong that van binh thuong (engine van duoc goi)
+  const r = model.toggleNodePosition('owner', 'own', 2);
+  assert.equal(r, true);
+  assert.equal(model.state.diagramDirty, true);
+  assert.equal(model.state.diagram.nodes.find((n) => n.id === 'owner')
+    .ownPositions.length, 2);
+});
+
+test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..5}', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);
   const spouse = model.state.diagram.nodes.find((n) => n.id === 'spouse');
@@ -1220,7 +1784,7 @@ test('toggleNodePosition: own/receive doc lap, dedupe, chan ngoai {1..3}', async
   assert.equal(model.toggleNodePosition('spouse', 'own', 3), true);
   assert.deepEqual(spouse.ownPositions, []);
   // chan tham so la
-  assert.equal(model.toggleNodePosition('spouse', 'own', 4), false);
+  assert.equal(model.toggleNodePosition('spouse', 'own', 6), false);
   assert.equal(model.toggleNodePosition('spouse', 'bogus', 1), false);
   assert.equal(model.toggleNodePosition('khong-co', 'own', 1), false);
 });
@@ -1234,45 +1798,185 @@ test('toggleNodePosition/setNodeRelation/addSlot: no-op tren two_party', async (
   assert.equal(model.state.diagramDirty, false);
 });
 
-test('applyAssignDefaults: owner → ownPositions het; node khac → receivePositions het', async () => {
+test('applyAssignDefaults: owner → ownPositions het; node khac → own=[], receive=[] (= từ chối)', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();                          // MIN-136: 1 node owner
-  const a = model.addPerson({ ho_ten: 'Owner' });
+  await model.newDraft();                          // MIN-136: 1 node owner
+  const a = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
   const b = model.addPerson({ ho_ten: 'Heir' });
-  model.addAsset({ so_serial: 'MM000001' });
-  model.addAsset({ so_serial: 'MM000002' });
+  model.addAsset({ so_serial: 'MM000001', so_thua_dat: '1', so_to_ban_do: '1' });
+  model.addAsset({ so_serial: 'MM000002', so_thua_dat: '1', so_to_ban_do: '1' });
   // Gan owner → ownPositions default [1,2], receive giu rong
   model.assignPerson('owner', a.row_id);
   const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
   assert.deepEqual(owner.ownPositions, [1, 2]);
   assert.deepEqual(owner.receivePositions, []);
-  // Slot thua ke khac → receivePositions default [1,2]
+  // Slot thua ke khac → own=[], receive=[] (= tu choi)
   const sp = model.addSlot();
   model.assignPerson(sp.id, b.row_id);
   const spouse = model.state.diagram.nodes.find((n) => n.id === sp.id);
-  assert.deepEqual(spouse.receivePositions, [1, 2]);
-  // Mang explicit khong bi ghi de: tat 1 chip roi gan lai → giu explicit
-  model.toggleNodePosition(sp.id, 'receive', 2);
-  const c = model.addPerson({ ho_ten: 'C' });
-  const kid = model.addSlot();
-  model.assignPerson(kid.id, c.row_id);
+  assert.deepEqual(spouse.ownPositions, []);
+  assert.deepEqual(spouse.receivePositions, []);
+  // Tick receive 1 thu cong
+  model.toggleNodePosition(sp.id, 'receive', 1);
   assert.deepEqual(model.state.diagram.nodes
     .find((n) => n.id === sp.id).receivePositions, [1]);
 });
 
-test('saveDiagram: workspace_conflict → status conflict', async () => {
+test('position defaults: owner assigned without assets expands with every added asset', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  model.assignPerson('owner', person.row_id);
+  const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.deepEqual(owner.ownPositions, []);
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.deepEqual(owner.ownPositions, [1]);
+  model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.deepEqual(owner.ownPositions, [1, 2]);
+});
+
+test('position defaults: removing an asset shrinks untouched ownership', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  const removed = model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
+  model.assignPerson('owner', person.row_id);
+  const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.deepEqual(owner.ownPositions, [1, 2]);
+  model.removeStageRow(removed.row_id);
+  assert.deepEqual(owner.ownPositions, [1]);
+});
+
+for (const empty of [false, true]) {
+  test(`position defaults: manual ownership ${empty ? 'empty' : 'subset'} survives add and repeated saves`, async () => {
+    const { model, client } = makeModel({});
+    await model.newDraft();
+    const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+    model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+    if (!empty) model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
+    model.assignPerson('owner', person.row_id);
+    model.toggleNodePosition('owner', 'own', 1);
+    const expected = empty ? [] : [2];
+    model.addAsset({ so_serial: 'G1-3', so_thua_dat: '1', so_to_ban_do: '1' });
+    assert.deepEqual(model.state.diagram.nodes[0].ownPositions, expected);
+    assert.equal((await model.saveCase()).ok, true);
+    model.addAsset({ so_serial: 'G1-4', so_thua_dat: '1', so_to_ban_do: '1' });
+    assert.equal((await model.saveCase()).ok, true);
+    const sent = client.calls.filter((c) =>
+      c.command === 'notary.workspace_save_case');
+    for (const call of sent) {
+      assert.deepEqual(call.payload.diagram.state.nodes[0].ownPositions, expected);
+    }
+    assert.deepEqual(model.state.diagram.nodes[0].ownPositions, expected);
+  });
+}
+
+test('position defaults: saveCase sends ownership after adding first asset without diagram edits', async () => {
+  const { model, client } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  model.assignPerson('owner', person.row_id);
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.equal((await model.saveCase()).ok, true);
+  const call = client.calls.find((c) => c.command === 'notary.workspace_save_case');
+  assert.deepEqual(call.payload.diagram.state.nodes[0].ownPositions, [1]);
+  assert.equal('positionTouched' in call.payload.diagram.state, false);
+});
+
+test('position defaults: empty owner stays empty when another node owns assets', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  const other = model.addPerson({ ho_ten: 'Other owner' });
+  model.assignPerson('owner', person.row_id);
+  const slot = model.addSlot();
+  model.assignPerson(slot.id, other.row_id);
+  model.toggleNodePosition(slot.id, 'own', 1);
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.deepEqual(model.state.diagram.nodes[0].ownPositions, []);
+  assert.deepEqual(slot.ownPositions, [1]);
+});
+
+test('WP5 node tests: drop 2nd person → own=[], receive=[]; add asset doesn\'t change unticked; owner gets new position', async () => {
+  const { model } = makeModel({});
+  await model.newDraft();
+  const ownerPerson = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  const secondPerson = model.addPerson({ ho_ten: 'Second' });
+  model.addAsset({ so_serial: 'A1', so_thua_dat: '1', so_to_ban_do: '1' });
+
+  // Drop owner → owner gets all positions
+  model.assignPerson('owner', ownerPerson.row_id);
+  const ownerNode = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.deepEqual(ownerNode.ownPositions, [1]);
+  assert.deepEqual(ownerNode.receivePositions, []);
+
+  // Drop 2nd person → own=[], receive=[] (= tu choi)
+  const slot = model.addSlot();
+  model.assignPerson(slot.id, secondPerson.row_id);
+  const secondNode = model.state.diagram.nodes.find((n) => n.id === slot.id);
+  assert.deepEqual(secondNode.ownPositions, []);
+  assert.deepEqual(secondNode.receivePositions, []);
+
+  // Add asset doesn't change unticked; owner gets new position
+  model.addAsset({ so_serial: 'A2', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.deepEqual(ownerNode.ownPositions, [1, 2]);
+  assert.deepEqual(secondNode.ownPositions, []);
+  assert.deepEqual(secondNode.receivePositions, []);
+
+  // Adding asset appends position only to people who already ticked that kind
+  model.toggleNodePosition(slot.id, 'receive', 1);
+  assert.deepEqual(secondNode.receivePositions, [1]);
+  model.addAsset({ so_serial: 'A3', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.deepEqual(ownerNode.ownPositions, [1, 2, 3]);
+  assert.deepEqual(secondNode.receivePositions, [1, 3]);
+  assert.deepEqual(secondNode.ownPositions, []);
+});
+
+test('position defaults: saveCase synchronizes defaults before capturing payload', async () => {
+  const { model, client } = makeModel({});
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
+  model.assignPerson('owner', person.row_id);
+  // Represent an untouched partial default loaded into the draft buffer.
+  model.state.diagram.nodes[0].ownPositions = [1];
+  assert.equal((await model.saveCase()).ok, true);
+  const call = client.calls.find(
+    (c) => c.command === 'notary.workspace_save_case');
+  assert.deepEqual(call.payload.diagram.state.nodes[0].ownPositions, [1, 2]);
+});
+
+test('position defaults: newDraft and openCase reset manual selection tracking', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.toggleNodePosition('owner', 'own', 1);
+  await model.openCase(42);
+  model.addAsset({ so_serial: 'G1-3', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.deepEqual(model.state.diagram.nodes.find((n) =>
+    n.id === 'owner').ownPositions, [1, 2, 3]);
+  model.toggleNodePosition('owner', 'own', 1);
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'New owner', ngay_chet: '2021-01-01' });
+  model.assignPerson('owner', person.row_id);
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  assert.deepEqual(model.state.diagram.nodes[0].ownPositions, [1]);
+});
+
+test('saveCase diagram-only: workspace_conflict → status conflict', async () => {
   const { model, client } = makeModel(seedCases('ready'));
   await model.openCase(42);
   model.setNodeFlag('owner', 'hidden', true);    // dirty diagram
   client.cases[42].revision = 12;
-  const r = await model.saveDiagram();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'workspace_conflict');
   assert.equal(model.state.status, 'conflict');
   assert.equal(model.state.conflict.server_revision, 12);
 });
 
-test('saveDiagram: owner mirror lech → diagram_owner_mismatch passthrough', async () => {
+test('saveCase: owner mirror lech → diagram_owner_mismatch passthrough', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);
   // Gia lap draft lech mirror (khong qua setter — UI khong bao gio tao
@@ -1282,47 +1986,53 @@ test('saveDiagram: owner mirror lech → diagram_owner_mismatch passthrough', as
   model.state.diagram.nodes.find((n) => n.id === 'spouse').personId = null;
   owner.personId = other;
   model.state.diagramDirty = true;
-  const r = await model.saveDiagram();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'diagram_owner_mismatch');
 });
 
-test('saveDiagram: domain mismatch → diagram_domain_mismatch', async () => {
+test('saveCase: domain mismatch → diagram_domain_mismatch', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);
   model.state.diagram = { version: 3, domain: 'two_party',
     nodes: TP_IDS.map((id) => ({ id, personId: null,
                                 hidden: false, deleted: false })) };
   model.state.diagramDirty = true;
-  const r = await model.saveDiagram();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'diagram_domain_mismatch');
 });
 
-test('saveDiagram two_party: persist + revision bump', async () => {
+test('saveCase two_party: persist + revision bump', async () => {
   const { model } = makeModel(seedCases('ready-two-party'));
   await model.openCase(48);
   model.assignPerson('p3', model.state.stage.people[0].row_id);
-  const r = await model.saveDiagram();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
   assert.equal(model.state.revision, 3);          // 2 → 3
   assert.equal(model.state.renderModel.status, 'unsupported');
   assert.deepEqual(model.state.diagram.nodes.map((n) => n.id), TP_IDS);
 });
 
-test('evaluateDiagram: cap nhat renderModel, KHONG doi revision/persist', async () => {
-  const { model } = makeModel(seedCases('empty'));
-  await model.openCase(43);
-  const node = model.addSlot();
-  model.setNodeFlag(node.id, 'hidden', true);
+test('evaluateDiagram: gui payload draft cho case da luu, KHONG doi revision/persist', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.setNodeFlag('owner', 'hidden', true);
   const r = await model.evaluateDiagram();
-  assert.equal(r.ok, true);
+  assert.equal(r.ok, true, JSON.stringify(r.error));
   const s = model.state;
-  assert.equal(s.revision, 1);                    // read-only — khong tang
-  assert.equal(s.evaluatedRevision, 1);
+  assert.equal(s.revision, 7);                    // read-only — khong tang
+  assert.equal(s.evaluatedRevision, null);        // draft evaluate
   assert.ok(s.renderModel);
   assert.equal(s.renderModel.engineVersion, 2);
   assert.equal(s.diagramDirty, true);             // draft van chua luu
+  const call = client.calls.filter(
+    (c) => c.command === 'notary.diagram_evaluate').at(-1).payload;
+  assert.equal('case_id' in call, false);
+  assert.equal('base_revision' in call, false);
+  assert.equal(call.case.case_type, 'inheritance');
+  assert.equal(call.stage.people.length, 4);
+  assert.equal(s.status, 'ready');
 });
 
 test('diagram tren case locked: evaluate duoc phep (read-only), save bi chan', async () => {
@@ -1330,9 +2040,70 @@ test('diagram tren case locked: evaluate duoc phep (read-only), save bi chan', a
   await model.openCase(44);
   const r = await model.evaluateDiagram();
   assert.equal(r.ok, true);                       // read-only qua duoc
-  const r2 = await model.saveDiagram();
+  const r2 = await model.saveCase();
   assert.equal(r2.ok, false);
   assert.equal(r2.error.code, 'workspace_locked');
+});
+
+// §7.1 D2: response evaluate gui tu so do CU khong duoc dat lai error/
+// renderModel sau khi so do da sua (gan owner) va da co evaluate moi hon.
+test('evaluateDiagram: response cu ve sau khi gan owner bi bo — khong dat lai error/renderModel', async () => {
+  const { model, pending } = makeDeferredModel(seedCases('ready'));
+  await model.openCase(42);
+  const ownerRow = model.state.stage.owner_row_id;
+  model.setOwnerRow(null);                 // so do chua owner — A gui luc nay
+  const pA = model.evaluateDiagram();
+  assert.equal(pending.length, 1);
+  assert.equal(
+    pending[0].payload.diagram.state.nodes.find((n) => n.id === 'owner')
+      .personId, null);
+  model.setOwnerRow(ownerRow);             // nguoi dung gan owner
+  const pB = model.evaluateDiagram();
+  assert.equal(pending.length, 2);
+  pending[1].resolve(evaluateOk(pending[1]));
+  await pB;
+  const renderB = model.state.renderModel;
+  assert.equal(renderB.status, 'complete');
+  // A (gui luc chua owner) ve SAU B va fail — phai bi bo hoan toan.
+  pending[0].resolve(evaluateFail('workspace_owner_required'));
+  const a = await pA;
+  assert.equal(a.ok, false);
+  assert.equal(model.state.error, null,
+    'banner owner_required cu bi dat lai sau khi da gan owner');
+  assert.equal(model.state.renderModel, renderB);
+  assert.deepEqual(model.state.diagramErrors, []);
+  assert.equal(model.state.busy, null);
+});
+
+test('evaluateDiagram: evaluate moi thanh cong don loi do evaluate dat truoc', async () => {
+  const { model, pending } = makeDeferredModel(seedCases('ready'));
+  await model.openCase(42);
+  const pA = model.evaluateDiagram();
+  pending[0].resolve(evaluateFail('workspace_owner_required'));
+  await pA;
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  // Sua so do qua touchDiagram — duong nay KHONG tu don state.error.
+  model.setNodeFlag('owner', 'hidden', true);
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  const pB = model.evaluateDiagram();
+  pending[1].resolve(evaluateOk(pending[1]));
+  await pB;
+  assert.equal(model.state.error, null,
+    'loi do evaluate dat van treo sau lan evaluate thanh cong');
+  assert.equal(model.state.renderModel.status, 'complete');
+});
+
+test('evaluateDiagram: evaluate thanh cong KHONG don loi cua duong ghi', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const w = await model.duplicateCase(999);      // lenh ghi fail → state.error
+  assert.equal(w.ok, false);
+  const writeError = model.state.error;
+  assert.equal(writeError.code, 'case_not_found');
+  const r = await model.evaluateDiagram();
+  assert.equal(r.ok, true);
+  assert.equal(model.state.error, writeError,
+    'evaluate khong duoc don loi cua duong ghi');
 });
 
 // ---------- intake / word (thin, cho MIN-112 wire UI) ----------
@@ -1541,7 +2312,7 @@ test('saveCaseMeta: case da luu → wire workspace_update, revision+1, caseInfo 
   assert.deepEqual(call.payload.case, { noi_niem_yet: 'xã Yên Sở' });
   assert.equal(model.state.revision, rev + 1);
   assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
-  assert.equal(model.state.notice, 'Đã lưu thông tin hồ sơ');
+  assert.equal(model.state.notice, null, 'R14: không toast chữ thành công');
   // Reload qua workspace_get thay gia tri da luu (mot nguon du lieu).
   await model.openCase(42);
   assert.equal(model.state.caseInfo.noi_niem_yet, 'xã Yên Sở');
@@ -1606,7 +2377,7 @@ test('saveCaseMeta: case locked → khong goi wire, tra workspace_locked', async
 
 test('saveCaseMeta: draft → cap nhat nhap local, khong goi wire; key la → validation_error', async () => {
   const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft();
+  await model.newDraft();
   const r = await model.saveCaseMeta({ noi_niem_yet: 'phường A' });
   assert.equal(r.ok, true);
   assert.equal(model.state.caseInfo.noi_niem_yet, 'phường A');
@@ -1628,7 +2399,7 @@ test('locked case: moi mutation draft la no-op — addPerson/addAsset/update/rem
 
   // Stage mutations — tra null, khong doi draft, khong dirty
   assert.equal(model.addPerson({ ho_ten: 'X' }), null);
-  assert.equal(model.addAsset({ so_serial: 'S1' }), null);
+  assert.equal(model.addAsset({ so_serial: 'S1', so_thua_dat: '1', so_to_ban_do: '1' }), null);
   assert.equal(s.stage.people.length, 2);
   assert.equal(s.stage.assets.length, 1);
   const pid = s.stage.people[0].row_id;
@@ -1680,17 +2451,17 @@ test('openCase(B) sau openCase(A) co aux state → moi aux state sach', async ()
   await model.loadWordOptions();
   assert.ok(model.state.wordOptions.length > 0);
   await model.evaluateDiagram();
-  assert.equal(model.state.evaluatedRevision, 1);
+  assert.equal(model.state.evaluatedRevision, null);
   const p = model.addPerson({ ho_ten: 'Nháp A' });
   model.setOwnerRow(p.row_id);
-  const rc = await model.commitStage();
+  const rc = await model.saveCase();
   assert.equal(rc.ok, true);
-  assert.equal(model.state.notice, 'Đã cập nhật Stage');
-  // server khoa case → commit tiep nhan workspace_locked → state.error
+  assert.equal(model.state.notice, null, 'R14: không toast chữ thành công');
+  // server khoa case → saveCase tiep nhan workspace_locked → state.error
   client.cases[43].locked = true;
   model.updatePersonField(
     model.state.stage.people[0].row_id, 'ho_ten', 'Sửa lại');
-  const rl = await model.commitStage();
+  const rl = await model.saveCase();
   assert.equal(rl.ok, false);
   assert.equal(model.state.error.code, 'workspace_locked');
   assert.equal(model.state.status, 'locked');
@@ -1729,7 +2500,7 @@ test('acceptSuggestion tren case locked → null, suggestion van con cho review'
   // day case sang locked qua mot write that bai
   model.updatePersonField('x', 'ho_ten', 'y');   // no-op nhung khong loi
   model.addPerson({ ho_ten: 'tmp' });
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.error.code, 'workspace_locked');
   assert.equal(model.canWrite(), false);
   const sugId = model.state.suggestions[0].suggestion_id;
@@ -1739,12 +2510,20 @@ test('acceptSuggestion tren case locked → null, suggestion van con cho review'
 
 // ---------- misc ----------
 
-test('hasUnsaved = stageDirty || diagramDirty', async () => {
+test('hasUnsaved = stageDirty || diagramDirty || metaDirty', async () => {
   const { model } = makeModel(seedCases('ready'));
   await model.openCase(42);
   assert.equal(model.hasUnsaved(), false);
   model.addPerson({ ho_ten: 'x' });
   assert.equal(model.hasUnsaved(), true);
+  // Meta-only cũng là thay đổi chưa ghi.
+  const { model: m2 } = makeModel(seedCases('ready'));
+  await m2.openCase(42);
+  m2.updateCaseMeta('noi_niem_yet', 'xã Meta');
+  assert.equal(m2.state.stageDirty, false);
+  assert.equal(m2.state.diagramDirty, false);
+  assert.equal(m2.state.metaDirty, true);
+  assert.equal(m2.hasUnsaved(), true);
 });
 
 test('onChange: subscriber duoc goi sau mutation/load', async () => {
@@ -1758,7 +2537,7 @@ test('onChange: subscriber duoc goi sau mutation/load', async () => {
   assert.ok(n > afterLoad);
 });
 
-test('model khong depend DOM: module load duoc trong node (khong window)', () => {
+test('model khong depend DOM: module load duoc trong node (khong window)', async () => {
   assert.ok(M.createModel);
   assert.equal(typeof M.createModel, 'function');
 });
@@ -1865,7 +2644,7 @@ test('onUnsavedChange: emit dung transition dirty→clean, promise rejection kho
   model.updatePersonField(
     model.state.stage.people[0].row_id, 'ngay_sinh', '1990');
   assert.deepEqual(seen, [true]);                 // van dirty — khong lap
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
   assert.deepEqual(seen, [true, false]);          // dirty → clean
 
@@ -1938,11 +2717,128 @@ test('exportWord: canceled job giu result (breakdown.skipped len wire — MIN-11
   assert.equal(model.state.wordBusy, false);
 });
 
+// ---------- Phần W: một hành động "Lưu & xuất" (owner 23/10/2026) ----------
+
+test('W1: hồ sơ chưa lưu — quét thư mục mẫu vẫn được (case_id null)', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.newDraft();
+  const o = await model.loadWordOptions({ file_token: 'tok-tpl' });
+  assert.equal(o.ok, true);
+  const call = client.calls.find(
+    (c) => c.command === 'notary.word_export_options');
+  assert.equal(call.payload.case_id, null);
+  assert.equal(model.state.wordOptions.length, 2);
+});
+
+test('W1: hồ sơ mới bấm Xuất → tự tạo + lưu trước rồi xuất case vừa tạo', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  await model.newDraft();
+  const person = model.addPerson({ ho_ten: 'Nguyễn Văn A' });
+  assert.ok(model.setOwnerRow(person.row_id));
+  assert.ok(model.addAsset({ so_serial: 'S1', so_thua_dat: '1', so_to_ban_do: '1' }));
+  const r = await model.exportWord(
+    ['Mau thue nha.docx'], { file_token: 'dest' },
+    { templateDir: { file_token: 'tok-tpl' } });
+  assert.equal(r.ok, true);
+  const cmds = client.calls.map((c) => c.command);
+  const saveAt = cmds.indexOf('notary.workspace_save_case');
+  const batchAt = cmds.indexOf('notary.word_export_batch');
+  assert.ok(saveAt >= 0 && batchAt > saveAt, 'phải lưu trước khi xuất');
+  const batch = client.calls[batchAt].payload;
+  assert.ok(Number.isInteger(batch.case_id) && batch.case_id >= 1,
+    'batch phải dùng case vừa tạo');
+  assert.equal(model.state.caseId, batch.case_id);
+});
+
+test('W3: hồ sơ đang sửa dở → tự lưu (kèm nơi niêm yết) trước lần xuất', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.updateCaseMeta('noi_niem_yet', 'xã Mới');
+  model.addPerson({ ho_ten: 'Người Thêm' });
+  const r = await model.exportWord(
+    ['khai_nhan_di_san'], { file_token: 'd' });
+  assert.equal(r.ok, true);
+  const saves = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case');
+  assert.equal(saves.length, 1);
+  assert.equal(saves[0].payload.case.noi_niem_yet, 'xã Mới');
+  assert.ok(saves[0].payload.stage.people
+    .some((p) => p.ho_ten === 'Người Thêm'));
+  const cmds = client.calls.map((c) => c.command);
+  assert.ok(cmds.indexOf('notary.workspace_save_case')
+    < cmds.indexOf('notary.word_export_batch'));
+});
+
+test('W2: chế độ gốc — tự lưu, nạp lại vị trí, xuất với revision mới', async () => {
+  const base = fakeClient(seedCases('ready'));
+  const batches = [];
+  let optionsReloads = 0;
+  const client = {
+    calls: base.calls,
+    run: async (cmd, payload) => {
+      if (cmd === 'notary.word_export_options'
+          && payload.original_source_id) {
+        optionsReloads += 1;
+        return { ok: true, data: {
+          documents: [{ document_key: 'original.docx',
+            display_name: 'Hợp đồng Word gốc',
+            ready: true, block_reason: null }],
+          binding_proposals: [] } };
+      }
+      if (cmd === 'notary.word_export_batch') batches.push(payload);
+      return base.run(cmd, payload);
+    },
+  };
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  const sourceId = crypto.randomUUID();
+  model.state.docxImport = { version: 1, sources: [
+    { source_id: sourceId, label: 'A.docx', records: [], bindings: [] }] };
+  model.state.stageDirty = true;
+  const before = model.state.revision;
+  const r = await model.exportWord(
+    ['original.docx'], { file_token: 'd' },
+    { originalSourceId: sourceId });
+  assert.equal(r.ok, true);
+  assert.equal(optionsReloads, 1, 'phải nạp lại vị trí sau khi lưu');
+  assert.equal(batches.length, 1);
+  assert.ok(batches[0].base_revision > before,
+    'base_revision phải là revision vừa lưu');
+  assert.equal(batches[0].base_revision, model.state.revision);
+  assert.equal(batches[0].original_source_id, sourceId);
+});
+
+test('W2: lỗi lưu thật khi xuất → dừng, không gửi batch, báo lỗi tại chỗ', async () => {
+  const base = fakeClient(seedCases('ready'));
+  const cmds = [];
+  const client = {
+    calls: base.calls,
+    run: async (cmd, payload) => {
+      cmds.push(cmd);
+      if (cmd === 'notary.workspace_save_case') {
+        return { ok: false, error: {
+          code: 'workspace_conflict', message: 'revision khac server',
+          retryable: false } };
+      }
+      return base.run(cmd, payload);
+    },
+  };
+  const model = M.createModel({ client, uuid });
+  await model.openCase(42);
+  model.addPerson({ ho_ten: 'Người Thêm' });
+  const r = await model.exportWord(['khai_nhan_di_san'], { file_token: 'd' });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'workspace_conflict');
+  assert.equal(cmds.includes('notary.word_export_batch'), false,
+    'không xuất bản cũ khi lưu thất bại');
+  assert.equal(model.state.wordBusy, false);
+});
+
 // ---------- MIN-122/128: nhap moi / draft / case_type ----------
 
-test('newDraft: inheritance — stage co owner_row_id null + seed DUNG 1 node owner (MIN-136)', () => {
+test('newDraft: inheritance — stage co owner_row_id null + seed DUNG 1 node owner (MIN-136)', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();
+  await model.newDraft();
   const s = model.state;
   assert.equal(s.status, 'ready');
   assert.equal(s.caseId, null);
@@ -1968,14 +2864,16 @@ test('newDraft: inheritance — stage co owner_row_id null + seed DUNG 1 node ow
   assert.deepEqual(s.capabilities.intake,
     ['image', 'pdf', 'docx', 'xlsx', 'text']);
   assert.equal(s.capabilities.diagram, true);
-  assert.equal(s.capabilities.word_export, false);
+  // W1 (owner 23/10/2026): hồ sơ mới xuất Word được — hành động xuất tự
+  // tạo + lưu trước, không cần Lưu thủ công.
+  assert.equal(s.capabilities.word_export, true);
   assert.match(s.draftId,
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 });
 
-test('newDraft(two_party): stage khong owner_row_id + 30 slot canonical', () => {
+test('newDraft(two_party): stage khong owner_row_id + 30 slot canonical', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft('two_party');
+  await model.newDraft('two_party');
   const s = model.state;
   assert.equal(model.caseType(), 'two_party');
   assert.equal(model.diagramDomain(), 'two_party');
@@ -1993,9 +2891,197 @@ test('newDraft(two_party): stage khong owner_row_id + 30 slot canonical', () => 
     ['chuyen_nhuong', 'tang_cho', 'cho_thue', 'dat_coc']);
 });
 
-test('updateCaseMeta case_type: doi loai → reset diagram buffer + stage key owner_row_id', () => {
+// ---------- vòng 2: nguồn Done cho nháp mới (§13.20) ----------
+
+function sourceStage() {
+  const owner = crypto.randomUUID();
+  const heir = crypto.randomUUID();
+  const asset = crypto.randomUUID();
+  return {
+    source_case_id: 77,
+    source_status: 'done',
+    stage: {
+      owner_row_id: owner,
+      people: [
+        { row_id: owner, entity_id: 12, ho_ten: 'Người Chủ',
+          gioi_tinh: null, ngay_sinh: '1950', ngay_chet: '2020-01-01',
+          so_giay_to: '001', ngay_cap: null, noi_cap: null,
+          dia_chi: null, place_of_origin: null,
+          loai_giay_to: null, loai_dia_chi: null },
+        { row_id: heir, entity_id: null, ho_ten: 'Người Thừa Kế',
+          gioi_tinh: 'Nữ', ngay_sinh: null, ngay_chet: null,
+          so_giay_to: null, ngay_cap: null, noi_cap: null,
+          dia_chi: null, place_of_origin: null,
+          loai_giay_to: null, loai_dia_chi: null },
+      ],
+      assets: [
+        { row_id: asset, entity_id: 21, so_serial: 'SRC 001',
+          so_vao_so: null, so_thua_dat: '1', so_to_ban_do: '1',
+          dia_chi: null, loai_so: null, hinh_thuc_su_dung: null,
+          thoi_han: '2063', nguon_goc: null, ngay_cap: null,
+          co_quan_cap: null, land_rows: null },
+        { row_id: crypto.randomUUID(), entity_id: null,
+          so_serial: '', so_vao_so: null, so_thua_dat: '2',
+          so_to_ban_do: '2', dia_chi: null, loai_so: null,
+          hinh_thuc_su_dung: null, thoi_han: null, nguon_goc: null,
+          ngay_cap: null, co_quan_cap: null, land_rows: [] },
+      ],
+    },
+  };
+}
+
+test('movePerson: same owner pointer syncs empty diagram owner on first drop',
+  async () => {
+    const { model, client } = makeModel(seedCases('empty'));
+    const source = sourceStage();
+    client.setSourceLatest(source);
+    await model.newDraft();
+    const rowId = model.state.stage.owner_row_id;
+    const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+
+    assert.equal(rowId, source.stage.owner_row_id);
+    assert.equal(owner.personId, null);
+    assert.equal(model.pool().people.some((p) => p.row_id === rowId), true);
+
+    assert.equal(model.movePerson(rowId, 'owner'), true);
+    assert.equal(owner.personId, rowId);
+    assert.equal(model.pool().people.some((p) => p.row_id === rowId), false);
+    assert.equal(model.state.diagramDirty, true);
+  });
+
+test('newDraft: đọc nguồn đúng 1 lần, stage nguồn + owner, không leak case/meta/diagram', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  const src = sourceStage();
+  client.setSourceLatest(src);
+  const r = await model.newDraft('inheritance');
+  assert.equal(r.ok, true);
+  const s = model.state;
+  const sourceCalls = client.calls.filter(
+    (c) => c.command === 'notary.workspace_source_latest');
+  assert.equal(sourceCalls.length, 1);
+  assert.deepEqual(sourceCalls[0].payload, {});
+  assert.equal(s.status, 'ready');
+  assert.equal(s.caseId, null);
+  // Stage nguồn: giữ thứ tự, entity_id/null/[]/thoi_han, owner đã remap
+  assert.deepEqual(s.stage.people, src.stage.people);
+  assert.deepEqual(s.stage.assets, src.stage.assets);
+  assert.equal(s.stage.owner_row_id, src.stage.owner_row_id);
+  assert.equal(s.stageDirty, true);
+  // committed vẫn rỗng — chưa có DB cho nháp này
+  assert.deepEqual(s.committed, { people: [], assets: [] });
+  // meta/diagram mới của nháp, không chép nguồn
+  assert.equal(s.caseInfo.id, null);
+  assert.equal(s.caseInfo.ngay_lap_ho_so, null);
+  assert.equal(s.diagram.domain, 'inheritance');
+  assert.equal(s.diagram.nodes.length, 1);
+  assert.equal(s.diagram.nodes[0].id, 'owner');
+  assert.equal(s.diagram.nodes[0].personId, null);
+  assert.equal('source_case_id' in s, false);
+});
+
+test('newDraft(two_party): nguồn inheritance → bỏ owner key, giữ Người/Tài sản', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  const src = sourceStage();
+  client.setSourceLatest(src);
+  await model.newDraft('two_party');
+  const s = model.state;
+  assert.equal('owner_row_id' in s.stage, false);
+  assert.deepEqual(s.stage.people, src.stage.people);
+  assert.deepEqual(s.stage.assets, src.stage.assets);
+  assert.equal(s.diagram.domain, 'two_party');
+  assert.deepEqual(s.diagram.nodes.map((n) => n.id), TP_IDS);
+});
+
+test('newDraft: không có Done → Stage rỗng thành công, không dirty', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();
+  const r = await model.newDraft();
+  assert.equal(r.ok, true);
+  assert.equal(model.state.status, 'ready');
+  assert.deepEqual(model.state.stage.people, []);
+  assert.deepEqual(model.state.stage.assets, []);
+  assert.equal(model.state.stageDirty, false);
+});
+
+test('newDraft: lỗi đọc nguồn hiện rõ, không nuốt thành nguồn rỗng', async () => {
+  const client = { run: async () => ({ ok: false, error: {
+    code: 'engine_unavailable', message: 'db busy', retryable: true,
+    next_action: 'retry', details: null } }) };
+  const model = M.createModel({ client, uuid });
+  const r = await model.newDraft();
+  assert.equal(r.ok, false);
+  assert.equal(model.state.status, 'unavailable');
+  assert.equal(model.state.error.code, 'engine_unavailable');
+  assert.equal(model.canWrite(), false);
+  assert.deepEqual(model.state.stage.people, []);
+  assert.equal(model.state.stageDirty, false);
+});
+
+test('newDraft: loading khóa sửa/lưu đến khi nguồn trả về', async () => {
+  let resolveSource;
+  const client = { run: () => new Promise((res) => {
+    resolveSource = res;
+  }) };
+  const model = M.createModel({ client, uuid });
+  const pending = model.newDraft();
+  assert.equal(model.state.status, 'loading');
+  assert.equal(model.canWrite(), false);
+  const blocked = await model.saveCase();
+  assert.equal(blocked.ok, false);
+  resolveSource({ ok: true, data: { stage: { people: [], assets: [] } } });
+  await pending;
+  assert.equal(model.state.status, 'ready');
+  assert.equal(model.canWrite(), true);
+});
+
+test('newDraft: response nguồn của phiên cũ không ghi đè nháp mới', async () => {
+  const resolvers = [];
+  const client = { run: () => new Promise((res) => resolvers.push(res)) };
+  const model = M.createModel({ client, uuid });
+  const first = model.newDraft('inheritance');
+  const second = model.newDraft('two_party');
+  const late = sourceStage();
+  resolvers[1]({ ok: true, data: { stage: { people: [], assets: [] } } });
+  await second;
+  resolvers[0]({ ok: true, data: late });
+  await first;
+  assert.equal(model.caseType(), 'two_party');
+  assert.deepEqual(model.state.stage.people, []);
+  assert.equal(model.state.stageDirty, false);
+});
+
+test('newDraft: sửa tay sau khi lấy nguồn không bị đọc lại/ghi đè', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  client.setSourceLatest(sourceStage());
+  await model.newDraft();
+  const row = model.state.stage.people[0];
+  model.updatePersonField(row.row_id, 'ho_ten', 'Sửa Tay');
+  assert.equal(model.state.stage.people[0].ho_ten, 'Sửa Tay');
+  assert.equal(client.calls.filter(
+    (c) => c.command === 'notary.workspace_source_latest').length, 1);
+});
+
+test('saveCase tu nguon: giu entity_id goi y + thoi_han le cua dong moi', async () => {
+  const { model, client } = makeModel(seedCases('empty'));
+  const src = sourceStage();
+  client.setSourceLatest(src);
+  await model.newDraft('inheritance');
+  const r = await model.saveCase();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  const sent = client.calls.find(
+    (c) => c.command === 'notary.workspace_save_case').payload;
+  assert.equal(sent.stage.people[0].entity_id, src.stage.people[0].entity_id);
+  assert.equal(sent.stage.people[1].entity_id, null);
+  assert.equal(sent.stage.assets[0].thoi_han, '2063');
+  assert.equal(sent.stage.assets[1].thoi_han, undefined);
+  assert.deepEqual(sent.stage.assets[1].land_rows, []);
+  assert.equal(sent.stage.owner_row_id, src.stage.owner_row_id);
+  assert.equal(client.calls.some(
+    (c) => c.command === 'notary.workspace_create'), false);
+});
+
+test('updateCaseMeta case_type: doi loai → reset diagram buffer + stage key owner_row_id', async () => {
+  const { model } = makeModel(seedCases('empty'));
+  await model.newDraft();
   const s = model.state;
   // thiet lap draft inheritance
   const p = model.addPerson({ ho_ten: 'X' });
@@ -2019,9 +3105,9 @@ test('updateCaseMeta case_type: doi loai → reset diagram buffer + stage key ow
   assert.equal(model.updateCaseMeta('case_type', 'gift'), false);
 });
 
-test('two_party draft: addSlot chan; addPerson toi da 30; assign unique', () => {
+test('two_party draft: addSlot chan; addPerson toi da 30; assign unique', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft('two_party');
+  await model.newDraft('two_party');
   const s = model.state;
   assert.equal(model.addSlot(), null);          // canonical co dinh
   // gan nguoi vao p1..p30
@@ -2043,36 +3129,36 @@ test('two_party draft: addSlot chan; addPerson toi da 30; assign unique', () => 
   assert.equal(model.setNodeFlag('p3', 'hidden', true), true);
 });
 
-test('MIN-136: seedDiagramSlots/ensureEmptyChildSlot khong con export', () => {
+test('MIN-136: seedDiagramSlots/ensureEmptyChildSlot khong con export', async () => {
   // Sinh node chi qua engine requiredSlots — helper client-side seed
   // 7 slot va auto-child da bi go khoi API cong khai.
   assert.equal(typeof M.seedDiagramSlots, 'undefined');
   assert.equal(typeof M.ensureEmptyChildSlot, 'undefined');
 });
 
-test('newTwoPartyState: canonical p1..p30 — export dung cho test/view', () => {
+test('newTwoPartyState: canonical p1..p30 — export dung cho test/view', async () => {
   const st = M.newTwoPartyState();
   assert.equal(st.version, 3);
   assert.equal(st.domain, 'two_party');
   assert.deepEqual(st.nodes.map((n) => n.id), TP_IDS);
 });
 
-test('newDraft: draft diagram dung stage nhap — assign tu stage, pool tu stage', () => {
+test('newDraft: draft diagram dung stage nhap — assign tu stage, pool tu stage', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();
-  const row = model.addPerson({ ho_ten: 'Người Nháp' });
+  await model.newDraft();
+  const row = model.addPerson({ ho_ten: 'Người Nháp', ngay_chet: '2020-01-01' });
   assert.ok(row);
   assert.equal(model.pool().people.length, 1);
   assert.equal(model.assignPerson('owner', row.row_id), true);
   assert.equal(model.pool().people.length, 0);
-  // pointer stage theo mirror — saveDraft gui owner_row_id hop le
+  // pointer stage theo mirror — saveCase gui owner_row_id hop le
   assert.equal(model.state.stage.owner_row_id, row.row_id);
 });
 
-test('movePerson: move vao node trong / swap / unassign ve Pool — owner mirror theo pointer', () => {
+test('movePerson: move vao node trong / swap / unassign ve Pool — owner mirror theo pointer', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();
-  const a = model.addPerson({ ho_ten: 'A' });
+  await model.newDraft();
+  const a = model.addPerson({ ho_ten: 'A', ngay_chet: '2020-01-01' });
   const b = model.addPerson({ ho_ten: 'B' });
   const sp = model.addSlot();                    // slot thu cong (API noi bo)
   model.assignPerson('owner', a.row_id);
@@ -2098,20 +3184,20 @@ test('movePerson: move vao node trong / swap / unassign ve Pool — owner mirror
   assert.equal(model.state.stage.owner_row_id, b.row_id);
 });
 
-test('updateCaseMeta: chi draft; saveDraft gui meta + idempotency_key', async () => {
+test('updateCaseMeta: nhap local; saveCase gui meta day du + idempotency_key', async () => {
   const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft();
+  await model.newDraft();
   assert.equal(model.updateCaseMeta('document_type', 'thoa_thuan'), true);
   assert.equal(model.updateCaseMeta('noi_niem_yet', 'xã Yên Sở'), true);
   assert.equal(model.updateCaseMeta('bogus', 'x'), false);
-  const owner = model.addPerson({ ho_ten: 'Người Chết' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  const owner = model.addPerson({ ho_ten: 'Người Chết', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   model.assignPerson('owner', owner.row_id);
   const draftId = model.state.draftId;
-  const r = await model.saveDraft();
+  const r = await model.saveCase();
   assert.equal(r.ok, true, JSON.stringify(r.error));
   const call = client.calls.find(
-    (c) => c.command === 'notary.workspace_create');
+    (c) => c.command === 'notary.workspace_save_case');
   assert.ok(call);
   assert.equal(call.payload.idempotency_key, draftId);
   assert.equal(call.payload.case.document_type, 'thoa_thuan');
@@ -2130,19 +3216,19 @@ test('updateCaseMeta: chi draft; saveDraft gui meta + idempotency_key', async ()
   assert.equal(model.state.revision, 1);
 });
 
-test('saveDraft two_party: payload khong owner_row_id, case_type two_party', async () => {
+test('saveCase two_party: payload khong owner_row_id, case_type two_party', async () => {
   const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft('two_party');
+  await model.newDraft('two_party');
   model.addPerson({ ho_ten: 'Bên A 1' });
   model.addPerson({ ho_ten: 'Bên B 1' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   const ps = model.state.stage.people;
   model.assignPerson('p1', ps[0].row_id);
   model.assignPerson('p16', ps[1].row_id);
-  const r = await model.saveDraft();
+  const r = await model.saveCase();
   assert.equal(r.ok, true, JSON.stringify(r.error));
   const call = client.calls.find(
-    (c) => c.command === 'notary.workspace_create');
+    (c) => c.command === 'notary.workspace_save_case');
   assert.equal(call.payload.case.case_type, 'two_party');
   assert.equal(call.payload.case.document_type, 'chuyen_nhuong');
   assert.equal('owner_row_id' in call.payload.stage, false);
@@ -2176,49 +3262,61 @@ test('saveDraft khong gui diagram → server seed owner theo owner_row_id', asyn
   assert.deepEqual(owner.ownPositions, [1]);     // mac dinh het vi tri
 });
 
-test('saveDraft: retry cung draftId → created:false, khong tao trung', async () => {
-  const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft();
-  const owner = model.addPerson({ ho_ten: 'Người Chết' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+test('saveCase: retry sau loi mang giu draftId → created:true mot lan, khong tao trung', async () => {
+  const client = fakeClient({});
+  const model = M.createModel({ client, uuid });
+  await model.newDraft();
+  const owner = model.addPerson({ ho_ten: 'Người Chết', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   model.assignPerson('owner', owner.row_id);
-  const r1 = await model.saveDraft();
-  assert.equal(r1.ok && r1.data.created, true);
+  const draftId = model.state.draftId;
+  const orig = client.run.bind(client);
+  let dropped = null;
+  client.run = async (command, payload) => {
+    if (command === 'notary.workspace_save_case' && !dropped) {
+      dropped = payload.idempotency_key;
+      return { ok: false, error: {
+        code: 'engine_unavailable', message: 'mat ket noi', retryable: true,
+        next_action: 'retry', details: null } };
+    }
+    return orig(command, payload);
+  };
+  const r1 = await model.saveCase();
+  assert.equal(r1.ok, false);
+  assert.equal(model.state.caseId, null);
+  assert.equal(model.state.draftId, draftId, 'giu key qua retry');
+  assert.equal(dropped, draftId);
+
+  const r2 = await model.saveCase();
+  assert.equal(r2.ok, true, JSON.stringify(r2.error));
+  assert.equal(r2.data.created, true);
   const cid = model.state.caseId;
-  // mo lai nhap khac roi quay lai goi workspace_create cung key qua client
-  const r2 = await client.run('notary.workspace_create', {
-    idempotency_key: client.calls.find(
-      (c) => c.command === 'notary.workspace_create')
-      .payload.idempotency_key,
-    case: { document_type: 'khai_nhan' },
-    stage: { owner_row_id: owner.row_id, people: [], assets: [] },
-    diagram: { state: { version: 3, domain: 'inheritance', nodes: [] } },
-  });
-  assert.equal(r2.ok, true);
-  assert.equal(r2.data.created, false);
-  assert.equal(r2.data.case.id, cid);
+  const keys = Object.keys(client.cases).filter((k) => Number(k) === cid);
+  assert.equal(keys.length, 1, 'chi mot case duoc tao');
+  assert.equal(client.cases[cid].status, 'done');
+  assert.equal(model.state.revision, 1);
 });
 
-test('saveDraft: stage_validation_error giu nhap + fieldErrors', async () => {
+test('saveCase: stage_validation_error giu nhap + fieldErrors', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();
+  await model.newDraft();
   const bad = model.addPerson({ ho_ten: '   ' });  // ho_ten trong → required
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   model.setOwnerRow(bad.row_id);                  // pointer hop le → toi
                                                   // duoc field check
-  const r = await model.saveDraft();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'stage_validation_error');
   assert.ok(model.state.fieldErrors.length >= 1);
   assert.equal(model.isDraft(), true);          // nhap nguyen ven
 });
 
-test('saveDraft: thieu owner → workspace_owner_required, nhap giu nguyen', async () => {
+test('saveCase new: thieu owner → workspace_owner_required, nhap giu nguyen', async () => {
   const { model } = makeModel(seedCases('empty'));
-  model.newDraft();
+  await model.newDraft();
   model.addPerson({ ho_ten: 'Ai Do' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
-  const r = await model.saveDraft();
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'workspace_owner_required');
   assert.equal(model.isDraft(), true);
@@ -2226,8 +3324,8 @@ test('saveDraft: thieu owner → workspace_owner_required, nhap giu nguyen', asy
 
 test('evaluateDiagram tren nhap: gui case.case_type + stage, khong gui case_id', async () => {
   const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft();
-  const owner = model.addPerson({ ho_ten: 'Người Chết' });
+  await model.newDraft();
+  const owner = model.addPerson({ ho_ten: 'Người Chết', ngay_chet: '2020-01-01' });
   model.assignPerson('owner', owner.row_id);
   const r = await model.evaluateDiagram();
   assert.equal(r.ok, true);
@@ -2243,7 +3341,7 @@ test('evaluateDiagram tren nhap: gui case.case_type + stage, khong gui case_id',
 
 test('evaluateDiagram tren nhap two_party: case hint + unsupported render', async () => {
   const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft('two_party');
+  await model.newDraft('two_party');
   model.addPerson({ ho_ten: 'Bên A' });
   model.assignPerson('p1', model.state.stage.people[0].row_id);
   const r = await model.evaluateDiagram();
@@ -2259,7 +3357,7 @@ test('evaluateDiagram tren nhap two_party: case hint + unsupported render', asyn
 
 test('intakeAnalyze tren nhap: khong gui case_id', async () => {
   const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft();
+  await model.newDraft();
   const r = await model.intakeAnalyze([
     { source_id: crypto.randomUUID(), kind: 'text', text: 'x' }]);
   assert.equal(r.ok, true);
@@ -2271,32 +3369,38 @@ test('intakeAnalyze tren nhap: khong gui case_id', async () => {
 test('session guard: openCase(A) rồi newDraft trước khi response về → bo apply', async () => {
   const { model, client } = makeModel(seedCases('ready'));
   const origRun = client.run;
-  let resolve;
+  const resolvers = [];
   client.run = (cmd, p) => new Promise((res) => {
-    resolve = () => origRun(cmd, p).then(res);
+    resolvers.push(() => origRun(cmd, p).then(res));
   });
   const p = model.openCase(42);
-  model.newDraft();                       // session doi truoc khi response
-  resolve();
-  await p;
+  const d = model.newDraft();          // session doi truoc khi response
+  resolvers.forEach((fn) => fn());
+  await Promise.all([p, d]);
   // state van la nhap — response workspace_get cua case 42 bi bo
   assert.equal(model.isDraft(), true);
   assert.equal(model.state.caseId, null);
 });
 
-test('commitStage chi goi tren case that — draft khong co commitStage', async () => {
-  const { model, client } = makeModel(seedCases('empty'));
-  model.newDraft();
+test('ca nhap va case cu chi persist khi nguoi dung bam Luu ho so', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
   model.addPerson({ ho_ten: 'A' });
-  assert.equal(model.state.stageDirty, true);
-  // saveDraft la duong luu duy nhat cua nhap
-  const callsBefore = client.calls.length;
-  const owner = model.state.stage.people[0];
-  model.assignPerson('owner', owner.row_id);
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
-  const r = await model.saveDraft();
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
+  model.assignPerson('spouse', model.state.stage.people.at(-1).row_id);
+  // Sửa buffer không phát command ghi nào.
+  assert.equal(client.calls.filter((c) => c.command.includes('save') ||
+    c.command.includes('commit') ||
+    c.command.includes('diagram_save')).length, 0);
+  const r = await model.saveCase();
   assert.equal(r.ok, true);
-  assert.ok(client.calls.length > callsBefore);
+  const writes = client.calls.filter((c) =>
+    c.command === 'notary.workspace_save_case');
+  assert.equal(writes.length, 1);
+  assert.equal(client.calls.some(
+    (c) => c.command === 'notary.workspace_create' ||
+      c.command === 'notary.workspace_commit_stage' ||
+      c.command === 'notary.diagram_save'), false);
 });
 
 // ---------- MIN-141 đợt 3: case metadata + danh bạ ủy quyền ----------
@@ -2320,7 +3424,7 @@ test('đợt3 openCase: meta mới vào caseInfo + baseline committedCaseInfo', 
   assert.equal(model.hasUnsaved(), false);
 });
 
-test('đợt3 commitStage meta-only: payload.case đi kèm stage, metaDirty clear', async () => {
+test('đợt3 saveCase meta-only: payload case+stage+diagram, metaDirty clear', async () => {
   const { model, client } = makeModel(seedCases('ready'));
   await model.openCase(42);
   model.updateCaseMeta('noi_niem_yet', 'xã Mới');
@@ -2328,14 +3432,16 @@ test('đợt3 commitStage meta-only: payload.case đi kèm stage, metaDirty clea
   assert.equal(model.state.metaDirty, true);
   assert.equal(model.hasUnsaved(), true);
   const rev = model.state.revision;
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true, JSON.stringify(r.error));
   const call = client.calls.find(
-    (c) => c.command === 'notary.workspace_commit_stage');
-  assert.ok(call.payload.case, 'commit meta-only phải gửi payload.case');
+    (c) => c.command === 'notary.workspace_save_case');
+  assert.ok(call.payload.case, 'saveCase luôn gửi snapshot case');
   assert.equal(call.payload.case.noi_niem_yet, 'xã Mới');
   assert.equal(call.payload.case.noi_dung_viec, 'Việc mới');
   assert.equal(call.payload.case.case_type, 'inheritance');
+  assert.ok(call.payload.stage.people.length);
+  assert.ok(call.payload.diagram.state);
   assert.equal(call.payload.base_revision, rev);
   assert.equal(model.state.metaDirty, false);
   assert.equal(model.state.revision, rev + 1);
@@ -2346,16 +3452,19 @@ test('đợt3 commitStage meta-only: payload.case đi kèm stage, metaDirty clea
   assert.equal(model.state.caseInfo.noi_dung_viec, 'Việc mới');
 });
 
-test('đợt3 commitStage: khong sua meta → payload khong kem case', async () => {
+test('đợt3 saveCase: khong sua meta van gui snapshot case+stage+diagram', async () => {
   const { model, client } = makeModel(seedCases('ready'));
   await model.openCase(42);
   model.addPerson({ ho_ten: 'Người Mới' });       // stageDirty only
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true, JSON.stringify(r.error));
   const call = client.calls.find(
-    (c) => c.command === 'notary.workspace_commit_stage');
-  assert.equal(call.payload.case, undefined,
-    'stage-only commit khong duoc dinh kem payload.case');
+    (c) => c.command === 'notary.workspace_save_case');
+  assert.ok(call.payload.case, 'saveCase luôn có block case');
+  assert.equal(call.payload.case.case_type, 'inheritance');
+  assert.equal(call.payload.case.ngay_lap_ho_so, null);
+  assert.equal(call.payload.stage.people.length, 5);
+  assert.ok(call.payload.diagram.state.nodes.length);
 });
 
 test('đợt3 commit meta: uq_id danh ba hop le → server resolve ten master', async () => {
@@ -2365,14 +3474,14 @@ test('đợt3 commit meta: uq_id danh ba hop le → server resolve ten master', 
   await model.openCase(42);
   model.updateCaseMeta('nguoi_nhan_uy_quyen', 'Người Danh Bạ');
   model.updateCaseMeta('nguoi_nhan_uy_quyen_id', 5);
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, true, JSON.stringify(r.error));
   assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen,
     'Người Danh Bạ');
   assert.equal(model.state.caseInfo.nguoi_nhan_uy_quyen_id, 5);
   // Id khong ton tai → validation_error, meta giu nguyen de sua lai.
   model.updateCaseMeta('nguoi_nhan_uy_quyen_id', 999);
-  const r2 = await model.commitStage();
+  const r2 = await model.saveCase();
   assert.equal(r2.ok, false);
   assert.equal(r2.error.code, 'validation_error');
   assert.equal(model.state.metaDirty, true,
@@ -2386,12 +3495,12 @@ test('đợt3 commit meta: immutable case_type mismatch → validation_error', a
   // Gia lap client lo gui kem case_type khac — server phai tu choi.
   const orig = client.run;
   client.run = (cmd, p) => {
-    if (cmd === 'notary.workspace_commit_stage' && p.case) {
+    if (cmd === 'notary.workspace_save_case' && p.case) {
       p = { ...p, case: { ...p.case, case_type: 'two_party' } };
     }
     return orig(cmd, p);
   };
-  const r = await model.commitStage();
+  const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'validation_error');
   assert.equal(model.state.caseInfo.case_type, 'inheritance');
@@ -2434,4 +3543,543 @@ test('đợt3 createUqCustomer: tao danh ba moi → chon lam nguoi nhan UQ', asy
   const r2 = await model.createUqCustomer('   ');
   assert.equal(r2.ok, false);
   assert.equal(client.calls.length, before);
+});
+
+test('saved conversion: dirty Stage được ghi cùng hành động, không bị chặn "Lưu trước"', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.diagram.nodes.find((n) => n.id === 'child_2').hidden = true;
+  model.state.diagramDirty = true;
+  const before = structuredClone(model.state.diagram);
+  const original = client.run.bind(client);
+  let writes = 0;
+  client.run = async (command, payload) => {
+    if (command !== 'notary.workspace_convert_type') return original(command, payload);
+    writes++;
+    return {ok:false,error:{code:'workspace_conflict',details:{server_revision:8}}};
+  };
+  model.updatePersonField(model.state.stage.people[0].row_id, 'ho_ten', 'Chữ đang sửa');
+  const request = {case_type:'two_party',document_type:'dat_coc',confirm_diagram_reset:true};
+  // R7: buffer Stage đang sửa không chặn convert — được ghi trước trong
+  // cùng hành động rồi mới gọi convert (convert lỗi conflict thật).
+  const conv = await model.convertCaseType(request);
+  assert.equal(conv.ok, false);
+  assert.equal(writes, 1, 'convert vẫn được gọi sau khi ghi buffer');
+  const saveCall = client.calls.find(
+    (c) => c.command === 'notary.workspace_save_case');
+  assert.ok(saveCall, 'buffer Stage phải được ghi trước khi convert');
+  assert.equal(model.state.stage.people[0].ho_ten, 'Chữ đang sửa',
+    'chữ đang sửa không bị mất');
+  assert.equal(model.state.stageDirty, false);
+  assert.deepEqual(model.state.diagram, before);
+  // Convert lỗi sau khi buffer đã được ghi: Diagram đang sửa đã nằm trong
+  // bản lưu (không mất), nên dirty sạch; loại hồ sơ giữ nguyên.
+  assert.equal(model.state.diagramDirty, false);
+  assert.equal(model.hasUnsaved(), false);
+  assert.equal(model.state.caseInfo.case_type, 'inheritance');
+});
+
+test('conversion pending blocks editing; success resets Diagram and invalidates Word result', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const before = structuredClone(model.state.stage);
+  let finish;
+  const original = client.run.bind(client);
+  client.run = (command, payload) => command === 'notary.workspace_convert_type'
+    ? new Promise(resolve => {finish=resolve;}) : original(command,payload);
+  model.state.diagramDirty = true;
+  model.state.wordOptions = {documents:[]};
+  model.state.wordResult = {old:true};
+  const pending = model.convertCaseType({case_type:'two_party',document_type:'dat_coc',confirm_diagram_reset:true});
+  assert.equal(model.canWrite(), false);
+  const name = model.state.stage.people[0].ho_ten;
+  model.updatePersonField(model.state.stage.people[0].row_id, 'ho_ten', 'Must not apply');
+  assert.equal(model.state.stage.people[0].ho_ten, name);
+  const stage = structuredClone(before); delete stage.owner_row_id;
+  finish({ok:true,data:{case:{...model.state.caseInfo,case_type:'two_party',document_type:'dat_coc',revision:8},
+    stage,diagram:{state:M.newTwoPartyState(),render_model:null},
+    capabilities:{intake:[],diagram:true,word_export:true}}});
+  assert.equal((await pending).ok,true);
+  assert.deepEqual(model.state.stage.people,before.people);
+  assert.deepEqual(model.state.stage.assets,before.assets);
+  assert.equal(model.state.diagramDirty,false);
+  assert.equal(model.state.wordOptions,null);
+  assert.equal(model.state.wordResult,null);
+  assert.equal(model.state.diagram.domain,'two_party');
+});
+
+// ---------- issue 13: saveCase (workspace_save_case) ----------
+
+function seedSaveCaseModel(client) {
+  const model = M.createModel({ client, uuid });
+  const s = model.state;
+  s.status = 'ready';
+  s.caseId = 42;
+  s.caseInfo = { id: 42, case_type: 'inheritance',
+                 document_type: 'khai_nhan', status: 'draft',
+                 locked: false, revision: 3, ngay_lap_ho_so: '2024-05-01',
+                 noi_niem_yet: null, ghi_chu: null,
+                 nguoi_nhan_uy_quyen: null,
+                 nguoi_nhan_uy_quyen_id: null, noi_dung_viec: null };
+  s.committedCaseInfo = structuredClone(s.caseInfo);
+  s.backendMode = 'real';
+  s.revision = 3;
+  s.locked = false;
+  s.unsupported = false;
+  s.capabilities = { intake: [], diagram: true, word_export: true };
+  s.committed = { people: [{ row_id: 'c1', ho_ten: 'Người Đã Lưu' }],
+                  assets: [{ row_id: 'a1', so_serial: 'S-001',
+                             so_thua_dat: '1', so_to_ban_do: '1' }] };
+  s.stage = structuredClone(s.committed);
+  s.stage.owner_row_id = 'c1';
+  s.committedDiagram = { version: 3, domain: 'inheritance', nodes: [
+    { id: 'owner', personId: 'c1', parentSlotIds: [],
+      spouseSlotId: null, ownPositions: [1], receivePositions: [],
+      hidden: false, deleted: false }] };
+  s.diagram = structuredClone(s.committedDiagram);
+  s.diagramDirty = true;
+  return model;
+}
+
+function savedWorkspace(payload, revision, status = 'done') {
+  return {
+    case: { id: 42, case_type: payload.case.case_type,
+            document_type: payload.case.document_type, status,
+            locked: false, revision },
+    backend_mode: 'real',
+    capabilities: { intake: [], diagram: true, word_export: true },
+    stage: structuredClone(payload.stage),
+    diagram: { state: structuredClone(payload.diagram.state),
+               render_model: null },
+    warnings: [],
+  };
+}
+
+test('B5 saveCase conflict: giữ model + dirty, không tự merge/retry', async () => {
+  const calls = [];
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    return { ok: false, error: { code: 'workspace_conflict',
+      message: 'revision khac', details: { server_revision: 9 } } };
+  } };
+  const model = seedSaveCaseModel(client);
+  model.updatePersonField('c1', 'ho_ten', 'Chữ Nháp');
+  const r = await model.saveCase();
+  assert.equal(r.ok, false);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'notary.workspace_save_case');
+  assert.equal(calls[0][1].case_id, 42);
+  assert.equal(calls[0][1].base_revision, 3);
+  assert.equal('idempotency_key' in calls[0][1], false);
+  assert.equal(model.state.status, 'conflict');
+  assert.equal(model.state.revision, 3, 'revision client không đổi');
+  assert.equal(model.state.stage.people[0].ho_ten, 'Chữ Nháp');
+  assert.equal(model.state.stageDirty, true, 'dirty phải còn');
+  assert.equal(model.state.diagramDirty, true, 'dirty diagram phải còn');
+  assert.equal(model.state.savingCase, false);
+  assert.equal(model.state.busy, null);
+});
+
+test('B5 saveCase lỗi mạng/validation: giữ dirty, không thay model', async () => {
+  const client = { run: async () => ({ ok: false, error: {
+    code: 'engine_unavailable', message: 'mat ket noi' } }) };
+  const model = seedSaveCaseModel(client);
+  model.updateAssetField('a1', 'so_serial', 'S-002');
+  const r = await model.saveCase();
+  assert.equal(r.ok, false);
+  assert.equal(model.state.caseId, 42);
+  assert.equal(model.state.revision, 3);
+  assert.equal(model.state.stage.assets[0].so_serial, 'S-002');
+  assert.equal(model.state.stageDirty, true);
+  assert.equal(model.state.error.code, 'engine_unavailable');
+  assert.equal(model.state.notice, null, 'không báo thành công khi lỗi');
+
+  const fieldClient = { run: async () => ({ ok: false, error: {
+    code: 'stage_validation_error', message: 'loi field',
+    details: { field_errors: [{ row_id: 'c1', field: 'ho_ten',
+                                code: 'required', message: 'bat buoc' }] } } }) };
+  const m2 = seedSaveCaseModel(fieldClient);
+  const r2 = await m2.saveCase();
+  assert.equal(r2.ok, false);
+  assert.equal(m2.state.fieldErrors.length, 1);
+  assert.equal(m2.state.stageDirty, false,
+    'seed stage chưa dirty nhưng lỗi không được ghi đè model');
+});
+
+test('B5 saveCase: khóa snapshot thứ hai và bỏ response thành công của session cũ', async () => {
+  let resolveSave;
+  const calls = [];
+  const saveCalls = [];
+  const client = { run: (cmd, payload) => {
+    calls.push([cmd, payload]);
+    if (cmd === 'notary.workspace_source_latest') {
+      return Promise.resolve({ ok: true, data: {
+        schema_version: SCHEMA, backend_mode: 'mock',
+        source_case_id: null, source_status: null,
+        stage: { people: [], assets: [] } } });
+    }
+    saveCalls.push([cmd, payload]);
+    return new Promise((resolve) => { resolveSave = resolve; });
+  } };
+  const model = seedSaveCaseModel(client);
+  const pending = model.saveCase();
+  assert.equal(model.state.savingCase, true);
+  assert.equal(model.canWrite(), false, 'editor phải bị khóa khi đang lưu');
+  const second = await model.saveCase();
+  assert.equal(second.ok, false, 'không cho snapshot thứ hai chen vào');
+  assert.equal(saveCalls.length, 1);
+  assert.equal(model.updatePersonField('c1', 'ho_ten', 'Gõ chen'), undefined);
+  assert.equal(model.state.stage.people[0].ho_ten, 'Người Đã Lưu',
+    'mutator bị chặn trong lúc lưu');
+
+  // Người dùng mở nháp khác trước khi response cũ về.
+  await model.newDraft('inheritance');
+  resolveSave({ ok: true, data: savedWorkspace(saveCalls[0][1], 4) });
+  const r = await pending;
+  assert.equal(r.ok, true);
+  assert.equal(model.state.caseId, null, 'response cũ không được ghi đè');
+  assert.equal(model.state.status, 'ready');
+  assert.equal(model.state.diagramDirty, true, 'nháp mới giữ dirty seed');
+  assert.equal(model.state.notice, null);
+  assert.equal(model.state.savingCase, false);
+});
+
+// ---------- nhãn trạng thái nghiệp vụ (D2) ----------
+
+test('statusLabel: draft→Nháp, done→Đã lưu, giữ nguyên dirty/unknown', async () => {
+  const { model } = makeModel(seedCases('ready', 'done'));
+  await model.openCase(42);
+  assert.equal(model.state.stageDirty, false);
+  assert.equal(model.statusLabel(), 'Nháp');
+
+  await model.openCase(44);
+  assert.equal(model.state.caseInfo.status, 'done');
+  assert.equal(model.statusLabel(), 'Đã lưu');
+  model.addPerson();
+  assert.equal(model.state.stageDirty, true,
+    'case Done phải dirty khi sửa');
+  assert.equal(model.statusLabel(), 'Đã lưu',
+    'Done + local dirty vẫn Đã lưu (nhãn độc lập chấm dirty)');
+
+  model.state.caseInfo.status = 'archived';
+  assert.equal(model.statusLabel(), 'archived');
+
+  await model.newDraft('inheritance');
+  assert.equal(model.statusLabel(), 'Nháp',
+    'nháp mới đọc caseInfo.status=draft, không suy từ isDraft');
+});
+
+test('saveCase thành công: thay model bằng workspace, xóa ba dirty flag', async () => {
+  const calls = [];
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    return { ok: true, data: savedWorkspace(payload, 8) };
+  } };
+  const model = seedSaveCaseModel(client);
+  model.updatePersonField('c1', 'ho_ten', 'Người Lưu');
+  model.updateCaseMeta('noi_niem_yet', 'Xã A');
+  const r = await model.saveCase();
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.equal(calls.length, 1);
+  const p = calls[0][1];
+  assert.equal(p.case.noi_niem_yet, 'Xã A');
+  assert.equal(p.stage.people[0].ho_ten, 'Người Lưu');
+  assert.deepEqual(p.docx_import, { version: 1, sources: [] });
+  const s = model.state;
+  assert.equal(s.caseId, 42);
+  assert.equal(s.revision, 8);
+  assert.equal(s.status, 'ready');
+  assert.equal(s.caseInfo.status, 'done');
+  assert.equal(s.stage.people[0].ho_ten, 'Người Lưu');
+  assert.equal(s.stageDirty, false);
+  assert.equal(s.diagramDirty, false);
+  assert.equal(s.metaDirty, false);
+  assert.equal(s.notice, null, 'R14: không toast chữ thành công');
+  assert.equal(s.savingCase, false);
+});
+
+// ---------- đợt 5 / E2: duplicateCase — key theo ý định + session guard ----------
+
+test('duplicateCase: timeout giữ key để retry, success đổi key + hydrate bản sao', async () => {
+  const { model, client } = makeModel(seedCases('ready', 'done'));
+  await model.openCase(42);
+  const sourceBefore = JSON.parse(JSON.stringify(client.cases[44]));
+  const realRun = client.run.bind(client);
+  const dupCalls = [];
+  let failOnce = true;
+  client.run = async (cmd, payload) => {
+    if (cmd === 'notary.workspace_duplicate') {
+      dupCalls.push(JSON.parse(JSON.stringify(payload)));
+      if (failOnce) {
+        failOnce = false;
+        throw new Error('timeout');
+      }
+    }
+    return realRun(cmd, payload);
+  };
+
+  const first = await model.duplicateCase(44);
+  assert.equal(first.ok, false);
+  const kept = model.state.duplicatePending;
+  assert.ok(kept, 'timeout phải giữ pending key');
+  assert.equal(kept.sourceId, 44);
+  assert.equal(model.state.duplicating, null);
+  assert.equal(model.state.caseId, 42, 'lỗi giữ workspace cũ');
+
+  const second = await model.duplicateCase(44);
+  assert.equal(second.ok, true);
+  assert.equal(second.data.created, true);
+  assert.equal(dupCalls[1].idempotency_key, kept.key,
+    'retry cùng ý định phải dùng lại key');
+  assert.equal(dupCalls[1].source_case_id, 44);
+  assert.equal(model.state.caseId, second.data.case.id);
+  assert.equal(model.state.caseInfo.status, 'draft');
+  assert.equal(model.state.revision, 1);
+  assert.equal(model.state.stageDirty, false);
+  assert.equal(model.state.diagramDirty, false);
+  assert.equal(model.state.metaDirty, false);
+  assert.equal(model.state.duplicatePending, null);
+  assert.equal(model.state.notice, null, 'R14: không toast chữ thành công');
+  assert.deepEqual(client.cases[44], sourceBefore, 'không sửa nguồn');
+
+  const third = await model.duplicateCase(44);
+  assert.equal(third.ok, true);
+  assert.notEqual(dupCalls[2].idempotency_key, dupCalls[1].idempotency_key,
+    'ý định sau success phải có key mới');
+  assert.notEqual(third.data.case.id, second.data.case.id);
+});
+
+test('duplicateCase: lỗi nghiệp vụ không giữ key; stale response không áp', async () => {
+  const { model, client } = makeModel(seedCases('ready', 'done'));
+  await model.openCase(42);
+  const missing = await model.duplicateCase(999);
+  assert.equal(missing.ok, false);
+  assert.equal(missing.error.code, 'case_not_found');
+  assert.equal(model.state.duplicatePending, null);
+  assert.equal(model.state.caseId, 42);
+
+  const realRun = client.run.bind(client);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let dupPayload = null;
+  client.run = (cmd, payload) => {
+    if (cmd === 'notary.workspace_duplicate') {
+      dupPayload = JSON.parse(JSON.stringify(payload));
+      return gate.then(() => realRun(cmd, payload));
+    }
+    return realRun(cmd, payload);
+  };
+  const pending = model.duplicateCase(44);
+  await Promise.resolve();
+  assert.equal(model.state.duplicating, 44);
+  assert.equal(model.canWrite(), false, 'đang nhân bản khóa sửa');
+  await model.openCase(42);          // phiên đổi trước khi response về
+  release();
+  const late = await pending;
+  assert.equal(late.ok, true);
+  assert.equal(dupPayload.source_case_id, 44);
+  assert.equal(model.state.caseId, 42, 'response bản sao của phiên cũ bị bỏ');
+  assert.equal(model.state.duplicating, null);
+});
+
+// G3: trang thai loi hien thi phai thay the theo lan ghi gan nhat —
+// banner cu (state.error) khong duoc treo qua lan bam sau.
+function scriptedFailClient(responses) {
+  let i = 0;
+  return { run: async () => responses[Math.min(i++, responses.length - 1)] };
+}
+
+test('G3 saveCase: moi lan loi chi bat dung kenh cua lan do', async () => {
+  const owner = { ok: false, error: {
+    code: 'workspace_owner_required', message: 'chua chon owner' } };
+  const field = { ok: false, error: {
+    code: 'stage_validation_error', message: 'loi field',
+    details: { field_errors: [{ row_id: 'c1', field: 'ho_ten',
+                                code: 'required', message: 'bat buoc' }] } } };
+  const diagram = { ok: false, error: {
+    code: 'diagram_invalid_state', message: 'so do sai',
+    details: { errors: [{ code: 'missing_land_owner',
+                          message: 'thieu chu dat' }] } } };
+  const model = seedSaveCaseModel(
+    scriptedFailClient([owner, field, diagram, owner]));
+
+  // (a) loi thuong → banner bat, khong co loi field/diagram
+  const r1 = await model.saveCase();
+  assert.equal(r1.ok, false);
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  assert.deepEqual(model.state.fieldErrors, []);
+  assert.deepEqual(model.state.diagramErrors, []);
+
+  // (b) stage_validation_error → fieldErrors moi, banner tat
+  const r2 = await model.saveCase();
+  assert.equal(r2.error.code, 'stage_validation_error');
+  assert.equal(model.state.error, null, 'banner cua lan truoc phai tat');
+  assert.equal(model.state.fieldErrors.length, 1);
+  assert.equal(model.state.fieldErrors[0].field, 'ho_ten');
+  assert.deepEqual(model.state.diagramErrors, []);
+
+  // (c) diagram_invalid_state → diagramErrors moi, fieldErrors + banner sach
+  const r3 = await model.saveCase();
+  assert.equal(r3.error.code, 'diagram_invalid_state');
+  assert.equal(model.state.error, null);
+  assert.deepEqual(model.state.fieldErrors, []);
+  assert.equal(model.state.diagramErrors.length, 1);
+  assert.equal(model.state.diagramErrors[0].code, 'missing_land_owner');
+
+  // (d) loi thuong lai → ca hai kenh field/diagram sach, banner moi
+  const r4 = await model.saveCase();
+  assert.equal(r4.error.code, 'workspace_owner_required');
+  assert.equal(model.state.error.code, 'workspace_owner_required');
+  assert.deepEqual(model.state.fieldErrors, []);
+  assert.deepEqual(model.state.diagramErrors, []);
+});
+
+test('G3 saveCase case cu: stage_validation_error tat banner cu', async () => {
+  const field = { ok: false, error: {
+    code: 'stage_validation_error', message: 'loi field',
+    details: { field_errors: [{ row_id: 'a1', field: 'so_serial',
+                                code: 'required', message: 'bat buoc' }] } } };
+  const model = seedSaveCaseModel(scriptedFailClient([field]));
+  model.state.stageDirty = true;
+  model.state.error = { code: 'workspace_owner_required', message: 'cu' };
+  model.state.diagramErrors = [{ code: 'missing_land_owner' }];
+
+  const r = await model.saveCase();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'stage_validation_error');
+  assert.equal(model.state.error, null, 'banner cu phai tat');
+  assert.equal(model.state.fieldErrors.length, 1);
+  assert.equal(model.state.fieldErrors[0].field, 'so_serial');
+  assert.deepEqual(model.state.diagramErrors, []);
+});
+
+// G3: sua du lieu lien quan phai don loi cua lan Luu truoc.
+test('G3 setOwnerRow: chon duoc owner → tat banner workspace_owner_required', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const people = model.state.stage.people;
+  const other = people.find(
+    (p) => p.row_id !== model.state.stage.owner_row_id);
+  model.state.error = { code: 'workspace_owner_required', message: 'cu' };
+
+  assert.equal(model.setOwnerRow(other.row_id), true);
+  assert.equal(model.state.error, null,
+               'da co owner thi banner chua-owner phai tat');
+});
+
+test('G3 setOwnerRow: go owner (null) → banner workspace_owner_required con', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  assert.ok(model.state.stage.owner_row_id);
+  model.state.error = { code: 'workspace_owner_required', message: 'cu' };
+  model.state.diagramErrors = [{ code: 'missing_land_owner' }];
+
+  assert.equal(model.setOwnerRow(null), true);
+  assert.equal(model.state.error.code, 'workspace_owner_required',
+               'chua co owner thi nguyen nhan con — giu banner');
+  assert.deepEqual(model.state.diagramErrors, [],
+                   'go owner van la sua so do');
+});
+
+test('G3 toggleNodePosition: sua so do → diagramErrors sach', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.diagramErrors = [{ code: 'missing_land_owner' }];
+
+  assert.equal(model.toggleNodePosition('spouse', 'receive', 2), true);
+  assert.deepEqual(model.state.diagramErrors, []);
+});
+
+test('G3 addAsset: chi don loi danh sach assets, giu loi khac', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.fieldErrors = [
+    { row_id: null, field: 'assets', code: 'required', message: 'chua co' },
+    { row_id: 'a1', field: 'so_serial', code: 'required', message: 'bat buoc' },
+  ];
+
+  assert.ok(model.addAsset({ so_serial: 'G1-9', so_thua_dat: '1', so_to_ban_do: '1' }));
+  assert.deepEqual(model.state.fieldErrors,
+                   [{ row_id: 'a1', field: 'so_serial', code: 'required',
+                      message: 'bat buoc' }]);
+});
+
+test('G3 addPerson: chi don loi danh sach people, giu loi khac', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  model.state.fieldErrors = [
+    { row_id: null, field: 'people', code: 'required', message: 'chua co' },
+    { row_id: 'a1', field: 'so_serial', code: 'required', message: 'bat buoc' },
+  ];
+
+  assert.ok(model.addPerson({ ho_ten: 'Nguoi Moi' }));
+  assert.deepEqual(model.state.fieldErrors,
+                   [{ row_id: 'a1', field: 'so_serial', code: 'required',
+                      message: 'bat buoc' }]);
+});
+
+// ---- D-048 (owner S5b): tài sản bắt buộc so_thua_dat + so_to_ban_do ----
+
+test('D-048 saveCase: thiếu số thửa/tờ bản đồ → chặn client, không gửi wire', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  // Xóa sạch 2 trường bắt buộc của tài sản đầu (giữ dòng khác hợp lệ).
+  model.updateAssetField(model.state.stage.assets[0].row_id, 'so_thua_dat', '');
+  model.updateAssetField(model.state.stage.assets[0].row_id, 'so_to_ban_do', '');
+  const savesBefore = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case').length;
+  const r = await model.saveCase();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'stage_validation_error');
+  const fe = r.error.details.field_errors;
+  assert.equal(fe.length, 2);
+  assert.deepEqual(
+    fe.map((e) => e.field).sort(), ['so_thua_dat', 'so_to_ban_do']);
+  for (const e of fe) {
+    assert.equal(e.row_id, model.state.stage.assets[0].row_id);
+    assert.equal(e.code, 'required');
+  }
+  const savesAfter = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case').length;
+  assert.equal(savesAfter, savesBefore, 'không gọi IPC khi thiếu trường bắt buộc');
+  // Stage giữ nguyên draft (không chuyển trạng thái lưu); '' được model
+  // chuẩn hóa thành null theo ASSET_FIELDS.
+  assert.ok(model.state.stage.assets[0].so_thua_dat == null,
+            'giá trị vẫn trống trong draft');
+});
+
+test('D-048 saveCase: đủ số thửa + tờ bản đồ → đi tiếp tới wire', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const r = await model.saveCase();
+  if (!r.ok && r.error.code === 'stage_validation_error') {
+    assert.fail('tài sản fixture hợp lệ mà vẫn bị chặn: ' +
+                JSON.stringify(r.error.details));
+  }
+  assert.ok(client.calls.some(
+    (c) => c.command === 'notary.workspace_save_case'));
+});
+
+test('D-048 updateField: lưu bị chặn → sửa đủ trường → gỡ lỗi row đó', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const a0 = model.state.stage.assets[0];
+  model.updateAssetField(a0.row_id, 'so_thua_dat', '');
+  model.updateAssetField(a0.row_id, 'so_to_ban_do', '');
+  const first = await model.saveCase();
+  assert.equal(first.ok, false);
+  assert.equal(model.state.fieldErrors.filter(
+    (e) => e.field === 'so_thua_dat' || e.field === 'so_to_ban_do').length, 2);
+  model.updateAssetField(a0.row_id, 'so_thua_dat', '99');
+  const left = model.state.fieldErrors.filter(
+    (e) => e.field === 'so_thua_dat' || e.field === 'so_to_ban_do');
+  assert.equal(left.length, 1);
+  assert.equal(left[0].field, 'so_to_ban_do');
+  // Sửa nốt → save không còn bị chặn bởi gate này.
+  model.updateAssetField(a0.row_id, 'so_to_ban_do', '8');
+  const second = await model.saveCase();
+  if (!second.ok && second.error.code === 'stage_validation_error') {
+    assert.fail('đã sửa đủ trường mà vẫn chặn: ' +
+                JSON.stringify(second.error.details));
+  }
 });

@@ -89,7 +89,11 @@
             ],
             "receivePositions": [],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [
+              "spouse"
+            ],
+            "spouseSuggestionId": null
           },
           {
             "id": "spouse",
@@ -101,7 +105,11 @@
               1
             ],
             "hidden": false,
-            "deleted": false
+            "deleted": false,
+            "spouseSlotIds": [
+              "owner"
+            ],
+            "spouseSuggestionId": null
           }
         ]
       }

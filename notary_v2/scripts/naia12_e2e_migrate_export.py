@@ -28,8 +28,9 @@ Bằng chứng sinh ra (tách theo tầng):
   * ``batch``      — export_options + từng document result + assertion nội
                      dung (người được ủy quyền, nơi niêm yết, diện tích từng
                      dòng đất) trích từ DOCX đầu ra;
-  * ``negative``   — cùng batch trên hồ sơ THIẾU vai trò ủy quyền phải fail
-                     bằng ``word.missing_authorized_person``;
+  * ``negative``   — cùng batch trên hồ sơ THIẾU vai trò ủy quyền: theo
+                     W6/W8 vẫn xuất nhưng phải ghi "người được ủy quyền N"
+                     vào ``missing`` và không lộ tên đại diện;
   * ``format_compare`` — so khung cấu trúc/định dạng nguồn->đích (docx->docx:
                      section, bảng, đoạn, header/footer, style, font) và
                      ComputeStatistics qua Word COM khi có Word;
@@ -127,32 +128,90 @@ def _synthetic_case(*, with_proxy: bool = True):
          "ngay_sinh": p.ngay_sinh.isoformat() if p.ngay_sinh else None,
          "ngay_chet": p.ngay_chet.isoformat() if p.ngay_chet else None,
          "so_giay_to": p.so_giay_to, "ngay_cap": None, "noi_cap": p.noi_cap,
-         "dia_chi": p.dia_chi, "loai_dia_chi": p.loai_dia_chi}
+         "dia_chi": p.dia_chi, "loai_dia_chi": p.loai_dia_chi,
+         "loai_giay_to": p.loai_giay_to}
         for p in people
     ]
+    person_rows = [
+        SimpleNamespace(
+            row_id=f"row-{p.id}", customer_id=p.id, vitri=index + 1,
+            ho_ten=p.ho_ten, gioi_tinh=p.gioi_tinh,
+            ngay_sinh=p.ngay_sinh.isoformat() if p.ngay_sinh else None,
+            ngay_chet=p.ngay_chet.isoformat() if p.ngay_chet else None,
+            so_giay_to=p.so_giay_to,
+            ngay_cap=p.ngay_cap.isoformat() if p.ngay_cap else None,
+            noi_cap=p.noi_cap, dia_chi=p.dia_chi,
+            place_of_origin=getattr(p, "place_of_origin", None),
+            loai_giay_to=getattr(p, "loai_giay_to", None),
+            loai_dia_chi=getattr(p, "loai_dia_chi", None))
+        for index, p in enumerate(people)
+    ]
+    asset_rows = []
+    for index, property_ in enumerate(properties):
+        land = json.loads(property_.land_rows_json or "[]")
+        asset_rows.append(SimpleNamespace(
+            row_id=f"asset-{index + 1}", property_id=None,
+            vitri=index + 1, so_serial=property_.so_serial,
+            so_vao_so=property_.so_vao_so,
+            so_thua_dat=property_.so_thua_dat,
+            so_to_ban_do=property_.so_to_ban_do,
+            dia_chi=property_.dia_chi, loai_so=property_.loai_so,
+            hinh_thuc_su_dung=property_.hinh_thuc_su_dung,
+            thoi_han=property_.thoi_han, nguon_goc=property_.nguon_goc,
+            ngay_cap=property_.ngay_cap,
+            co_quan_cap=property_.co_quan_cap,
+            land_rows_present=True,
+            land_rows=[SimpleNamespace(
+                vitri=land_index + 1, loaidat=row.get("loai_dat"),
+                dientich=row.get("dien_tich"), thoihan=row.get("thoi_han"))
+                for land_index, row in enumerate(land)]))
     case_state = json.dumps({
-        "schemaVersion": 1, "stage": stage,
-        "diagram": {"engineState": {"nodes": [
-            {"id": "n1", "personId": "1", "role": "Owner",
-             "isLandOwner": True, "hidden": False, "deleted": False},
-            {"id": "n2", "personId": "2", "role": "Con",
-             "willReceive": True, "isLandOwner": False,
-             "hidden": False, "deleted": False},
-        ]}},
+        "schemaVersion": 4, "stage": stage,
+        "owner_row_id": person_rows[0].row_id,
+        "diagram": {
+            "state": {"version": 3, "domain": "inheritance", "nodes": [
+                {"id": "n1", "personId": person_rows[0].row_id,
+                 "role": "Owner", "isLandOwner": True,
+                 "spouseSlotIds": [], "spouseSuggestionId": None,
+                 "hidden": False, "deleted": False},
+                {"id": "n2", "personId": person_rows[1].row_id,
+                 "role": "Con", "willReceive": True, "isLandOwner": False,
+                 "spouseSlotIds": [], "spouseSuggestionId": None,
+                 "hidden": False, "deleted": False},
+            ]},
+            "engineState": {"nodes": [
+                {"id": "n1", "personId": "1", "role": "Owner",
+                 "isLandOwner": True,
+                 "spouseSlotIds": [], "spouseSuggestionId": None,
+                 "hidden": False, "deleted": False},
+                {"id": "n2", "personId": "2", "role": "Con",
+                 "willReceive": True, "isLandOwner": False,
+                 "spouseSlotIds": [], "spouseSuggestionId": None,
+                 "hidden": False, "deleted": False},
+            ]},
+        },
     }, ensure_ascii=False)
     participants = [_participant(receiver, "Con")]
     if with_proxy:
         participants.append(
             _participant(proxy, "Người được ủy quyền", receive=False))
+    by_entity = {row.customer_id: row.row_id for row in person_rows}
+    for participant in participants:
+        participant.case_person_row_id = by_entity.get(participant.customer_id)
     return SimpleNamespace(
         id=99, nguoi_chet=owner, tai_san=properties[0],
         property_links=[
             SimpleNamespace(property=p, is_primary=(p is properties[0]), id=i)
             for i, p in enumerate(properties)],
         ngay_lap_ho_so=date(2026, 7, 3), loai_van_ban="thoa_thuan",
+        trang_thai="draft", workspace_revision=1,
         noi_niem_yet=NIEM_YET,
+        nguoi_nhan_uy_quyen=None, nguoi_nhan_uy_quyen_id=None,
+        noi_dung_viec=None,
         ghi_chu="Hồ sơ kiểm chứng NAIA-12",
         participants=participants,
+        person_rows=person_rows,
+        asset_rows=asset_rows,
         case_state_json=case_state,
     )
 
@@ -665,8 +724,9 @@ def _fixture_lookup(token: str, fixture: dict):
                 fixture["props"][0], "thoi_han", "") or "")
         return True, value
     if normalized == "loai dat":
-        return True, str(getattr(
-            fixture["props"][0], "loai_dat", "") or "")
+        # Storage B không có trường "loại đất tổng" cấp tài sản; dữ kiện
+        # nằm ở từng cụm đất nên token tổng xuất rỗng.
+        return True, ""
     if normalized in ("thoi han", "tho han"):
         return True, str(getattr(
             fixture["props"][0], "thoi_han", "") or "")
@@ -754,6 +814,9 @@ def _fixture_prop_field(prop, field_norm: str, fixture: dict, asset: int) -> str
         return _area_in_words(fixture, asset)
     if field_norm == "muc dich su dung":
         return fixture["purpose"](asset)
+    if field_norm == "loai dat":
+        # Không còn nguồn asset-level trong B — xem `_lookup_expected`.
+        return ""
     attr = _PROP_FIELD_ATTR.get(field_norm)
     if attr is None:
         return ""
@@ -1835,12 +1898,29 @@ def run(src_dir: Path, out_dir: Path) -> dict:
             # rỗng (job lỗi không result_data) KHÔNG được tính là pass.
             returned_keys = {d["document_key"] for d in neg_docs}
             missing_results = sorted(set(uq_keys) - returned_keys)
-            bad = [
-                d["document_key"] for d in neg_docs
-                if d["status"] != "failed"
-                or (d.get("error") or {}).get("code")
-                != "word.missing_authorized_person"]
-            leaked = list(exports_neg_dir.glob("*_HS-*.docx"))
+            # W6/W8 (ce798f9, owner 23/10): thiếu người được ủy quyền KHÔNG
+            # chặn xuất nữa — file vẫn lưu nhưng phải ghi "người được ủy
+            # quyền N" vào `missing` cho MỌI slot mẫu đòi, và không được lộ
+            # tên đại diện (hồ sơ phản ví dụ không có ai được ủy quyền).
+            bad = []
+            leaked = []
+            for d in neg_docs:
+                key = d["document_key"]
+                slots = word_engine.required_authorized_slots(
+                    docx.Document(str(migrated_dir / key)))
+                need = {f"người được ủy quyền {n}" for n in slots}
+                if (d["status"] != "saved"
+                        or not need <= set(d.get("missing") or [])):
+                    bad.append(key)
+                    continue
+                path = (d.get("output_file") or {}).get("path")
+                outs = ([Path(path)] if path
+                        else list(exports_neg_dir.glob(f"*{Path(key).stem}*.docx")))
+                for out_file in outs:
+                    text = "\n".join(
+                        p.text for p in docx.Document(str(out_file)).paragraphs)
+                    if PROXY_NAME in text:
+                        leaked.append(out_file)
             ok_neg = (not bad and not leaked and not missing_results
                       and len(neg_docs) == len(uq_keys))
             negative = {
@@ -1849,6 +1929,7 @@ def run(src_dir: Path, out_dir: Path) -> dict:
                 "documents": [
                     {"document_key": d["document_key"],
                      "status": d["status"],
+                     "missing": d.get("missing"),
                      "error_code": (d.get("error") or {}).get("code")}
                     for d in neg_docs],
                 "missing_results": missing_results,
@@ -1856,7 +1937,7 @@ def run(src_dir: Path, out_dir: Path) -> dict:
                 "outputs_leaked": [p.name for p in leaked],
             }
             check(
-                "negative.missing_authorized_fails", ok_neg,
+                "negative.missing_authorized_noted", ok_neg,
                 f"{len(neg_docs)}/{len(uq_keys)} văn bản UQ có kết quả; "
                 f"bad={bad[:5]}; thiếu result={missing_results[:5]}; "
                 f"leaked={len(leaked)}")

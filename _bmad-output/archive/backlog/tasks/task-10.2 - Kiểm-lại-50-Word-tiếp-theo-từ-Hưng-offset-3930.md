@@ -24,7 +24,7 @@ ordinal: 12000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Owner yêu cầu Devin đang sống trong worktree kiểm khoảng 50 file từ điểm quét dở sau TASK-10.1. Dùng working tree hiện tại, đọc nguồn rồi đối chiếu từng trường; mã R chỉ hỗ trợ cảnh báo. Chỉ kiểm và ghi bằng chứng, không sửa code/spec/Word hay commit/push; F01/F04/F05 vẫn chờ.
+Owner yêu cầu Devin đang sống trong worktree kiểm khoảng 50 file từ điểm quét dở sau TASK-10.1. Dùng working tree hiện tại, đọc nguồn rồi đối chiếu từng trường; mã R chỉ hỗ trợ cảnh báo. Chỉ kiểm và ghi bằng chứng, không sửa code/spec/Word hay commit/push; F04/F05 vẫn chờ.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -53,7 +53,7 @@ Owner yêu cầu Devin đang sống trong worktree kiểm khoảng 50 file từ 
 <!-- SECTION:NOTES:BEGIN -->
 Đã gửi một lần vào terminal Devin term_a62029ff-58d4-4b3e-a944-efbb85ddee76 đúng worktree. Orca receipt accepted=true/input_accepted; provider unsupported nên chưa chứng minh turn_started. Không gửi lặp. Prompt .agents/task-10.2/devin-request.md, receipt .agents/task-10.2/send-receipt.json. Báo cáo đích .agents/task-10.2/RESULT.md.
 
-Kiem xong 50/50 file offset 3930-3979 (Hung). Engine 2026-10-12-field-standard-review. Doc duoc 50/50, extract 50/50, 0 loi doc. PASS 28 (22 danh muc rong dung + 6 file khop het truong). DIFF 22 = loi may that, 7 nhom (DIFFS.md): E1 mat Trieu Tuan Anh khi dai dien+chuc danh+CCCD 1 dong (13 file); E2 'Dai dien ong' khong ':' (3931); E3 'Dai dien :' giua dong TAB (3943); E4 so CCCD dinh 'do' -> noi_cap trong/lech (3944/3945); E5 danh sach dat theo GCN sot ban ghi (3945 sot2/2; 3955/3964/3968 sot 2/3); E6 dia chi thua truoc so thua -> mat dia_chi (3958); E7 thua nhieu truong 1 dong roi han (3970). Khong phat sinh F01/F04/F05. Moc tiep: offset 3980; gap kiem-tung-truong 3910-3929 con mo. Evidence: .agents/task-10.2/ (manifest+text+expected+actual+compare_report+quet_report+DIFFS+RESULT).
+Kiem xong 50/50 file offset 3930-3979 (Hung). Engine 2026-10-12-field-standard-review. Doc duoc 50/50, extract 50/50, 0 loi doc. PASS 28 (22 danh muc rong dung + 6 file khop het truong). DIFF 22 = loi may that, 7 nhom (DIFFS.md): E1 mat Trieu Tuan Anh khi dai dien+chuc danh+CCCD 1 dong (13 file); E2 'Dai dien ong' khong ':' (3931); E3 'Dai dien :' giua dong TAB (3943); E4 so CCCD dinh 'do' -> noi_cap trong/lech (3944/3945); E5 danh sach dat theo GCN sot ban ghi (3945 sot2/2; 3955/3964/3968 sot 2/3); E6 dia chi thua truoc so thua -> mat dia_chi (3958); E7 thua nhieu truong 1 dong roi han (3970). Khong phat sinh F04/F05. Moc tiep: offset 3980; gap kiem-tung-truong 3910-3929 con mo. Evidence: .agents/task-10.2/ (manifest+text+expected+actual+compare_report+quet_report+DIFFS+RESULT).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

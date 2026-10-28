@@ -196,7 +196,7 @@ test('adoptJobResult: website_select thanh cong doi scope, that bai giu cu', () 
   const ok = job('upload.website_select', 'succeeded', {
     workflow_version: V, website_id: 'khac', revision: 3, run_id: null,
     audit_id: null, browser_id: null, active_job_ids: [],
-    needs_reconcile_record_ids: [], has_excel: false, queue_revision: null,
+    has_excel: false, queue_revision: null,
   }, { jobId: 'job_w' });
   assert.equal(C.adoptJobResult(st, ok), true);
   assert.equal(st.websiteId, 'khac');
@@ -513,7 +513,7 @@ test('view: syncTbody empty→non-empty→empty khong de dong placeholder thua',
       workflow_version: V, website_id: 'nam_dinh', revision: 1,
       run_id: 'run_1', audit_id: null, browser_id: null,
       has_excel: true, queue_revision: 1,
-      needs_reconcile_record_ids: [], active_job_ids: ['job_q'],
+      active_job_ids: ['job_q'],
     }, { jobId: 'job_ws1', at: '2026-09-24T10:00:01Z' }));
     jobs.set('job_q', job('upload.queue_get', 'succeeded', {
       workflow_version: V, website_id: 'nam_dinh', run_id: 'run_1',
@@ -538,7 +538,6 @@ test('view: syncTbody empty→non-empty→empty khong de dong placeholder thua',
       workflow_version: V, website_id: 'nam_dinh', revision: 2,
       run_id: 'run_1', audit_id: null, browser_id: null,
       has_excel: true, queue_revision: 3,
-      needs_reconcile_record_ids: [],
       active_job_ids: ['job_q', 'job_q2'],
     }, { jobId: 'job_ws2', at: '2026-09-24T10:00:03Z' }));
     jobs.set('job_q2', job('upload.queue_get', 'succeeded', {
@@ -833,7 +832,7 @@ test('view: nut Audit theo capability/dang nhap/busy; ngay DD/MM/YYYY; confirm d
   jobs.set('ws', job('upload.workspace_get', 'succeeded', {
     workflow_version: V, website_id: 'fake_portal', revision: 1,
     run_id: null, audit_id: null, browser_id: 'br1', has_excel: false,
-    queue_revision: null, needs_reconcile_record_ids: [],
+    queue_revision: null,
     active_job_ids: ['job_sess'],
   }, { jobId: 'ws', at: '2026-09-24T10:00:02Z' }));
   // Dang nhap xong → tai mo; nap van khoa vi chua co file.
@@ -880,7 +879,7 @@ test('view: audit head khop audit_id/website; KPI + bang tu state.audit', async 
   jobs.set('ws', job('upload.workspace_get', 'succeeded', {
     workflow_version: V, website_id: 'fake_portal', revision: 1,
     run_id: null, audit_id: null, browser_id: null, has_excel: false,
-    queue_revision: null, needs_reconcile_record_ids: [],
+    queue_revision: null,
     active_job_ids: ['job_a'],
   }, { jobId: 'ws', at: '2026-09-24T10:00:01Z' }));
   jobs.set('job_a', job('upload.audit_excel', 'succeeded', {
@@ -947,7 +946,7 @@ test('view: loi nap hien tai cho voi huong dan; thanh cong xoa loi cu', async ()
   jobs.set('ws', job('upload.workspace_get', 'succeeded', {
     workflow_version: V, website_id: 'fake_portal', revision: 1,
     run_id: null, audit_id: null, browser_id: null, has_excel: false,
-    queue_revision: null, needs_reconcile_record_ids: [],
+    queue_revision: null,
     active_job_ids: ['job_af'],
   }, { jobId: 'ws', at: '2026-09-24T10:00:01Z' }));
   jobs.set('job_af', job('upload.audit_excel', 'failed', null, {
@@ -1008,7 +1007,7 @@ test('adoptJobResult: wsAppliedFor song sot setWebsite — khong ap lai', () => 
   const j = job('upload.workspace_get', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', revision: 3,
     run_id: 'r1', audit_id: null, browser_id: 'br1', has_excel: true,
-    queue_revision: 2, needs_reconcile_record_ids: [], active_job_ids: [],
+    queue_revision: 2, active_job_ids: [],
   }, { jobId: 'job_ws' });
   assert.equal(C.adoptJobResult(st, j), true);
   // Marker ghi SAU setWebsite → clearWebsiteScope (null→nam_dinh) khong
@@ -1032,7 +1031,7 @@ test('adoptJobResult: select tra website khac dich → mo pending + siteError',
     const j = job('upload.website_select', 'succeeded', {
       workflow_version: V, website_id: 'khac_hon', revision: 5,
       run_id: null, audit_id: null, browser_id: null, has_excel: false,
-      queue_revision: null, needs_reconcile_record_ids: [],
+      queue_revision: null,
       active_job_ids: [],
     }, { jobId: 'job_w' });
     assert.equal(C.adoptJobResult(st, j), true);
@@ -1182,8 +1181,6 @@ test('adoptJobResult: prepare partial → remaining + session active + '
     workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
     browser_id: 'br1',
     summary: { prepared_count: 9, remaining: 19 },
-    saved_record_ids: [2, 4],
-    needs_reconcile_record_ids: [],
     breakdown: { succeeded: 9, failed: 1 },
   }, { jobId: 'job_p1', error: {
     code: 'upload.partial_failure', message: '1 ho so that bai',
@@ -1193,11 +1190,9 @@ test('adoptJobResult: prepare partial → remaining + session active + '
   assert.equal(st.uploadSessionActive, true);
   assert.equal(st.prepareError.code, 'upload.partial_failure');
   assert.equal(st.queueFor, null,
-    'queue phai duoc fetch lai sau dot (saved/needs doi)');
-  // Saved da xac minh → roi selection + danh dau savedIds.
-  assert.equal(st.selectedIds.has(2), false);
-  assert.equal(st.selectedIds.has(4), false);
-  assert.deepEqual([...st.savedIds].sort((a, b) => a - b), [2, 4]);
+    'queue phai duoc fetch lai sau dot (trang thai prepared doi)');
+  // Ket qua chi la tien do chuan bi: lua chon nguoi dung khong bi doi.
+  assert.deepEqual([...st.selectedIds].sort((a, b) => a - b), [2, 4, 6]);
 });
 
 test('adoptJobResult: prepare terminal khong data — loi tai cho; '
@@ -1267,7 +1262,6 @@ test('adoptJobResult: prepare progress cap nhat remaining trong luc chay', () =>
     workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
     browser_id: 'br1',
     summary: { prepared_count: 10, remaining: 18 },
-    saved_record_ids: [], needs_reconcile_record_ids: [],
     breakdown: { succeeded: 10, failed: 0 },
   }, { jobId: 'job_p', error: null });
   C.adoptJobResult(st, done);
@@ -1275,13 +1269,11 @@ test('adoptJobResult: prepare progress cap nhat remaining trong luc chay', () =>
   assert.equal(st.remaining, 18);
 });
 
-test('adoptJobResult: session_status tab snapshot — saved roi bang, '
-     + 'closed/unknown can doi chieu', () => {
+test('adoptJobResult: session_status tab snapshot chi la tai nguyen', () => {
   const st = S.createUploadState();
   st.websiteId = 'nam_dinh';
   st.runId = 'r1';
   st.browserId = 'br1';
-  st.uploadSessionActive = true;
   st.queueJobId = 'job_q';
   C.adoptJobResult(st, job('upload.queue_get', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
@@ -1298,22 +1290,21 @@ test('adoptJobResult: session_status tab snapshot — saved roi bang, '
   const j = job('upload.session_status', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
     login: { status: 'authenticated', checked_at: '2026-09-24T10:00:00Z' },
-    tabs: { open_record_ids: [8], saved_record_ids: [2],
-            closed_record_ids: [6], unknown_record_ids: [7] },
+    tabs: { open_record_ids: [8], closed_record_ids: [6],
+            unknown_record_ids: [7] },
   });
   assert.equal(C.adoptJobResult(st, j), true);
-  assert.equal(st.rowIds.has(2), false, 'da xac minh Luu → roi bang');
-  assert.equal(st.selectedIds.has(2), false);
   assert.deepEqual([...st.openTabIds], [8]);
-  assert.deepEqual([...st.needsReconcileIds].sort((a, b) => a - b), [6, 7]);
-  assert.equal(st.rowIds.has(6), true,
-    'closed KHONG duoc coi la saved — van con trong bang');
-  assert.equal(st.rowIds.has(7), true,
-    'unknown KHONG duoc coi la saved — van con trong bang');
+  // Moi dong van con trong bang; khong co co che suy ket qua Luu.
+  for (const id of [2, 6, 7, 8]) {
+    assert.equal(st.rowIds.has(id), true, `row ${id} bi an khoi bang`);
+    assert.equal(st.selectedIds.has(id), true, `row ${id} bi bo chon`);
+  }
+  assert.equal(st.sessionTabs.closed_record_ids.length, 1);
 });
 
-test('adoptJobResult: session_close → needs_reconcile + het phien + '
-     + 'queue refetch', () => {
+test('adoptJobResult: session_close → het phien, tra tai nguyen, khong '
+     + 'doi ket qua Luu', () => {
   const st = S.createUploadState();
   st.websiteId = 'nam_dinh';
   st.runId = 'r1';
@@ -1322,60 +1313,26 @@ test('adoptJobResult: session_close → needs_reconcile + het phien + '
   st.remaining = 19;
   st.queueFor = { runId: 'r1', auditId: 'a1' };
   st.openTabIds = new Set([6, 7]);
-  st.sessionTabs = { open_record_ids: [6, 7], saved_record_ids: [],
-                     closed_record_ids: [], unknown_record_ids: [] };
+  st.sessionTabs = { open_record_ids: [6, 7], closed_record_ids: [],
+                     unknown_record_ids: [] };
   // session_close scope theo website+browser (khong can job tracking).
   const j = job('upload.session_close', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
-    closed: true, verified_record_ids: [],
-    needs_reconcile_record_ids: [6, 7],
+    closed: true, closed_record_ids: [6], unknown_record_ids: [7],
   }, { jobId: 'job_c' });
   assert.equal(C.adoptJobResult(st, j), true);
   assert.equal(st.uploadSessionActive, false);
-  assert.deepEqual([...st.needsReconcileIds].sort((a, b) => a - b), [6, 7]);
+  assert.notEqual(st.sessionClosedAt, null);
+  assert.equal(st.sessionTabs, null);
   assert.equal(st.openTabIds.size, 0);
   assert.equal(st.remaining, 0);
-  assert.equal(st.queueFor, null, 'queue phai fetch lai sau dong phien');
 });
 
-test('adoptJobResult: reconcile xac minh → saved roi bang + needs giam + '
-     + 'refetch; reconcile sai run bi tu choi', () => {
-  const st = S.createUploadState();
-  st.websiteId = 'nam_dinh';
-  st.runId = 'r1';
-  st.reconcileJobId = 'job_rc';
-  st.needsReconcileIds = new Set([6, 7]);
-  st.queueFor = { runId: 'r1', auditId: 'a2' };
-  const ok = job('upload.reconcile', 'succeeded', {
-    workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
-    audit_id: 'a2', verified_record_ids: [6],
-    needs_reconcile_record_ids: [7],
-  }, { jobId: 'job_rc' });
-  assert.equal(C.adoptJobResult(st, ok), true);
-  assert.equal(st.needsReconcileIds.has(6), false,
-    'verified → mo khoa needs_reconcile');
-  assert.equal(st.needsReconcileIds.has(7), true, 'con lai van giu');
-  assert.equal(st.queueFor, null);
-
-  // Result cua run khac khong duoc ap.
-  const st2 = S.createUploadState();
-  st2.websiteId = 'nam_dinh';
-  st2.runId = 'run_b';
-  st2.reconcileJobId = 'job_rc2';
-  const wrong = job('upload.reconcile', 'succeeded', {
-    workflow_version: V, website_id: 'nam_dinh', run_id: 'run_a',
-    audit_id: 'a2', verified_record_ids: [1],
-    needs_reconcile_record_ids: [],
-  }, { jobId: 'job_rc2' });
-  assert.equal(C.adoptJobResult(st2, wrong), false);
-});
-
-test('adoptJobResult: scan run moi giu needsReconcileIds website-scope', () => {
+test('adoptJobResult: scan run moi reset selection va nhan run moi', () => {
   const st = S.createUploadState();
   st.websiteId = 'nam_dinh';
   st.runId = 'run_cu';
   st.scanJobId = 'job_s';
-  st.needsReconcileIds = new Set([6, 7]);
   st.selectedIds = new Set([1]);
   const j = job('upload.scan', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', run_id: 'run_moi',
@@ -1383,74 +1340,8 @@ test('adoptJobResult: scan run moi giu needsReconcileIds website-scope', () => {
   }, { jobId: 'job_s' });
   assert.equal(C.adoptJobResult(st, j), true);
   assert.equal(st.runId, 'run_moi');
-  assert.equal(st.selectedIds.size, 0);
-  assert.deepEqual([...st.needsReconcileIds].sort((a, b) => a - b), [6, 7],
-    'ho so chua ro da Luu khong duoc bien mat khi quet run moi');
-});
-
-test('view: banner doi chieu + nut hanh dong theo needs_reconcile', async () => {
-  const { document } = makeDom();
-  const U = loadModule(document);
-  const L = require('../src/renderer/lib.js');
-  const jobs = new Map();
-  const view = U.buildView({
-    api: fakeApi(), L, jobs, notify: () => {},
-    entry: { id: 'upload', title: 'Upload Lab' },
-    module: { id: 'upload', namespaces: ['upload'], status: 'available' },
-    h: fakeHelpers(document, L),
-    submit: async () => null,
-  });
-  jobs.set('cat', job('upload.websites', 'succeeded', {
-    workflow_version: V,
-    websites: [{ website_id: 'fake_portal', label: 'Gia lap',
-                 display_url: 'http://127.0.0.1:9',
-                 capabilities: ['scan', 'prepare', 'reconcile'],
-                 status: 'available' }],
-    selected_website_id: 'fake_portal',
-  }, { jobId: 'cat', at: '2026-09-24T10:00:01Z' }));
-  jobs.set('ws', job('upload.workspace_get', 'succeeded', {
-    workflow_version: V, website_id: 'fake_portal', revision: 1,
-    run_id: 'run_1', audit_id: null, browser_id: null, has_excel: true,
-    queue_revision: 1, needs_reconcile_record_ids: [6, 7],
-    active_job_ids: ['job_q', 'job_d'],
-  }, { jobId: 'ws', at: '2026-09-24T10:00:02Z' }));
-  jobs.set('job_q', job('upload.queue_get', 'succeeded', {
-    workflow_version: V, website_id: 'fake_portal', run_id: 'run_1',
-    queue_revision: 1, has_excel: true,
-    folder_rows: [
-      { record_id: 6, contract_no: '6/2026', selected: true },
-      { record_id: 7, contract_no: '7/2026', selected: true },
-      { record_id: 8, contract_no: '8/2026', selected: true },
-    ],
-    missing_in_excel_record_ids: [6, 7, 8],
-  }, { jobId: 'job_q', at: '2026-09-24T10:00:03Z' }));
-  view.refresh();
-  const scanPanel = findById(view.el, 'ul-panel-scan-upload');
-  const banner = collect(scanPanel,
-    (e) => e.classList && e.classList.contains('ul-reconcile'))[0];
-  assert.ok(banner, 'thieu banner doi chieu');
-  assert.equal(banner.hidden, false, 'banner phai hien khi co needs');
-  assert.match(banner.textContent, /2 hồ sơ/);
-  assert.match(banner.textContent, /Nạp sổ Excel mới/,
-    'chua co Excel moi → hint huong dan nap so');
-  const reconBtn = collect(scanPanel,
-    (e) => e.classList && e.classList.contains('ul-reconcile-btn'))[0];
-  assert.ok(reconBtn, 'thieu nut Doi chieu');
-  assert.equal(reconBtn.disabled, true,
-    'chua nap so moi → nut doi chieu khoa');
-  // Dong can doi chieu duoc danh dau trong bang, khong bien mat.
-  const marked = collect(scanPanel, (e) =>
-    e.tagName === 'TR' && e.classList.contains('ul-row-reconcile'));
-  assert.equal(marked.length, 2);
-  // Download thanh cong → co file → nut doi chieu mo (cap + run + file).
-  jobs.set('job_d', job('upload.download_export', 'succeeded', {
-    workflow_version: V, website_id: 'fake_portal', browser_id: 'br1',
-    file_ref: { path: 'D:/x/so_moi.xlsx', scope: 'machine_local' },
-    from_date: '2026-01-01', to_date: '2026-09-24',
-  }, { jobId: 'job_d', at: '2026-09-24T10:00:04Z' }));
-  view.refresh();
-  assert.equal(reconBtn.disabled, false,
-    'co so Excel moi + capability → nut doi chieu mo');
+  assert.equal(st.selectedIds.size, 0,
+    'luot quet moi bo lua chon cua luot cu');
 });
 
 test('derive: prepare stale_revision → auto-retry mot lan voi revision '
@@ -1498,15 +1389,14 @@ test('derive: prepare stale_revision → auto-retry mot lan voi revision '
     workflow_version: V,
     websites: [{ website_id: 'fake_portal', label: 'Gia lap',
                  display_url: 'http://127.0.0.1:9',
-                 capabilities: ['scan', 'prepare', 'queue_get', 'reconcile'],
+                 capabilities: ['scan', 'prepare', 'queue_get'],
                  status: 'available' }],
     selected_website_id: 'fake_portal',
   }, { jobId: 'cat', at: '2026-09-24T10:00:01Z' }));
   jobs.set('ws', job('upload.workspace_get', 'succeeded', {
     workflow_version: V, website_id: 'fake_portal', revision: 1,
     run_id: 'r1', audit_id: 'a1', browser_id: 'br1', has_excel: true,
-    queue_revision: 1, needs_reconcile_record_ids: [],
-    active_job_ids: ['job_q0', 'ss1'],
+    queue_revision: 1,     active_job_ids: ['job_q0', 'ss1'],
   }, { jobId: 'ws', at: '2026-09-24T10:00:02Z' }));
   jobs.set('ss1', job('upload.session_status', 'succeeded', {
     workflow_version: V, website_id: 'fake_portal', browser_id: 'br1',
@@ -1543,8 +1433,7 @@ test('derive: prepare stale_revision → auto-retry mot lan voi revision '
     workflow_version: V, website_id: 'fake_portal', run_id: 'r1',
     browser_id: 'br1',
     summary: { prepared_count: 1, remaining: 2 },
-    saved_record_ids: [], needs_reconcile_record_ids: [],
-    breakdown: { succeeded: 1, failed: 0 },
+        breakdown: { succeeded: 1, failed: 0 },
   }, { jobId: 'user_1', at: '2026-09-24T10:00:08Z' }));
   view.refresh();
   await flush();
@@ -1624,15 +1513,13 @@ test('adoptJobs: prepare partial CU khong hoi sinh session sau '
     workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
     browser_id: 'br1',
     summary: { prepared_count: 9, remaining: 19 },
-    saved_record_ids: [], needs_reconcile_record_ids: [],
-  }, { jobId: 'job_p1', at: '2026-09-24T10:00:08Z', error: {
+      }, { jobId: 'job_p1', at: '2026-09-24T10:00:08Z', error: {
     code: 'upload.partial_failure', message: '1 ho so that bai',
     retryable: true, next_action: 'retry' } }));
   jobs.set('job_c1', job('upload.session_close', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
     closed: true, verified_record_ids: [],
-    needs_reconcile_record_ids: [],
-  }, { jobId: 'job_c1', at: '2026-09-24T10:00:12Z' }));
+      }, { jobId: 'job_c1', at: '2026-09-24T10:00:12Z' }));
   // Moi pass: session_close (idx 6) ap TRUOC prepare (idx 13). Prepare
   // T8 < close T12 → truong session khong duoc hoi sinh ke ca khi
   // prepare re-adopt (khong once-marker).
@@ -1650,8 +1537,7 @@ test('adoptJobs: prepare partial CU khong hoi sinh session sau '
   jobs.set('job_p2', job('upload.prepare', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
     summary: { prepared_count: 5, remaining: 3 },
-    saved_record_ids: [], needs_reconcile_record_ids: [],
-  }, { jobId: 'job_p2', at: '2026-09-24T10:00:20Z' }));
+      }, { jobId: 'job_p2', at: '2026-09-24T10:00:20Z' }));
   C.adoptJobs(st, jobs);
   assert.equal(st.uploadSessionActive, true);
   assert.equal(st.remaining, 3);
@@ -1742,8 +1628,7 @@ test('adoptJobs: stale_revision CU hon ranh gioi phien khong re-arm retry '
   jobs.set('job_c1', job('upload.session_close', 'succeeded', {
     workflow_version: V, website_id: 'nam_dinh', browser_id: 'br1',
     closed: true, verified_record_ids: [],
-    needs_reconcile_record_ids: [],
-  }, { jobId: 'job_c1', at: '2026-09-24T10:00:12Z' }));
+      }, { jobId: 'job_c1', at: '2026-09-24T10:00:12Z' }));
   C.adoptJobs(st, jobs);
   assert.equal(st.sessionClosedAt, '2026-09-24T10:00:12Z');
   assert.equal(st.prepareRetryIds, null,
@@ -1796,8 +1681,7 @@ test('adoptJobResult: prepare failed KEM RESULT cu hon ranh gioi phien '
   const stale = job('upload.prepare', 'failed', {
     workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
     summary: { prepared_count: 0, remaining: 9 },
-    saved_record_ids: [], needs_reconcile_record_ids: [],
-  }, {
+      }, {
     jobId: 'job_p1', at: '2026-09-24T10:00:05Z',
     error: { code: 'stale_revision', message: 'queue doi',
              retryable: true, next_action: 'retry' },
@@ -1812,8 +1696,7 @@ test('adoptJobResult: prepare failed KEM RESULT cu hon ranh gioi phien '
   const fresh = job('upload.prepare', 'failed', {
     workflow_version: V, website_id: 'nam_dinh', run_id: 'r1',
     summary: { prepared_count: 0, remaining: 9 },
-    saved_record_ids: [], needs_reconcile_record_ids: [],
-  }, {
+      }, {
     jobId: 'job_p2', at: '2026-09-24T10:00:30Z',
     error: { code: 'stale_revision', message: 'queue lai doi',
              retryable: true, next_action: 'retry' },

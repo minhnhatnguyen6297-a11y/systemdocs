@@ -420,8 +420,7 @@ class TestNotarySchemaInit(unittest.TestCase):
       Zalo (lời gọi exchange trước đây bị thiếu trong sidecar).
     """
 
-    def test_ensure_db_creates_land_rows_and_zalo_tables(self):
-        import sqlite3
+    def setUp(self):
         import notary_adapter
 
         tmp = tempfile.TemporaryDirectory(prefix="g1-notary-schema-")
@@ -445,9 +444,15 @@ class TestNotarySchemaInit(unittest.TestCase):
 
         os.environ["G1_NOTARY_DATA_DIR"] = tmp.name
         notary_adapter._db_ready = False
+        # Nap model de dang ky day du bang vao Base.metadata truoc create_all.
+        notary_adapter._models()
         notary_adapter._ensure_db()
+        self.db_path = Path(tmp.name) / "notary.db"
 
-        db_path = Path(tmp.name) / "notary.db"
+    def test_ensure_db_creates_land_rows_and_zalo_tables(self):
+        import sqlite3
+
+        db_path = self.db_path
         self.assertTrue(db_path.is_file())
         con = sqlite3.connect(db_path)
         try:
@@ -471,6 +476,99 @@ class TestNotarySchemaInit(unittest.TestCase):
             ddl.replace("\n", " "),
             r"UNIQUE\s*\(\s*property_id\s*,\s*vitri\s*\)",
             "property_land_rows thieu UNIQUE (property_id, vitri)")
+
+    def test_ensure_db_columns_match_all_models(self):
+        import sqlite3
+        import notary_adapter
+
+        models = notary_adapter._models()
+        con = sqlite3.connect(self.db_path)
+        try:
+            for table in models.Base.metadata.tables.values():
+                with self.subTest(table=table.name):
+                    columns = {row[1] for row in con.execute(
+                        f'PRAGMA table_info("{table.name}")')}
+                    self.assertEqual(
+                        {column.name for column in table.columns} - columns,
+                        set(), f"thieu cot model trong {table.name}")
+        finally:
+            con.close()
+
+    def test_ensure_db_case_property_columns(self):
+        import sqlite3
+
+        con = sqlite3.connect(self.db_path)
+        try:
+            columns = {row[1]: row for row in con.execute(
+                "PRAGMA table_info(inheritance_case_properties)")}
+        finally:
+            con.close()
+        self.assertIn("case_asset_row_id", columns)
+        self.assertEqual(columns["property_id"][3], 0)
+
+    def test_ensure_db_saves_case_owned_property(self):
+        import notary_adapter
+
+        models = notary_adapter._models()
+        with notary_adapter._db_session() as db:
+            case = models.InheritanceCase()
+            db.add(case)
+            db.flush()
+            # Tao dong dich that de giu rang buoc khoa ngoai.
+            db.add(models.CaseAssetRow(
+                row_id="row-test-1", case_id=case.id, vitri=1))
+            db.flush()
+            link = models.InheritanceCaseProperty(
+                case_id=case.id, case_asset_row_id="row-test-1",
+                property_id=None)
+            db.add(link)
+            db.commit()
+            link_id, case_id = link.id, case.id
+
+        with notary_adapter._db_session() as db:
+            saved = db.get(models.InheritanceCaseProperty, link_id)
+            self.assertEqual(saved.case_id, case_id)
+            self.assertEqual(saved.case_asset_row_id, "row-test-1")
+            self.assertIsNone(saved.property_id)
+
+    def test_ensure_db_adds_case_asset_column_to_legacy_table(self):
+        import sqlite3
+        import notary_adapter
+
+        con = sqlite3.connect(self.db_path)
+        try:
+            con.executescript("""
+                DROP TABLE inheritance_case_properties;
+                CREATE TABLE inheritance_case_properties (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    case_id INTEGER NOT NULL,
+                    property_id INTEGER NOT NULL,
+                    is_primary BOOLEAN NOT NULL DEFAULT 0,
+                    created_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
+                    updated_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
+                    FOREIGN KEY(case_id) REFERENCES inheritance_cases(id),
+                    FOREIGN KEY(property_id) REFERENCES properties(id)
+                );
+            """)
+        finally:
+            con.close()
+
+        for _ in range(2):
+            notary_adapter._db_ready = False
+            notary_adapter._ensure_db()
+        con = sqlite3.connect(self.db_path)
+        try:
+            columns = {row[1]: row for row in con.execute(
+                "PRAGMA table_info(inheritance_case_properties)")}
+            foreign_keys = list(con.execute(
+                "PRAGMA foreign_key_list(inheritance_case_properties)"))
+        finally:
+            con.close()
+        self.assertIn("case_asset_row_id", columns)
+        self.assertEqual(columns["property_id"][3], 1)
+        self.assertIn(
+            ("case_asset_rows", "case_asset_row_id", "row_id"),
+            {(row[2], row[3], row[4]) for row in foreign_keys})
 
 
 if __name__ == "__main__":

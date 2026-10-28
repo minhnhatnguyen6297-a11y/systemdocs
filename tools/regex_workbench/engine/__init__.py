@@ -1,19 +1,11 @@
-"""Regex Workbench engine: zoning first, field extraction second."""
+"""Lõi luật chung — một đường luật duy nhất cho Word.
 
-from .runner import (
-    DEFAULT_PROFILE,
-    PROFILES_DIR,
-    lint_profile,
-    load_profile,
-    run,
-    validate_profile,
-)
+Module luật: `contract_extract` (nguồn: `engine/contract_extract.py`).
+Consumer gọi qua adapter của mình (Upload: `upload_lab/extraction_adapter.py`;
+Document Intake: `notary_v2/services/document_intake/adapters/docx.py`).
+Không còn pipeline profile/zoning riêng — mọi luật nằm trong `contract_extract`.
+"""
 
-__all__ = [
-    "DEFAULT_PROFILE",
-    "PROFILES_DIR",
-    "lint_profile",
-    "load_profile",
-    "run",
-    "validate_profile",
-]
+from .contract_extract import ENGINE_ID, ENGINE_VERSION, extract_text
+
+__all__ = ["ENGINE_ID", "ENGINE_VERSION", "extract_text"]

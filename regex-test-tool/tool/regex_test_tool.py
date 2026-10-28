@@ -18,8 +18,22 @@ TOOL_DIR = Path(__file__).resolve().parent
 if str(TOOL_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_DIR))
 
-import extract_contract
-import kiem_tra_trich_xuat
+# Duong import: ban dong goi uu tien vendor/ (build_release.ps1 dung ra);
+# ban chay trong repo dung loi luat chung tools/ + upload_lab/ cua repo.
+_VENDOR_DIR = TOOL_DIR / "vendor"
+if _VENDOR_DIR.is_dir():
+    for _path in (_VENDOR_DIR / "tools", _VENDOR_DIR):
+        if str(_path) not in sys.path:
+            sys.path.insert(0, str(_path))
+else:
+    _REPO_ROOT = TOOL_DIR.parents[1]
+    for _path in (_REPO_ROOT / "tools", _REPO_ROOT):
+        if str(_path) not in sys.path:
+            sys.path.insert(0, str(_path))
+
+from upload_lab import extraction_adapter
+from upload_lab.extraction_adapter import case_from_payload
+from upload_lab import kiem_tra_trich_xuat
 from ket_qua_log import (
     BAO_HIEM_CAN_THIEU,
     DECEASED_CAN_THIEU,
@@ -36,7 +50,7 @@ from ket_qua_log import (
     truong_trong,
 )
 
-ENGINE_VERSION = getattr(extract_contract, "ENGINE_VERSION", "khong-ro")
+ENGINE_VERSION = getattr(extraction_adapter, "ENGINE_VERSION", "khong-ro")
 
 PERSON_COLUMNS = ("stt", "nguon", "gioi_tinh", "ho_ten", "ngay_sinh", "cccd", "ngay_cap", "dia_chi")
 PERSON_HEADERS = ("STT", "Nguồn", "Giới tính", "Họ tên", "Ngày sinh", "CCCD", "Ngày cấp", "Địa chỉ")
@@ -81,7 +95,7 @@ def kind_label(kind: str) -> str:
 
 def run_extract(path: str | Path) -> dict:
     try:
-        return extract_contract.extract(str(path))
+        return extraction_adapter.extract(str(path))
     except Exception as exc:  # noqa: BLE001 - hien loi ra UI cho nguoi test
         return {"error": str(exc)}
 
@@ -169,7 +183,7 @@ def summarize(payload: dict) -> str:
         return f"Lỗi: {payload['error']}"
     raw = payload.get("raw", {})
     web = payload.get("web_form", {})
-    kind = str(raw.get("document_kind", ""))
+    kind = str(case_from_payload(payload).get("loaivanbannhandien") or "")
     n_party = len(raw.get("ben_a", {}).get("nguoi", [])) + len(raw.get("ben_b", {}).get("nguoi", []))
     chua_ho_tro = raw.get("tai_san_chua_ho_tro") or []
     note = ""
@@ -177,7 +191,7 @@ def summarize(payload: dict) -> str:
         note = " | loại này chưa có luật kiểm tra"
     return (
         f"Loại: {kind} (tự nhận diện, không cần chọn){note} | "
-        f"Tên: {web.get('ten_hop_dong', '')} | "
+        f"Tên: {case_from_payload(payload)['tenvanban'] or ''} | "
         f"Người: {n_party} | Chết: {len(raw.get('nguoi_chet', []))} | "
         f"Thửa: {len(raw.get('danh_sach_thua_dat', []))}"
         + (f" | Chưa hỗ trợ: {', '.join(chua_ho_tro)}" if chua_ho_tro else "")
@@ -331,7 +345,7 @@ class StaffTestWindow(tk.Tk):
             saved = "Đã lưu vào log."
         except OSError as exc:
             saved = f"KHÔNG lưu được log: {exc}"
-        self.single_summary.set(summarize(payload) + f" | {saved} | Loại: {kind_label(payload.get('raw', {}).get('document_kind', ''))}")
+        self.single_summary.set(summarize(payload) + f" | {saved} | Loại: {kind_label(case_from_payload(payload)['loaivanbannhandien'] or '')}")
         for tree, rows, thieu in (
             (self.s_person, person_rows(payload), PERSON_THIEU),
             (self.s_deceased, deceased_rows(payload), DECEASED_THIEU),
@@ -426,7 +440,7 @@ class StaffTestWindow(tk.Tk):
             except OSError:
                 pass
             raw = payload.get("raw", {})
-            kind = raw.get("document_kind", "") if not payload.get("error") else "ERROR"
+            kind = case_from_payload(payload).get("loaivanbannhandien") or "" if not payload.get("error") else "ERROR"
             theo_loai[kind_label(kind)] = theo_loai.get(kind_label(kind), 0) + 1
             n_person: int | str = ""
             n_asset: int | str = ""

@@ -261,7 +261,7 @@ class QtUIStructureTests(unittest.TestCase):
             self.assertEqual(window.folderNumberSelection.selected_record_ids(), [])
         self.assertIsNotNone(app)
 
-    def test_refresh_preserves_manual_deselection_and_removes_only_saved_record(self):
+    def test_refresh_preserves_manual_deselection_across_tab_resource_updates(self):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
         from PySide6.QtWidgets import QApplication
@@ -298,13 +298,14 @@ class QtUIStructureTests(unittest.TestCase):
             window.folderNumberSelection.set_selected(31, False)
             window._apply_selection_to_folder_table()
 
-            # Record 32 is saved on the web; refresh must keep 31 unchecked.
-            with patch("ui_qt.main_window.load_upload_queue", return_value=({}, records, 3)):
-                window._handle_prepared_pages_changed(
-                    {"saved_record_ids": [32], "closed_record_ids": [], "open_record_ids": [31, 33]}
-                )
+            # Mot tab dong lai (tai nguyen): khong dong nao bi bo khoi bang,
+            # lua chon nguoi dung giu nguyen (31 van bo chon).
+            window._handle_prepared_pages_changed(
+                {"closed_record_ids": [32], "open_record_ids": [31, 33]}
+            )
 
-            self.assertEqual(window.folderNumberSelection.selected_record_ids(), [33])
+            self.assertEqual(window.folderNumberSelection.selected_record_ids(), [32, 33])
+            self.assertEqual(window.openPreparedRecordIds, {31, 33})
         self.assertIsNotNone(app)
 
     def test_download_excel_from_web_queues_work_in_upload_thread(self):
@@ -400,7 +401,7 @@ class QtUIStructureTests(unittest.TestCase):
                 return {"status": "idle"}
 
             def poll_prepared_pages(self):
-                return {"saved_record_ids": [], "closed_record_ids": [], "open_record_ids": []}
+                return {"closed_record_ids": [], "open_record_ids": []}
 
             def close(self):
                 return None

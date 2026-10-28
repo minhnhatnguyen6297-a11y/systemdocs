@@ -6,7 +6,6 @@
       "case_type": "gift",
       "document_type": "khai_nhan",
       "status": "draft",
-      "locked": false,
       "revision": 1,
       "stage": {
         "people": [],

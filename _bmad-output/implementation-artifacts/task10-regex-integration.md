@@ -15,7 +15,7 @@ Xử lý 41 xung đột đường dẫn theo nơi lưu mới; gộp cả hai n�
 
 Kiểm trước khi đưa vào main: không còn conflict; spec/link/namespace đúng; engines/validators/fixtures mirror; Upload/Tool/DOCX/renderer đạt; chạy mới 50 file và kiểm UI đã lưu/mở lại. So ancestry/HEAD và main sạch trước/sau gộp. Không push, không làm mất bằng chứng cũ.
 
-Mốc sweep tiếp 3980; gap 3910–3929 và gap 20 file vị trí10–29 giữ riêng. F01/F04/F05 còn chờ quyết định.
+Mốc sweep tiếp 3980; gap 3910–3929 và gap 20 file vị trí10–29 giữ riêng. F04/F05 còn chờ quyết định.
 
 ## Kiểm sau xử lý xung đột
 Upload424passed/2skip;Tool207passed/1skip;DOCX+docs67passed/1skip;renderer102passed, không loại3testWord cũ. Các thay đổi Word có sẵn trên main giải quyết3test đó. Có241link hợp lệ,0conflict/legacytrackedpath,4cặp snapshot mirror. Native fresh50 vẫn48khớp trường đã kiểm+2source_review,76người/13mô tả đất;nguồn50 và110bằng chứng cũ không đổi. Chromium+realDB nhận/sửa/lưu/mở lại/chặn ngày sai/giữnguồn đạt.

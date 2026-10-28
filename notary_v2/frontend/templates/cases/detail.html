@@ -6,26 +6,18 @@
 <div class="page-header">
   <h2>
     <i class="bi bi-folder2-open me-2" style="color:var(--gold)"></i>
-    Hồ sơ #{{ case.id }} — {{ case.nguoi_chet.ho_ten }}
-    {% if case.is_locked %}
-      <span class="badge badge-locked ms-2 rounded-pill fs-6"><i class="bi bi-lock-fill me-1"></i>Đã khoá</span>
+    {% set facts = case_facts or {} %}
+    {% set owner = facts.get('owner') or {} %}
+    {% set asset = facts.get('asset') or {} %}
+    Hồ sơ #{{ case.id }} — {{ owner.get('name', '') }}
+    {% if case.trang_thai == 'done' %}
+      <span class="badge badge-done ms-2 rounded-pill fs-6"><i class="bi bi-check2-circle me-1"></i>Đã lưu</span>
     {% else %}
-      <span class="badge badge-draft ms-2 rounded-pill fs-6">Bản nháp</span>
+      <span class="badge badge-draft ms-2 rounded-pill fs-6">Nháp</span>
     {% endif %}
   </h2>
   <div class="d-flex gap-2">
-    {% if not case.is_locked %}
-      <a href="/cases/{{ case.id }}/edit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Sửa</a>
-      <form action="/cases/{{ case.id }}/lock" method="post" style="display:inline">
-        <button class="btn btn-success btn-sm" onclick="return confirm('Khoá hồ sơ? Sau khi khoá sẽ không sửa được nữa.')">
-          <i class="bi bi-lock me-1"></i>Khoá hồ sơ
-        </button>
-      </form>
-    {% else %}
-      <form action="/cases/{{ case.id }}/unlock" method="post" style="display:inline">
-        <button class="btn btn-warning btn-sm"><i class="bi bi-unlock me-1"></i>Mở khoá</button>
-      </form>
-    {% endif %}
+    <a href="/cases/{{ case.id }}/edit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Sửa</a>
     <a href="/cases/{{ case.id }}/export-word" class="btn btn-gold btn-sm">
       <i class="bi bi-file-word me-1"></i>Xuất Word
     </a>
@@ -43,14 +35,13 @@
         <i class="bi bi-person-x me-2" style="color:#dc2626"></i>Người để lại di sản
       </div>
       <div class="card-body">
-        <div class="fw-bold fs-6" style="color:var(--navy)">{{ case.nguoi_chet.ho_ten }}</div>
+        <div class="fw-bold fs-6" style="color:var(--navy)">{{ owner.get('name', '') }}</div>
         <div class="text-muted mt-1" style="font-size:13px">
-          <div><i class="bi bi-calendar3 me-1"></i>Sinh: {{ case.nguoi_chet.ngay_sinh.year if case.nguoi_chet.ngay_sinh and case.nguoi_chet.ngay_sinh.day == 1 and case.nguoi_chet.ngay_sinh.month == 1 else (case.nguoi_chet.ngay_sinh.strftime('%d/%m/%Y') if case.nguoi_chet.ngay_sinh else '') }}</div>
-          <div><i class="bi bi-calendar-x me-1"></i>Chết: {{ case.nguoi_chet.ngay_chet.year if case.nguoi_chet.ngay_chet and case.nguoi_chet.ngay_chet.day == 1 and case.nguoi_chet.ngay_chet.month == 1 else (case.nguoi_chet.ngay_chet.strftime('%d/%m/%Y') if case.nguoi_chet.ngay_chet else '') }}</div>
-          <div><i class="bi bi-card-text me-1"></i>GT: {{ case.nguoi_chet.so_giay_to }}</div>
-          <div><i class="bi bi-geo-alt me-1"></i>{{ case.nguoi_chet.dia_chi }}</div>
+          <div><i class="bi bi-calendar3 me-1"></i>Sinh: {{ owner.get('birth', '') }}</div>
+          <div><i class="bi bi-calendar-x me-1"></i>Chết: {{ owner.get('death', '') }}</div>
+          <div><i class="bi bi-card-text me-1"></i>GT: {{ owner.get('doc', '') }}</div>
+          <div><i class="bi bi-geo-alt me-1"></i>{{ owner.get('address', '') }}</div>
         </div>
-        <a href="/customers/{{ case.nguoi_chet.id }}" class="btn btn-sm btn-outline-secondary mt-2" style="font-size:11px">Xem chi tiết</a>
       </div>
     </div>
   </div>
@@ -62,14 +53,11 @@
         <i class="bi bi-house-door me-2" style="color:var(--gold)"></i>Tài sản di sản
       </div>
       <div class="card-body">
-        <div class="fw-bold" style="color:var(--navy)"><code>{{ case.tai_san.so_serial }}</code></div>
+        <div class="fw-bold" style="color:var(--navy)"><code>{{ asset.get('serial', '') }}</code></div>
         <div class="text-muted mt-1" style="font-size:13px">
-          <div>Thửa: <strong>{{ case.tai_san.so_thua_dat or '—' }}</strong> — Tờ BĐ: <strong>{{ case.tai_san.so_to_ban_do or '—' }}</strong></div>
-          <div><i class="bi bi-geo-alt me-1"></i>{{ case.tai_san.dia_chi }}</div>
-          <div>Loại đất: {{ case.tai_san.loai_dat or '—' }}</div>
-          <div>Thời hạn: {{ case.tai_san.thoi_han or '—' }}</div>
+          <div>Thửa: <strong>{{ asset.get('thua') or '—' }}</strong> — Tờ BĐ: <strong>{{ asset.get('to_ban_do') or '—' }}</strong></div>
+          <div><i class="bi bi-geo-alt me-1"></i>{{ asset.get('address', '') }}</div>
         </div>
-        <a href="/properties/{{ case.tai_san.id }}" class="btn btn-sm btn-outline-secondary mt-2" style="font-size:11px">Xem chi tiết</a>
       </div>
     </div>
   </div>
@@ -87,10 +75,10 @@
             {% if case.loai_van_ban == 'khai_nhan' %}Văn bản khai nhận di sản{% else %}Văn bản thoả thuận phân chia{% endif %}
           </div>
           <div class="mb-2"><strong>Trạng thái:</strong>
-            {% if case.is_locked %}
-              <span class="badge badge-locked">Đã khoá</span>
+            {% if case.trang_thai == 'done' %}
+              <span class="badge badge-done">Đã lưu</span>
             {% else %}
-              <span class="badge badge-draft">Bản nháp</span>
+              <span class="badge badge-draft">Nháp</span>
             {% endif %}
           </div>
           {% if case.ghi_chu %}<div><strong>Ghi chú:</strong> {{ case.ghi_chu }}</div>{% endif %}
@@ -136,23 +124,29 @@
             <th>Nhận tài sản</th>
             <th>Tỷ lệ %</th>
             <th>Ghi chú</th>
-            {% if not case.is_locked %}<th style="width:100px">Thao tác</th>{% endif %}
+            <th style="width:100px">Thao tác</th>
           </tr>
         </thead>
         <tbody>
           {% for p in case.participants %}
+          {% set row = (participant_rows or {}).get(p.id) or {} %}
+          {% set name = row.get('ho_ten') or (p.customer.ho_ten if p.customer else '—') %}
           <tr>
             <td>
-              <a href="/customers/{{ p.customer.id }}" style="color:var(--navy)" class="fw-bold text-decoration-none">{{ p.customer.ho_ten }}</a>
-              <div style="font-size:11px; color:var(--muted)">{{ p.customer.so_giay_to }}</div>
+              {% if p.customer %}
+              <a href="/customers/{{ p.customer.id }}" style="color:var(--navy)" class="fw-bold text-decoration-none">{{ name }}</a>
+              {% else %}
+              <span style="color:var(--navy)" class="fw-bold">{{ name }}</span>
+              {% endif %}
+              <div style="font-size:11px; color:var(--muted)">{{ row.get('so_giay_to') or (p.customer.so_giay_to if p.customer else '') }}</div>
             </td>
             <td><span class="badge bg-secondary bg-opacity-10 text-secondary">{{ p.vai_tro }}</span></td>
             <td class="text-center">Hàng {{ p.hang_thua_ke }}</td>
             <td>
-              {% if p.customer.con_song %}
-                <span class="badge badge-alive rounded-pill">Còn sống</span>
-              {% else %}
+              {% if (row.get('ngay_chet') if row else (p.customer.ngay_chet if p.customer else None)) or (p.customer and not p.customer.con_song) %}
                 <span class="badge badge-dead rounded-pill">Đã chết</span>
+              {% else %}
+                <span class="badge badge-alive rounded-pill">Còn sống</span>
               {% endif %}
             </td>
             <td class="text-center">
@@ -168,7 +162,6 @@
               </div>
             </td>
             <td style="font-size:12px; color:var(--muted)">{{ p.ghi_chu or '—' }}</td>
-            {% if not case.is_locked %}
             <td>
               <button class="btn btn-sm btn-outline-primary me-1"
                       data-bs-toggle="modal"
@@ -183,7 +176,6 @@
               </button>
               <form id="del-p-{{ p.id }}" action="/participants/{{ p.id }}/delete" method="post" style="display:none"></form>
             </td>
-            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
@@ -198,8 +190,7 @@
   </div>
 </div>
 
-<!-- Form thêm người (chỉ khi chưa khoá) -->
-{% if not case.is_locked %}
+<!-- Form thêm người -->
 <div class="card mt-3">
   <div class="card-header"><i class="bi bi-person-plus me-2" style="color:var(--gold)"></i>Thêm người tham gia hồ sơ</div>
   <div class="card-body">
@@ -264,23 +255,13 @@
   </div>
 </div>
 
-{% endif %}
-
-{% if case.is_locked %}
-<div class="alert alert-success mt-3">
-  <i class="bi bi-lock-fill me-2"></i>
-  Hồ sơ đã được khoá. Nhấn <strong>Xuất Word</strong> để tải file hợp đồng.
-</div>
-{% endif %}
-
 <!-- Modals sửa người tham gia -->
 {% for p in case.participants %}
-{% if not case.is_locked %}
 <div class="modal fade" id="editModal{{ p.id }}" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Sửa: {{ p.customer.ho_ten }}</h5>
+        <h5 class="modal-title">Sửa: {{ (participant_rows or {}).get(p.id, {}).get('ho_ten') or (p.customer.ho_ten if p.customer else "") }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" action="/participants/{{ p.id }}/edit">
@@ -326,6 +307,5 @@
     </div>
   </div>
 </div>
-{% endif %}
 {% endfor %}
 {% endblock %}

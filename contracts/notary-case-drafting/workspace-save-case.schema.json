@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://systemdocs/contracts/notary-case-drafting/workspace-save-case.schema.json",
+  "title": "notary.workspace_save_case — Storage B đang triển khai vòng 1",
+  "description": "Lưu nguyên tử metadata, Stage case-owned và Diagram v3; server quyết định done, revision, identity và render_model. Từ 23/10/2026 (S1/S2): case mới cho 0 Người/0 Tài sản và owner null; mỗi dòng Người cần họ tên, mỗi dòng Tài sản cần số thửa + số tờ; chuỗi rỗng ghi null.",
+  "definitions": {
+    "case_meta": {
+      "allOf": [
+        {"$ref": "draft-v2.schema.json#/definitions/payload_workspace_create_v2/properties/case"},
+        {"anyOf": [{"required": ["case_type"]}, {"required": ["casetype"]}]},
+        {"anyOf": [{"required": ["document_type"]}, {"required": ["documenttype"]}]},
+        {
+          "if": {"anyOf": [{"required": ["case_type"], "properties": {"case_type": {"const": "inheritance"}}}, {"required": ["casetype"], "properties": {"casetype": {"const": "inheritance"}}}]},
+          "then": {"properties": {"document_type": {"enum": ["khai_nhan", "thoa_thuan"]}, "documenttype": {"enum": ["khai_nhan", "thoa_thuan"]}}},
+          "else": {"properties": {"document_type": {"enum": ["chuyen_nhuong", "tang_cho", "cho_thue", "dat_coc"]}, "documenttype": {"enum": ["chuyen_nhuong", "tang_cho", "cho_thue", "dat_coc"]}}}
+        }
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case", "stage", "diagram"],
+      "properties": {
+        "case_id": {"type": "integer", "minimum": 1},
+        "base_revision": {"type": "integer", "minimum": 1},
+        "idempotency_key": {"$ref": "common.schema.json#/definitions/uuid4"},
+        "case": {"$ref": "#/definitions/case_meta"},
+        "stage": {"$ref": "draft-v2.schema.json#/definitions/stage_v2"},
+        "diagram": {"$ref": "draft-v2.schema.json#/definitions/payload_diagram_save_v2/properties/diagram"},
+        "docx_import": {"$ref": "common.schema.json#/definitions/docx_import"}
+      },
+      "allOf": [
+        {
+          "if": {"required": ["case_id"]},
+          "then": {"required": ["base_revision"], "not": {"required": ["idempotency_key"]}},
+          "else": {
+            "required": ["idempotency_key"],
+            "not": {"required": ["base_revision"]}
+          }
+        },
+        {
+          "if": {"properties": {"case": {"anyOf": [{"required": ["case_type"], "properties": {"case_type": {"const": "inheritance"}}}, {"required": ["casetype"], "properties": {"casetype": {"const": "inheritance"}}}]}}},
+          "then": {
+            "properties": {
+              "diagram": {"properties": {"state": {"properties": {"domain": {"const": "inheritance"}}}}}
+            }
+          },
+          "else": {
+            "properties": {
+              "stage": {"not": {"required": ["owner_row_id"]}, "properties": {"people": {"maxItems": 30}}},
+              "diagram": {"properties": {"state": {"properties": {"domain": {"const": "two_party"}}}}}
+            }
+          }
+        }
+      ]
+    },
+    "result_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "case", "stage", "diagram", "capabilities", "created"],
+      "properties": {
+        "schema_version": {"$ref": "draft-v2.schema.json#/definitions/schema_version_v2"},
+        "backend_mode": {"enum": ["real", "mock"]},
+        "case": {"allOf": [{"$ref": "workspace-update.schema.json#/definitions/case_v2"}, {"properties": {"status": {"const": "done"}}}]},
+        "stage": {"$ref": "draft-v2.schema.json#/definitions/stage_v2_output"},
+        "diagram": {
+          "type": "object", "additionalProperties": false,
+          "required": ["domain", "state", "render_model", "warnings"],
+          "properties": {
+            "domain": {"enum": ["inheritance", "two_party"]},
+            "state": {"$ref": "draft-v2.schema.json#/definitions/diagram_state_v3"},
+            "render_model": {"$ref": "common.schema.json#/definitions/render_model"},
+            "warnings": {"type": "array", "items": {"$ref": "common.schema.json#/definitions/warning"}}
+          }
+        },
+        "capabilities": {"$ref": "workspace.schema.json#/definitions/result_data/properties/capabilities"},
+        "docx_import": {"$ref": "common.schema.json#/definitions/docx_import"},
+        "warnings": {"type": "array", "items": {"$ref": "common.schema.json#/definitions/warning"}},
+        "created": {"type": "boolean"}
+      }
+    }
+  }
+}

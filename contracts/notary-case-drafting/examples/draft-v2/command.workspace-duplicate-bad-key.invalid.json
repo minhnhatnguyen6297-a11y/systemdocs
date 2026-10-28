@@ -1,0 +1,14 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.21: idempotency_key phải UUID v4."
+  },
+  "contract_version": "desktopcommand.v1",
+  "command_id": "a1b2c3d4-2032-4032-8032-000000000032",
+  "command": "notary.workspace_duplicate",
+  "payload": {
+    "source_case_id": 48,
+    "idempotency_key": "not-a-uuid"
+  },
+  "expected_error": "validation_error"
+}

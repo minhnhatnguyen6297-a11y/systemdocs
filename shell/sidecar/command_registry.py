@@ -223,7 +223,6 @@ COMMANDS = {
     "upload.prepare": _upload("prepare_dispatch"),
     "upload.finish_review": _upload("finish_review_dispatch"),
     "upload.staff_options": _upload("upload_staff_options_v1"),
-    "upload.reconcile": _upload("upload_reconcile_v1"),
 }
 
 
@@ -249,11 +248,17 @@ COMMANDS.update({
     "notary.customer_list": _notary_drafting("customer_list"),
     "notary.customer_create": _notary_drafting("customer_create"),
     "notary.workspace_get": _notary_drafting("workspace_get"),
+    "notary.workspace_source_latest":
+        _notary_drafting("workspace_source_latest"),
+    "notary.workspace_duplicate":
+        _notary_drafting("workspace_duplicate"),
     "notary.workspace_create": _notary_drafting("workspace_create"),
+    "notary.workspace_save_case": _notary_drafting("workspace_save_case"),
     "notary.intake_analyze": _notary_drafting("intake_analyze"),
     "notary.workspace_commit_stage":
         _notary_drafting("workspace_commit_stage"),
     "notary.workspace_update": _notary_drafting("workspace_update"),
+    "notary.workspace_convert_type": _notary_drafting("workspace_convert_type"),
     "notary.diagram_evaluate": _notary_drafting("diagram_evaluate"),
     "notary.diagram_save": _notary_drafting("diagram_save"),
     "notary.word_export_options": _notary_drafting("word_export_options"),

@@ -29,6 +29,7 @@ import httpx
 from dotenv import dotenv_values
 from fastapi import HTTPException
 from PIL import Image, ImageOps
+from .normalization import norm_doc_no, norm_document_type
 
 _logger = logging.getLogger("ocr_ai")
 
@@ -44,8 +45,6 @@ OCR_AI_CONCURRENCY = max(1, int(os.getenv("OCR_AI_CONCURRENCY", "6")))
 AI_TIMEOUT_SECONDS = float(os.getenv("OCR_AI_TIMEOUT_SECONDS", "90"))
 AI_MAX_IMAGE_PX = max(640, int(os.getenv("QWEN_MAX_IMAGE_PX", "1800")))
 JPEG_QUALITY = 82
-PAIR_FUZZY_MAX_ID_MISMATCH = max(0, min(3, int(os.getenv("OCR_PAIR_FUZZY_MAX_ID_MISMATCH", "1"))))
-PAIR_FUZZY_NAME_THRESHOLD = float(os.getenv("OCR_PAIR_FUZZY_NAME_THRESHOLD", "0.95"))
 
 
 def _ms(seconds: float) -> float:
@@ -135,6 +134,8 @@ def _looks_like_label(line: str, labels: list[str], threshold: float = 0.84) -> 
 
 def _normalize_date(value: Any) -> str:
     raw = _clean_text(value).replace("-", "/").replace(".", "/")
+    if re.fullmatch(r"(?:19|20)\d{2}", raw):
+        return raw
     match = re.search(r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4})(?!\d)", raw)
     if not match:
         return ""
@@ -158,13 +159,16 @@ def _normalize_gender(value: Any) -> str:
 def _normalize_person_data(data: dict[str, Any]) -> dict[str, str]:
     return {
         "ho_ten": _clean_text(data.get("ho_ten")),
-        "so_giay_to": re.sub(r"\D", "", _clean_text(data.get("so_giay_to"))),
+        "so_giay_to": norm_doc_no(_clean_text(data.get("so_giay_to")))[0] or "",
         "ngay_sinh": _normalize_date(data.get("ngay_sinh")),
         "gioi_tinh": _normalize_gender(data.get("gioi_tinh")),
         "dia_chi": _clean_text(data.get("dia_chi")),
         "ngay_cap": _normalize_date(data.get("ngay_cap")),
         "ngay_het_han": _normalize_date(data.get("ngay_het_han")),
         "ngay_chet": _normalize_date(data.get("ngay_chet")),
+        "loai_giay_to": _clean_text(data.get("loai_giay_to")),
+        "noi_cap": _clean_text(data.get("noi_cap")),
+        "loai_dia_chi": _clean_text(data.get("loai_dia_chi")),
     }
 
 
@@ -2076,23 +2080,34 @@ def _labeled_value(lines: list[str], labels: list[str]) -> str:
 
 def _looks_like_death_certificate(lines: list[str]) -> bool:
     folded = " ".join(_ascii_text(line) for line in lines)
-    return "khai tu" in folded and ("nguoi chet" in folded or "da chet" in folded)
+    return (("khai tu" in folded or "giay chung tu" in folded)
+            and ("nguoi chet" in folded or "da chet" in folded or "ngay chet" in folded))
 
 
 def _normalize_death_certificate_doc(lines: list[str], filename: str) -> dict[str, Any]:
     name = _labeled_value(lines, ["ho, chu dem, ten nguoi chet", "ho va ten nguoi chet"])
     birth = _labeled_value(lines, ["ngay sinh", "ngay, thang, nam sinh"])
-    identity = _labeled_value(lines, ["giay to tuy than", "so dinh danh ca nhan"])
-    address = _labeled_value(lines, ["noi cu tru cuoi cung", "noi cu tru"])
+    address = _labeled_value(lines, ["noi chet", "noi thuong tru cuoi cung", "noi cu tru cuoi cung", "noi cu tru"])
     death = _labeled_value(lines, ["da chet vao ngay", "ngay, thang, nam chet", "ngay chet"])
-    identity_match = re.search(r"(?<!\d)(\d{9,12})(?!\d)", identity)
+    text = "\n".join(lines)
+    title = next((line for line in lines if re.fullmatch(
+        r"(?:trich luc khai tu|giay chung tu)(?:\s*\(\s*ban sao\s*\))?",
+        _ascii_text(line))), "")
+    number = re.search(r"(?im)^\s*(?:S[oố]\s*:|(?:Trích\s+lục\s+khai\s+tử|"
+                       r"Giấy\s+chứng\s+tử)(?:\s*\(\s*bản\s+sao\s*\))?\s+số\s*:?)"
+                       r"\s*(.+?)\s*$", text)
+    issuer = next((line for line in lines if re.match(
+        r"^(?:uy ban nhan dan|ubnd)\b", _ascii_text(line))), "")
+    issued = _labeled_value(lines, ["ngay cap", "ngay, thang, nam cap"])
     data = _normalize_person_data(
         {
             "ho_ten": name,
-            "so_giay_to": identity_match.group(1) if identity_match else "",
+            "so_giay_to": number[1] if number else "",
             "ngay_sinh": birth,
             "dia_chi": address,
             "ngay_chet": death,
+            "loai_giay_to": norm_document_type(title)[0] if title else "",
+            "noi_cap": issuer, "ngay_cap": issued, "loai_dia_chi": "Nơi chết",
         }
     )
     warnings = []
@@ -2115,6 +2130,10 @@ def _normalize_native_ocr_doc(lines: list[str], filename: str) -> dict[str, Any]
     cleaned_lines = [_clean_text(ln) for ln in lines if _clean_text(ln)]
     if not cleaned_lines:
         return {"doc_type": "unknown", "side": "unknown", "data": {}, "filename": filename, "text_lines": []}
+    if any(re.match(r"(?i)^ĐƠN\s+(?:XIN\s+)?XÁC\s+NHẬN(?=\s*(?:[.:;\n]|$))", line)
+           for line in cleaned_lines[:10]):
+        return {"doc_type": "unknown", "side": "unknown", "data": {},
+                "filename": filename, "text_lines": cleaned_lines}
 
     if _looks_like_property_doc(cleaned_lines):
         return _normalize_property_ocr_doc(cleaned_lines, filename)
@@ -2219,39 +2238,6 @@ def _normalize_name_ascii(value: str) -> str:
     return re.sub(r"\s+", " ", folded).strip()
 
 
-def _id_hamming_distance(left: str, right: str) -> int | None:
-    if len(left) != 12 or len(right) != 12:
-        return None
-    return sum(1 for a, b in zip(left, right) if a != b)
-
-
-def _name_match_strong(left: str, right: str) -> bool:
-    a = _normalize_name_ascii(left)
-    b = _normalize_name_ascii(right)
-    if not a or not b:
-        return False
-    if a == b:
-        return True
-    if SequenceMatcher(None, a, b).ratio() >= PAIR_FUZZY_NAME_THRESHOLD:
-        return True
-    tokens_a = {tok for tok in a.split() if len(tok) >= 2}
-    tokens_b = {tok for tok in b.split() if len(tok) >= 2}
-    if len(tokens_a) >= 2 and len(tokens_b) >= 2 and tokens_a == tokens_b:
-        return True
-    return False
-
-
-def _sides_can_pair(side_a: str, side_b: str) -> bool:
-    a = _clean_text(side_a).lower() or "unknown"
-    b = _clean_text(side_b).lower() or "unknown"
-    if a == "front_back" or b == "front_back":
-        return False
-    sides = {a, b}
-    if "front" in sides and "back" in sides:
-        return True
-    if "unknown" in sides and ("front" in sides or "back" in sides):
-        return True
-    return False
 
 
 def _is_optional_field_compatible(left: dict[str, Any], right: dict[str, Any], key: str) -> bool:
@@ -2264,25 +2250,6 @@ def _is_optional_field_compatible(left: dict[str, Any], right: dict[str, Any], k
     return a == b
 
 
-def _should_fuzzy_pair(left: dict[str, Any], right: dict[str, Any]) -> bool:
-    id_left = re.sub(r"\D", "", str(left.get("so_giay_to") or ""))
-    id_right = re.sub(r"\D", "", str(right.get("so_giay_to") or ""))
-    if len(id_left) != 12 or len(id_right) != 12 or id_left == id_right:
-        return False
-
-    mismatch = _id_hamming_distance(id_left, id_right)
-    if mismatch is None or mismatch > PAIR_FUZZY_MAX_ID_MISMATCH:
-        return False
-
-    if not _name_match_strong(str(left.get("ho_ten") or ""), str(right.get("ho_ten") or "")):
-        return False
-    if not _sides_can_pair(str(left.get("side") or "unknown"), str(right.get("side") or "unknown")):
-        return False
-    if not _is_optional_field_compatible(left, right, "ngay_sinh"):
-        return False
-    if not _is_optional_field_compatible(left, right, "gioi_tinh"):
-        return False
-    return True
 
 
 def _merge_person_group(group: list[dict[str, Any]]) -> dict[str, Any]:
@@ -2380,12 +2347,15 @@ def _merge_person_group(group: list[dict[str, Any]]) -> dict[str, Any]:
     return merged
 
 
-def _pair_persons(persons: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _pair_persons_in_document(persons: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = {}
     passthrough: list[dict[str, Any]] = []
     for p in persons:
-        id_no = re.sub(r"\D", "", str(p.get("so_giay_to") or ""))
-        if len(id_no) == 12:
+        id_no = str(p.get("so_giay_to") or "").strip()
+        death_paper = (p.get("loai_dia_chi") == "Nơi chết"
+                       or p.get("loai_giay_to") in (
+                           "Trích lục khai tử", "Trích lục khai tử (bản sao)", "Giấy chứng tử"))
+        if re.fullmatch(r"\d{12}", id_no) and not death_paper:
             groups.setdefault(id_no, []).append(p)
         else:
             one = dict(p)
@@ -2393,46 +2363,38 @@ def _pair_persons(persons: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if not isinstance(one.get("_files"), list):
                 one["_files"] = []
             passthrough.append(one)
-    merged_exact = [_merge_person_group(g) for g in groups.values()]
-    if len(merged_exact) < 2:
-        return merged_exact + passthrough
+    merged_exact = []
+    for group in groups.values():
+        if len(group) == 2:
+            left, right = group
+            names = [_normalize_name_ascii(str(person.get("ho_ten") or "")) for person in group]
+            clear_pair = ({left.get("side"), right.get("side")} == {"front", "back"}
+                          and (not all(names) or names[0] == names[1])
+                          and all(_is_optional_field_compatible(left, right, key)
+                                  for key in ("ngay_sinh", "gioi_tinh", "dia_chi")))
+            if clear_pair:
+                merged_exact.append(_merge_person_group(group))
+                continue
+        # No fuzzy-ID/name winner, even inside a container with several cards.
+        for person in group:
+            one = _merge_person_group([person])
+            one["paired"] = False
+            merged_exact.append(one)
+    return merged_exact + passthrough
 
-    # Fuzzy stage for OCR slips: allow pairing when ID differs by <=1 digit,
-    # names strongly match (accent/no-accent tolerant), and sides complement.
-    parent = list(range(len(merged_exact)))
 
-    def find(x: int) -> int:
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    def union(a: int, b: int) -> None:
-        ra = find(a)
-        rb = find(b)
-        if ra != rb:
-            parent[rb] = ra
-
-    for i in range(len(merged_exact)):
-        for j in range(i + 1, len(merged_exact)):
-            if _should_fuzzy_pair(merged_exact[i], merged_exact[j]):
-                union(i, j)
-
-    fuzzy_groups: dict[int, list[dict[str, Any]]] = {}
-    for idx, person in enumerate(merged_exact):
-        root = find(idx)
-        fuzzy_groups.setdefault(root, []).append(person)
-
-    merged_final: list[dict[str, Any]] = []
-    for group in fuzzy_groups.values():
-        if len(group) == 1:
-            one = dict(group[0])
-            if not isinstance(one.get("_files"), list):
-                one["_files"] = []
-            merged_final.append(one)
-        else:
-            merged_final.append(_merge_person_group(group))
-    return merged_final + passthrough
+def _pair_persons(persons: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Never enrich one source document with fields from another document."""
+    documents: dict[tuple, list[dict]] = {}
+    for index, person in enumerate(persons):
+        files = person.get("_files") or []
+        source = person.get("source_id")
+        if not source and files:
+            source = re.sub(r"#p\d+$", "", str(files[0]))
+        key = ("source", source) if source else ("unscoped", index)
+        documents.setdefault(key, []).append(person)
+    return [person for group in documents.values()
+            for person in _pair_persons_in_document(group)]
 
 
 

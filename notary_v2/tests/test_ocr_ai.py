@@ -254,7 +254,10 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
                 {"OCR_MODEL": "gpt-4o", "OPENAI_API_KEY": "legacy-key"},
                 clear=True,
             ),
-            mock.patch.object(ocr_ai, "_read_env", return_value={}),
+            # Patch module ĐỊNH NGHĨA: `ocr_ai._read_env` chỉ là re-export;
+            # `_get_api_key`/`_get_model` resolve `_read_env` trong globals
+            # của `ocr_pipeline`, nên patch facade không chặn được dotenv thật.
+            mock.patch.object(ocr_ai._ocr_pipeline, "_read_env", return_value={}),
         ):
             config = await ocr_ai.ocr_config()
 
@@ -321,11 +324,11 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result["summary"]["ai_runs"], 3)
         self.assertEqual(result["properties"][0]["so_serial"], "A 692942")
-        death = next(person for person in result["persons"] if person["so_giay_to"] == "036050001234")
+        death = next(person for person in result["persons"] if person.get("loai_dia_chi") == "Nơi chết")
         self.assertEqual(death["ngay_chet"], "03/04/2026")
         self.assertEqual(death["side"], "single")
 
-    async def test_analyze_images_pairs_qwen_front_and_back(self):
+    async def test_analyze_images_keeps_front_back_sources_independent(self):
         front = make_upload("qr-front.jpg")
         back = make_upload("back.jpg")
         outputs = [
@@ -352,12 +355,12 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
         ):
             result = await ocr_ai.analyze_images([front, back])
 
-        self.assertEqual(result["summary"]["persons"], 1)
-        person = result["persons"][0]
-        self.assertEqual(person["side"], "front_back")
-        self.assertTrue(person["paired"])
-        self.assertNotIn("missing_back", person["warnings"])
-        self.assertEqual(person["ngay_cap"], "25/03/2021")
+        self.assertEqual(result["summary"]["persons"], 2)
+        by_file = {person["_files"][0]: person for person in result["persons"]}
+        self.assertEqual(by_file["qr-front.jpg"]["ngay_cap"], "")
+        self.assertEqual(by_file["back.jpg"]["ngay_cap"], "25/03/2021")
+        self.assertFalse(by_file["qr-front.jpg"]["paired"])
+        self.assertFalse(by_file["back.jpg"]["paired"])
 
     async def test_analyze_images_runs_qwen_for_every_image(self):
         upload = make_upload("front.jpg")
@@ -423,7 +426,7 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["errors"][0]["stage"], "model")
         self.assertEqual(len(result["persons"]), 1)
 
-    async def test_analyze_images_pairs_front_back_by_id(self):
+    async def test_analyze_images_does_not_join_independent_files_by_id(self):
         front = make_upload("front.jpg")
         back = make_upload("back.jpg")
         outputs = [
@@ -449,11 +452,10 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
         ):
             result = await ocr_ai.analyze_images([front, back])
 
-        self.assertEqual(result["summary"]["persons"], 1)
-        person = result["persons"][0]
-        self.assertEqual(person["so_giay_to"], "036179009696")
-        self.assertTrue(person["paired"])
-        self.assertEqual(len(person.get("_files", [])), 2)
+        self.assertEqual(result["summary"]["persons"], 2)
+        self.assertEqual({person["so_giay_to"] for person in result["persons"]}, {"036179009696"})
+        self.assertTrue(all(not person["paired"] for person in result["persons"]))
+        self.assertEqual([person["_files"] for person in result["persons"]], [["front.jpg"], ["back.jpg"]])
 
     async def test_analyze_images_marks_mismatched_front_and_back_as_incomplete(self):
         front = make_upload("chien-front.jpg")
@@ -505,7 +507,7 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
             result = ocr_ai.shape_cached_ocr(raw_results)
 
         self.assertEqual(result["properties"][0]["_file"], "property")
-        death = next(person for person in result["persons"] if person["so_giay_to"] == "036050001234")
+        death = next(person for person in result["persons"] if person.get("loai_dia_chi") == "Nơi chết")
         self.assertEqual(death["ngay_chet"], "03/04/2026")
         self.assertEqual(death["side"], "single")
 
@@ -727,7 +729,7 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chosen, clean)
         self.assertEqual(source, "back")
 
-    def test_pair_persons_allows_fuzzy_id_when_name_matches(self):
+    def test_pair_persons_does_not_guess_fuzzy_identity_between_sources(self):
         front = {
             "ho_ten": "DƯƠNG THỊ XUÂN",
             "so_giay_to": "036179009696",
@@ -761,10 +763,10 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
             "warnings": [],
         }
         merged = ocr_ai._pair_persons([front, back])
-        self.assertEqual(len(merged), 1)
-        self.assertTrue(merged[0]["paired"])
-        self.assertEqual(merged[0]["side"], "front_back")
-        self.assertEqual(len(merged[0].get("_files", [])), 2)
+        self.assertEqual([person["so_giay_to"] for person in merged], ["036179009696", "036179009697"])
+        self.assertTrue(all(not person["paired"] for person in merged))
+        self.assertEqual(merged[0]["ngay_cap"], "")
+        self.assertEqual(merged[1]["ngay_cap"], "25/03/2021")
 
     def test_pair_persons_rejects_fuzzy_id_when_mismatch_too_high(self):
         front = {

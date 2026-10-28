@@ -23,7 +23,7 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-if [ -z "$ok" ]; then echo "::error::không thấy renderer page qua CDP sau 60s"; tail -50 "$PROFILE/app.log"; exit 1; fi
+if [ -z "$ok" ]; then echo "::error::không thấy renderer page qua CDP sau 60s"; tail -50 "$PROFILE/app.log"; tail -15 "$PROFILE/app.log" | sed 's/^/::warning::app.log: /'; exit 1; fi
 sleep 3
 kill -0 $PID 2>/dev/null || { echo "::error::Electron đã thoát sớm"; tail -50 "$PROFILE/app.log"; exit 1; }
 echo "e2e-smoke OK (log: $PROFILE/app.log)"; tail -5 "$PROFILE/app.log"

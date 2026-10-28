@@ -1,0 +1,30 @@
+{
+  "fixture_context": {
+    "draft_v2": true,
+    "note": "§13.20: không có case Done → thành công với nguồn rỗng, không phải case_not_found; không có owner key vì không có domain nguồn."
+  },
+  "contract_version": "desktopcommand.v1",
+  "job_id": "j_ws_source_empty_001",
+  "command_id": "a1b2c3d4-2002-4001-8001-000000000002",
+  "status": "succeeded",
+  "waiting_on": null,
+  "progress": null,
+  "result": {
+    "kind": "workspace_source_latest",
+    "data": {
+      "schema_version": "notary.case-drafting.v2",
+      "backend_mode": "real",
+      "source_case_id": null,
+      "source_status": null,
+      "stage": {
+        "people": [],
+        "assets": []
+      }
+    },
+    "evidence": [],
+    "warnings": [],
+    "source_files": []
+  },
+  "error": null,
+  "updated_at": "2026-10-22T08:00:00.500000+00:00"
+}

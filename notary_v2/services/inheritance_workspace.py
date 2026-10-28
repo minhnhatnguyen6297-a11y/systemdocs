@@ -10,8 +10,8 @@ v2 ở MIN-128).
 Wire diagram state V3 (§13.4):
     {"version": 3, "domain": "inheritance" | "two_party",
      "nodes": [node_v3_inheritance | node_v3_two_party]}
-
-- inheritance node: {id, personId, parentSlotIds, spouseSlotId,
+- inheritance node: {id, personId, parentSlotIds, spouseSlotIds,
+  spouseSlotId mirror, spouseSuggestionId,
   ownPositions ⊆ {1,2,3}, receivePositions ⊆ {1,2,3}, hidden, deleted}
 - two_party node: đúng 30 phần tử theo thứ tự canonical {id ∈ p1..p30,
   personId, hidden, deleted} — ô trống giữ chỗ, KHÔNG compact; domain
@@ -26,38 +26,37 @@ import json
 from collections.abc import Mapping
 from typing import Any, Optional
 
-from models import InheritanceCase
+from models import InheritanceCase, case_saved_at
 from services.inheritance_engine import run_inheritance_case
 from services.case_workspace import (
     CASE_TYPE_INHERITANCE,
     CASE_TYPE_TWO_PARTY,
     CASE_TYPES,
     DIAGRAM_STATE_VERSION,
+    POSITION_VALUES,
     SCHEMA_VERSION,
     WorkspaceError,
     _case_meta,
     _check_extra_keys,
     _is_uuid4,
-    _people_map,
+    _project_role_nodes,
     _prune_positions,
     _STAGE_KEYS,
     _to_int,
     _utc_now_iso,
-    _v2_to_legacy_nodes,
     _v3_to_v2_nodes,
     unsupported_render_model,
 )
 
 
 _INHERITANCE_NODE_FIELDS = {
-    "id", "personId", "parentSlotIds", "spouseSlotId",
-    "ownPositions", "receivePositions", "hidden", "deleted"}
+    "id", "personId", "parentSlotIds", "spouseSlotId", "spouseSlotIds",
+    "spouseSuggestionId", "ownPositions",
+    "receivePositions", "hidden", "deleted", "noSpouseChildren"}
 _TWO_PARTY_NODE_FIELDS = {"id", "personId", "hidden", "deleted"}
 _TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
 _TWO_PARTY_ID_SET = set(_TWO_PARTY_IDS)
-_POSITIONS = (1, 2, 3)
-
-
+_POSITIONS = POSITION_VALUES
 # --------------------------------------------------------------- wire check
 
 
@@ -171,16 +170,28 @@ def _validate_diagram_wire(state: Any) -> list:
             errors.append({
                 "code": "self_parent",
                 "message": f"nodes[{i}] tự trỏ làm cha/mẹ"})
-        sl = node.get("spouseSlotId")
-        if sl is not None and (not isinstance(sl, str) or not sl):
+        spouse_ids = node.get("spouseSlotIds")
+        if not isinstance(spouse_ids, list) or any(
+                not isinstance(spouse_id, str) or not spouse_id
+                for spouse_id in spouse_ids):
             errors.append({
-                "code": "invalid_spouse",
-                "message": f"nodes[{i}].spouseSlotId phải là chuỗi node-id "
-                           "hoặc null"})
-        elif sl == nid:
+                "code": "invalid_spouse_slots",
+                "message": f"nodes[{i}].spouseSlotIds phải là mảng chuỗi"})
+            spouse_ids = []
+        elif len(set(spouse_ids)) != len(spouse_ids):
+            errors.append({
+                "code": "duplicate_spouse",
+                "message": f"nodes[{i}].spouseSlotIds không được trùng"})
+        elif nid in spouse_ids:
             errors.append({
                 "code": "self_spouse",
                 "message": f"nodes[{i}] tự trỏ làm vợ/chồng"})
+        suggestion = node.get("spouseSuggestionId")
+        if suggestion is not None and (
+                not isinstance(suggestion, str) or not suggestion):
+            errors.append({
+                "code": "invalid_spouse_suggestion",
+                "message": f"nodes[{i}].spouseSuggestionId phải là chuỗi hoặc null"})
         for pf in ("ownPositions", "receivePositions"):
             arr = node.get(pf)
             if not isinstance(arr, list):
@@ -211,18 +222,11 @@ def _validate_diagram_wire(state: Any) -> list:
                         "code": "dangling_parent",
                         "message": f"nodes[{i}] parentSlotIds '{p}' "
                                    "không tồn tại"})
-            sl = node.get("spouseSlotId")
-            if isinstance(sl, str) and sl not in ids:
-                errors.append({
-                    "code": "dangling_spouse",
-                    "message": f"nodes[{i}] spouseSlotId '{sl}' không tồn tại"})
-            elif (isinstance(sl, str) and sl in node_by_id
-                    and node_by_id[sl].get("spouseSlotId")
-                    != node.get("id")):
-                errors.append({
-                    "code": "spouse_conflict",
-                    "message": f"nodes[{i}] và '{sl}' không link vợ-chồng "
-                               "hai chiều"})
+            for spouse_id in node.get("spouseSlotIds") or []:
+                if spouse_id not in ids:
+                    errors.append({
+                        "code": "dangling_spouse",
+                        "message": f"nodes[{i}] spouseSlotIds '{spouse_id}' không tồn tại"})
         # Cycle trên cạnh cha-con.
         children = {}
         for node in node_by_id.values():
@@ -247,6 +251,28 @@ def _validate_diagram_wire(state: Any) -> list:
     return errors
 
 
+# Lỗi engine thuộc nhóm "thiếu dữ kiện để tính" (S3, owner 23/10/2026):
+# hồ sơ còn điền dần nên đường Lưu ghi được ở trạng thái incomplete.
+# Mọi lỗi cấu trúc khác (wire/reference/domain/quan hệ) vẫn raise.
+_INCOMPLETE_ENGINE_CODES = frozenset({"missing_land_owner",
+                                      "invalid_death_date"})
+
+
+def _softened_incomplete(render_model: Mapping[str, Any]) -> Optional[dict]:
+    """render_model `invalid` chỉ vì thiếu dữ kiện → bản `incomplete`.
+
+    Trả None khi còn lỗi cấu trúc/không xác định — caller phải raise.
+    """
+    errors = render_model.get("errors")
+    if not isinstance(errors, list) or not errors:
+        return None
+    if not all(isinstance(e, Mapping)
+               and e.get("code") in _INCOMPLETE_ENGINE_CODES
+               for e in errors):
+        return None
+    return {**render_model, "status": "incomplete"}
+
+
 def _persisted_state(state: Mapping[str, Any]) -> dict:
     """State đã validate → canonical persist shape (§13.4).
 
@@ -268,7 +294,9 @@ def _persisted_state(state: Mapping[str, Any]) -> dict:
             "id": n["id"],
             "personId": n.get("personId"),
             "parentSlotIds": list(n.get("parentSlotIds") or []),
-            "spouseSlotId": n.get("spouseSlotId"),
+            "spouseSlotIds": list(n.get("spouseSlotIds") or []),
+            "spouseSlotId": (n.get("spouseSlotIds") or [None])[-1],
+            "spouseSuggestionId": n.get("spouseSuggestionId"),
             "ownPositions": _positions(n.get("ownPositions")),
             "receivePositions": _positions(n.get("receivePositions")),
             "hidden": n["hidden"],
@@ -313,9 +341,7 @@ class InheritanceWorkspaceService:
     # ----------------------------------------------------- diagram_evaluate
 
     def evaluate_diagram(self, case_id: int, state: Any) -> dict:
-        """`notary.diagram_evaluate` trên case đã commit — READ-ONLY:
-        không persist, không tăng revision (§13.4 A5). Cho phép trên case
-        locked (đọc)."""
+        """`notary.diagram_evaluate` trên case đã commit — READ-ONLY."""
         case = self._load_case(case_id)
         case_type, _ = _case_meta(case)
         if case_type not in CASE_TYPES:
@@ -346,12 +372,7 @@ class InheritanceWorkspaceService:
 
     def evaluate_draft(self, payload_case: Any, stage: Any,
                        state: Any) -> dict:
-        """`notary.diagram_evaluate` chế độ nháp (case_id absent, §13.4):
-        stage/diagram từ payload; không persist, evaluated_revision=null.
-
-        `payload_case` (optional): `{case_type}` — domain hiệu lực của
-        nháp; absent → "inheritance" (nhất quán `_payload_case_type` của
-        validator: payload.case.case_type > default inheritance)."""
+        """`notary.diagram_evaluate` chế độ nháp — không persist."""
         if not isinstance(stage, Mapping):
             raise WorkspaceError(
                 "validation_error", "payload.stage phải là object")
@@ -375,39 +396,136 @@ class InheritanceWorkspaceService:
                 f"diagram state có {len(errors)} lỗi",
                 details={"errors": errors})
         from services.case_workspace import CaseWorkspaceService
-        owner_row_id = CaseWorkspaceService._validate_owner_pointer(
-            stage, people, ct)
+        # S2/S19 (owner 23/10/2026): chưa chọn Chủ đất hoặc Stage còn lỗi
+        # field tùy chọn không chặn "Xem cách tính"; pointer non-null sai
+        # vẫn là mâu thuẫn dữ liệu và vẫn raise.
+        CaseWorkspaceService._validate_owner_pointer(
+            stage, people, ct, allow_unassigned=True)
         field_errors = CaseWorkspaceService(self.db)._validate_stage(
             people, assets, ct)
-        if field_errors:
+        # S19 chỉ nới lỗi THIẾU/rỗng; sai KIỂU (vd ho_ten không phải chuỗi)
+        # vẫn là dữ liệu hỏng -> raise như trước (quyết định kỹ thuật 29/10).
+        type_errors = [e for e in field_errors
+                       if e.get("code") == "invalid_type"]
+        if type_errors:
             raise WorkspaceError(
                 "stage_validation_error",
-                f"Stage có {len(field_errors)} lỗi field",
-                details={"field_errors": field_errors})
-        row_ids = {p["row_id"] for p in people}
+                f"Stage có {len(type_errors)} lỗi kiểu dữ liệu",
+                details={"field_errors": type_errors})
+        row_ids = {p.get("row_id") for p in people
+                   if isinstance(p, Mapping)}
         _check_person_refs(state, row_ids)
         if state["domain"] == CASE_TYPE_TWO_PARTY:
             render_model = unsupported_render_model()
         else:
             render_model = self._evaluate_inheritance(
                 state, valid_row_ids=row_ids, people=people)
+        if field_errors:
+            if render_model.get("status") == "complete":
+                render_model["status"] = "incomplete"
+            render_model["warnings"] = list(
+                render_model.get("warnings") or []) + [{
+                    "code": "stage.incomplete_fields",
+                    "message": f"Stage còn {len(field_errors)} lỗi field"}]
         return {
             "schema_version": SCHEMA_VERSION,
             "evaluated_revision": None,
             "render_model": render_model,
         }
 
+    # ------------------------------------------------- shared diagram prepare
+
+    def prepare_diagram(self, *, case_type: str, stage: Mapping[str, Any],
+                        state: Any,
+                        previous_stage: Optional[Mapping[str, Any]] = None
+                        ) -> tuple[dict, dict, list]:
+        """Validate/prune/evaluate Diagram thuần — không ghi, không commit.
+
+        Trả `(clean_state, render_model, warnings)`. Ref tới row đã bị xóa
+        khỏi chính case (có trong `previous_stage`) được gỡ; UUID chưa
+        từng thuộc bản trước/payload là `diagram_reference_outside_stage`.
+
+        Ranh giới lỗi (S3, owner 23/10/2026): lỗi CẤU TRÚC — wire v3,
+        reference ngoài Stage, owner mismatch, quan hệ/chu kỳ engine —
+        vẫn raise `diagram_invalid_state`/mã riêng. Lỗi chỉ vì THIẾU DỮ
+        KIỆN để tính (`missing_land_owner`, `invalid_death_date`) trả
+        render_model `incomplete` để đường Lưu ghi được; đường evaluate
+        vẫn báo nguyên trạng thái chưa tính được của engine.
+        """
+        self._check_domain(state, case_type)
+        errors = _validate_diagram_wire(state)
+        if errors:
+            raise WorkspaceError(
+                "diagram_invalid_state",
+                f"diagram state có {len(errors)} lỗi",
+                details={"errors": errors})
+        people = stage.get("people")
+        assets = stage.get("assets")
+        if not isinstance(people, list) or not isinstance(assets, list):
+            raise WorkspaceError(
+                "validation_error",
+                "stage.people/stage.assets phải là danh sách")
+        valid_rows = {p["row_id"] for p in people if isinstance(p, Mapping)}
+        previous_rows = {
+            p.get("row_id") for p in (previous_stage or {}).get("people", [])
+            if isinstance(p, Mapping)}
+        nodes = []
+        for node in state["nodes"]:
+            pid = node.get("personId")
+            if pid is not None and pid not in valid_rows:
+                if pid in previous_rows:
+                    node = {**node, "personId": None}
+                else:
+                    raise WorkspaceError(
+                        "diagram_reference_outside_stage",
+                        "personId không thuộc Stage của payload",
+                        details={"personId": pid})
+            nodes.append(node)
+        checked = {**state, "nodes": nodes}
+        _check_person_refs(checked, valid_rows)
+
+        owner_row_id = stage.get("owner_row_id")
+        warnings: list = []
+        if case_type == CASE_TYPE_INHERITANCE:
+            for node in nodes:
+                if (node.get("id") == "owner"
+                        and node.get("deleted") is not True
+                        and node.get("personId") is not None
+                        and node["personId"] != owner_row_id):
+                    raise WorkspaceError(
+                        "diagram_owner_mismatch",
+                        "node owner.personId phải khớp stage.owner_row_id",
+                        details={"owner_row_id": owner_row_id,
+                                 "node_personId": node["personId"]})
+        clean_state = _persisted_state(checked)
+        if case_type == CASE_TYPE_INHERITANCE:
+            pruned = _prune_positions(clean_state["nodes"], len(assets))
+            if pruned:
+                warnings.append({
+                    "code": "diagram.selection_pruned",
+                    "message": "Dấu chọn tài sản ngoài vị trí hiện có "
+                               "đã được gỡ"})
+            render_model = self._evaluate_inheritance(
+                clean_state, valid_row_ids=valid_rows, people=people)
+            if render_model.get("status") == "invalid":
+                softened = _softened_incomplete(render_model)
+                if softened is None:
+                    raise WorkspaceError(
+                        "diagram_invalid_state",
+                        "diagram state bị engine từ chối",
+                        details={"errors": render_model.get("errors") or []})
+                render_model = softened
+        else:
+            render_model = unsupported_render_model()
+        return clean_state, render_model, warnings
+
     # -------------------------------------------------------- diagram_save
 
     def save_diagram(self, case_id: int, base_revision: int,
                      state: Any) -> dict:
-        """`notary.diagram_save` — atomic: persist state + render_model +
-        revision+1 (§13.4). Prune dấu chọn ngoài vị trí asset trong cùng
-        transaction + warning `diagram.selection_pruned` trên result."""
+        """`notary.diagram_save` — persist Diagram JSON v4, giữ status;
+        revision+1 (§13.4). Không rewrite Stage/master."""
         case = self._load_case(case_id)
-        if case.is_locked:
-            raise WorkspaceError(
-                "workspace_locked", f"Hồ sơ #{case_id} đang bị khóa")
         case_type, _ = _case_meta(case)
         if case_type not in CASE_TYPES:
             raise WorkspaceError(
@@ -425,89 +543,52 @@ class InheritanceWorkspaceService:
                 f"Revision server hiện là {server_revision}, "
                 f"base_revision={base_revision}",
                 details={"server_revision": server_revision})
-        self._check_domain(state, case_type)
-        errors = _validate_diagram_wire(state)
-        if errors:
-            raise WorkspaceError(
-                "diagram_invalid_state",
-                f"diagram state có {len(errors)} lỗi",
-                details={"errors": errors})
 
         try:
             from services.case_workspace import CaseWorkspaceService
             case_ws = CaseWorkspaceService(self.db)
             composed = self._compose(case)
             valid_rows = {p["row_id"] for p in composed.people}
-            committed_state, _ = case_ws._state_v3(
-                case, composed.payload, composed.entity_to_row,
-                domain=case_type, valid_row_ids=valid_rows,
-                asset_count=len(composed.assets))
+            committed_state = case_ws._state_v3(
+                composed.payload, domain=case_type,
+                valid_row_ids=valid_rows,
+                asset_count=len(composed.assets),
+                person_rows={p["row_id"]: p for p in composed.people})
             owner_row_id = None
             if case_type == CASE_TYPE_INHERITANCE:
                 owner_row_id = case_ws._resolve_owner_row_id(
                     composed.payload, committed_state, valid_rows)
-                owner_pid = next(
-                    (n.get("personId") for n in state["nodes"]
-                     if n.get("id") == "owner" and n.get("deleted") is not True
-                     and n.get("personId") is not None), None)
-                if owner_pid is not None and owner_pid != owner_row_id:
-                    raise WorkspaceError(
-                        "diagram_owner_mismatch",
-                        "node owner.personId phải khớp stage.owner_row_id "
-                        "đã commit",
-                        details={"owner_row_id": owner_row_id,
-                                 "node_personId": owner_pid})
-            _check_person_refs(state, valid_rows)
-
-            clean_state = _persisted_state(state)
-            diagram_warnings = []
-            resolved_people = [
-                (p["row_id"], _to_int(p.get("id")) or p.get("id"), p)
-                for p in composed.persisted_people]
-            resolved_assets = [
-                (a["row_id"], _to_int(a.get("id")) or a.get("id"), a)
-                for a in composed.persisted_assets]
-            if case_type == CASE_TYPE_INHERITANCE:
-                if _prune_positions(
-                        clean_state["nodes"], len(composed.assets)):
-                    diagram_warnings.append({
-                        "code": "diagram.selection_pruned",
-                        "message": "Dấu chọn tài sản ngoài vị trí hiện có "
-                                   "đã được gỡ"})
-                people_map = _people_map(resolved_people)
-                people_by_id = {p["row_id"]: {"ngay_chet": p["ngay_chet"]}
-                                for p in composed.people}
-                render_model = run_inheritance_case(
-                    {"version": 2,
-                     "nodes": _v3_to_v2_nodes(clean_state["nodes"])},
-                    people_by_id)
-                legacy_nodes = _v2_to_legacy_nodes(
-                    _v3_to_v2_nodes(clean_state["nodes"]), people_map)
-            else:
-                render_model = unsupported_render_model()
-                legacy_nodes = None
+            stage_view = {
+                "people": composed.people,
+                "assets": composed.assets,
+                "owner_row_id": owner_row_id,
+            }
+            clean_state, render_model, diagram_warnings =                 self.prepare_diagram(case_type=case_type,
+                                     stage=stage_view, state=state)
 
             now = _utc_now_iso()
             case.case_state_json = json.dumps(
                 case_ws._build_payload(
-                    composed.payload, resolved_people,
-                    resolved_assets, clean_state, render_model,
-                    legacy_nodes, now, domain=case_type,
-                    owner_row_id=owner_row_id),
+                    composed.payload, clean_state, render_model, now,
+                    domain=case_type, owner_row_id=owner_row_id,
+                    warnings=diagram_warnings),
                 ensure_ascii=False)
+            case.engine_state_json = None
             if case_type == CASE_TYPE_INHERITANCE:
-                case.engine_state_json = json.dumps(
-                    {"version": 2, "updatedAt": now, "nodes": legacy_nodes},
-                    ensure_ascii=False)
-                case_ws._sync_participants_and_owner(case, legacy_nodes)
+                role_nodes = _project_role_nodes(
+                    clean_state["nodes"], composed.people)
+                case_ws._sync_participants_and_owner(
+                    case, role_nodes, composed.people, owner_row_id)
             self.db.flush()
 
             new_revision = server_revision + 1
             from sqlalchemy import text as sa_text
+            saved_at = case_saved_at()
             updated = self.db.execute(sa_text(
-                "UPDATE inheritance_cases SET workspace_revision = :rev "
+                "UPDATE inheritance_cases "
+                "SET workspace_revision = :rev, updated_at = :now "
                 "WHERE id = :cid AND workspace_revision = :base"),
-                {"rev": new_revision, "cid": case.id,
+                {"rev": new_revision, "now": saved_at, "cid": case.id,
                  "base": server_revision})
             if updated.rowcount != 1:
                 self.db.rollback()
@@ -538,8 +619,7 @@ class InheritanceWorkspaceService:
     @staticmethod
     def _check_domain(state: Any, case_type: str) -> None:
         """state.domain hợp lệ nhưng khác case_type hiệu lực →
-        `diagram_domain_mismatch` — kiểm TRƯỚC wire validation (§13.5;
-        domain invalid → `diagram_invalid_state` ở wire check sau đó)."""
+        `diagram_domain_mismatch` — kiểm TRƯỚC wire validation."""
         if isinstance(state, Mapping):
             domain = state.get("domain")
             if domain in CASE_TYPES and domain != case_type:
@@ -551,16 +631,13 @@ class InheritanceWorkspaceService:
     def _evaluate_inheritance(self, state: Mapping[str, Any], *,
                               valid_row_ids: set,
                               people: list) -> dict:
-        """Bọc engine thừa kế + Pool warning — CHỈ cho domain inheritance.
-
-        Pool = Stage committed − personId đã assign trên node → warning
-        `diagram.unassigned_pool_person` (+ `diagram.missing_death_date`
-        nếu engine chưa báo)."""
+        """Bọc engine thừa kế + Pool warning — CHỈ cho domain inheritance."""
         v3_nodes = [n for n in state["nodes"]
                     if n.get("personId") in valid_row_ids
                     or n.get("personId") is None]
         people_by_id = {
-            p["row_id"]: {"ngay_chet": p.get("ngay_chet")}
+            p["row_id"]: {"ngay_chet": p.get("ngay_chet"),
+                          "loai_giay_to": p.get("loai_giay_to")}
             for p in people}
         render_model = run_inheritance_case(
             {"version": 2, "nodes": _v3_to_v2_nodes(v3_nodes)},
@@ -583,16 +660,12 @@ class InheritanceWorkspaceService:
                     "message": "Người trong Stage chưa có ngày chết"})
                 warned.add("diagram.missing_death_date")
         render_model["warnings"] = warnings
-        # Pool còn người chưa gán → draft chưa hoàn chỉnh (giữ semantics
-        # v1 + mock: chỉ hạ status khi engine tính xong trọn vẹn).
         if unassigned and render_model.get("status") == "complete":
             render_model["status"] = "incomplete"
         return render_model
 
     def _compose(self, case: InheritanceCase):
-        """Reuse seam compose của case_workspace — đọc stage committed theo
-        đúng normalize (row_id/entity_id) mà không persist migrate-on-read
-        (evaluate/save tự persist riêng qua _build_payload)."""
+        """Stage wire đọc từ rows Storage B (không persist khi đọc)."""
         from services.case_workspace import CaseWorkspaceService
         return CaseWorkspaceService(self.db)._compose_stage(case)
 
