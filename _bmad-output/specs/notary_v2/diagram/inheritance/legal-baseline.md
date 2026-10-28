@@ -1,5 +1,7 @@
 # Nền pháp lý thừa kế — đối chiếu điều luật
 
+> ⚠️ **chưa được luật sư rà soát**
+
 > **Vai trò:** file duy nhất trong spec ghi **số điều luật**. `business-rules.md`
 > giữ nguyên quy ước "không ghi số điều" và trỏ về đây. Quyết định đã chốt nằm ở
 > [`decision-80`](../../../../../docs/decisions/decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md);
