@@ -985,12 +985,21 @@ function createDiagramPane(ctx) {
         }
       } else {
         const empty = nodes.filter((n) => !n.personId);
-        if (empty.length) {
+        // Luật A (D-048 v2): người còn sống không đề xuất ô Chủ đất
+        // (owner) trong menu gán — movePerson ở model cũng chặn.
+        const rowAlive = !String(row.ngay_chet || '').trim();
+        const ownerFiltered = rowAlive
+          ? empty.filter((n) => n.id !== 'owner') : empty;
+        if (ownerFiltered.length) {
           body.append(h('div', 'muted', 'Ô đang trống:'));
           const grid = h('div', 'cd-tight');
-          for (const n of empty) {
+          for (const n of ownerFiltered) {
             grid.append(btn(`Gán vào “${refName(n)}”`, 'secondary sm',
               assign(n.id)));
+          }
+          if (rowAlive && empty.length > ownerFiltered.length) {
+            grid.append(h('div', 'muted small',
+              'Ô “Chủ đất” chỉ nhận người đã mất.'));
           }
           body.append(grid);
         }
@@ -1250,6 +1259,17 @@ function createDiagramPane(ctx) {
     if ((model.state.renderModel?.warnings || []).some((warning) =>
       warning.code === 'missing_death_date' && warning.personId === n.personId)) {
       card.append(h('div', 'cd-badge cd-badge-warn', 'thiếu ngày mất'));
+    }
+    // Luật A (D-048 v2): node owner mirror stage.owner_row_id — người
+    // còn sống ở đây là trạng thái không hợp lệ (đã bị chặn gán mới,
+    // nhưng dữ liệu cũ có thể còn). Nhãn chỉ đọc, không auto-gỡ.
+    if (n.id === 'owner' && n.personId) {
+      const row = (model.state.stage.people || []).find(
+        (pr) => pr && pr.row_id === n.personId);
+      if (row && !String(row.ngay_chet || '').trim()) {
+        card.append(h('div', 'cd-badge cd-badge-warn',
+          'còn sống — không hợp lệ làm chủ đất'));
+      }
     }
     if (spouseOwner && n.personId) {
       const text = spouseLawful ? 'Vợ/chồng hợp pháp'

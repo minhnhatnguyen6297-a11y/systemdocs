@@ -102,7 +102,8 @@ function seedExistingCase(model) {
   s.committed = {
     people: [{ row_id: 'c1', ho_ten: 'Người Đã Lưu',
                ngay_sinh: '1955-01-01', so_giay_to: '001234' }],
-    assets: [{ row_id: 'cA1', so_serial: 'S-001' }],
+    assets: [{ row_id: 'cA1', so_serial: 'S-001',
+               so_thua_dat: '1', so_to_ban_do: '1' }],
   };
   s.stage = structuredClone(s.committed);
   s.stage.owner_row_id = 'c1';
@@ -464,7 +465,7 @@ test('MIN-136: Pool nháp mới lấy stage.people — thả được ngay chưa
   let pane = collect(view.el, (e) => e.classList.contains('cd-pool'))[0];
   assert.match(pane.textContent, /Chưa có người\./);
   // Them nguoi vao stage nhap → xuat hien trong Pool ngay.
-  model.addPerson();
+  model.addPerson({ ngay_chet: '2021-01-01' });
   model.state.stage.people[0].ho_ten = 'Người Nháp Mới';
   model.dismissNotice();
   pane = collect(view.el, (e) => e.classList.contains('cd-pool'))[0];
@@ -742,9 +743,9 @@ test('MIN-133 D2: không card Thông tin hồ sơ; Lưu hồ sơ tạo mới g�
         (e) => e.getAttribute('aria-label') === lbl).length, 0,
         `còn ô "${lbl}"`);
     }
-    const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+    const owner = model.addPerson({ ho_ten: 'Người Để Lại', ngay_chet: '2021-01-01' });
     model.setOwnerRow(owner.row_id);
-    model.addAsset({ so_serial: 'AA000001' });
+    model.addAsset({ so_serial: 'AA000001', so_thua_dat: '10', so_to_ban_do: '2' });
     const draftKey = model.state.draftId;
     calls.length = 0;
     await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
@@ -2169,9 +2170,10 @@ function saveCaseRespond(workspace) {
 test('B1: một lần bấm gửi đúng một workspace_save_case cùng snapshot', async () => {
   const respond = saveCaseRespond();
   const { model, view, calls } = await build(test, { draft: true, respond });
-  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại', ngay_chet: '2021-01-01' });
   model.setOwnerRow(owner.row_id);
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'Thửa A' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'Thửa A',
+                   so_thua_dat: '10', so_to_ban_do: '2' });
   const key = model.state.draftId;
   // Gõ vào DOM nhưng KHÔNG bắn input/change — bridge click phải flush.
   fid(view.el, 'meta:noi_niem_yet').value = 'Xã Mới';
@@ -2209,9 +2211,9 @@ test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi 
   const respond = saveCaseRespond();
   const { model, view, calls, notifications } = await build(test,
     { draft: true, respond });
-  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại', ngay_chet: '2021-01-01' });
   model.setOwnerRow(owner.row_id);
-  model.addAsset({ so_serial: 'AA000001' });
+  model.addAsset({ so_serial: 'AA000001', so_thua_dat: '10', so_to_ban_do: '2' });
 
   // Ngày hợp lệ dd/mm/yyyy.
   const birth = fid(view.el, `p:${owner.row_id}:ngay_sinh`);
@@ -2243,6 +2245,11 @@ test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi 
   await findBtns(view.el, 'Lưu hồ sơ')[0].onclick();
   assert.equal(calls.filter(([c]) => c === 'notary.workspace_save_case').length,
     0, 'ngày sai không được gửi snapshot thiếu');
+  // Save flush rerender → lấy lại tham chiếu DOM mới.
+  bad = fid(view.el, `p:${owner.row_id}:ngay_sinh`);
+  console.error('DBG bad.value=%j class=%j dirty=%j owner=%j fieldErrs=%j notifications=%j',
+    bad.value, bad.className, model.state.stageDirty, model.state.stage.owner_row_id,
+    JSON.stringify(model.state.fieldErrors), notifications.length);
   assert.equal(bad.classList.contains('cd-input-bad'), true,
     'ô ngày sai phải được đánh dấu');
   // R13: một dòng lỗi trong card chứa ô, không toast.
@@ -2259,9 +2266,9 @@ test('B2: ô text + ô ngày đang sửa được flush; ngày sai không gửi 
 test('B2: ký tự gõ dở trong ô ngày rỗng → null, không chặn lưu', async () => {
   const respond = saveCaseRespond();
   const { model, view, calls } = await build(test, { draft: true, respond });
-  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại', ngay_chet: '2021-01-01' });
   model.setOwnerRow(owner.row_id);
-  model.addAsset({ so_serial: 'AA000001' });
+  model.addAsset({ so_serial: 'AA000001', so_thua_dat: '10', so_to_ban_do: '2' });
   const birth = fid(view.el, `p:${owner.row_id}:ngay_sinh`);
   birth.value = '';
   calls.length = 0;
@@ -2289,9 +2296,9 @@ test('R14: Lưu hồ sơ — spinner tại nút, xong tích xanh, không toast c
     });
   };
   const { model, view, notifications } = await build(test, { draft: true, respond });
-  const owner = model.addPerson({ ho_ten: 'Người Để Lại' });
+  const owner = model.addPerson({ ho_ten: 'Người Để Lại', ngay_chet: '2021-01-01' });
   model.setOwnerRow(owner.row_id);
-  model.addAsset({ so_serial: 'AA000001' });
+  model.addAsset({ so_serial: 'AA000001', so_thua_dat: '10', so_to_ban_do: '2' });
   const saveBtn = findBtns(view.el, 'Lưu hồ sơ')[0];
   const pending = saveBtn.onclick();
   await new Promise((r) => setTimeout(r, 0));
@@ -2555,6 +2562,66 @@ test('R13: lỗi không gắn ô → một dòng ở slot Stage, không banner t
     (e) => e.classList.contains('banner') &&
       e.classList.contains('err')).length, 0,
     'không còn banner lỗi toàn cục');
+});
+
+// ---- D-048 (S5b): dòng lỗi là nút nhảy tới ô, ô gắn data-fid ----
+
+test('D-048 view: lỗi field tài sản có row_id → nút nhảy bấm focus ô', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.fieldErrors = [
+    { row_id: 'cA1', field: 'so_thua_dat', code: 'required' }];
+  model.dismissNotice();
+  // Ô lỗi có data-fid a:cA1:so_thua_dat (đích của nút).
+  assert.ok(fid(view.el, 'a:cA1:so_thua_dat'),
+    'ô tài sản phải gắn data-fid');
+  const slot = collect(
+    collect(view.el, (e) => e.classList.contains('cd-assets'))[0],
+    (e) => e.classList.contains('cd-card-errslot'))[0];
+  const btn = collect(slot,
+    (e) => e.classList.contains('cd-err-jump'))[0];
+  assert.ok(btn, 'dòng lỗi phải là nút nhảy');
+  const input = fid(view.el, 'a:cA1:so_thua_dat');
+  let focused = false;
+  input.focus = () => { focused = true; };
+  btn.onclick();
+  assert.equal(focused, true, 'bấm nút focus ô lỗi');
+  assert.equal(input.classList.contains('cd-err-flash'), true,
+    'ô có hiệu ứng nhấp nháy ngắn');
+});
+
+test('D-048 view: lỗi không có ô đích (field assets) giữ dòng chữ thường', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.fieldErrors = [
+    { row_id: null, field: 'assets', code: 'required' }];
+  model.dismissNotice();
+  const slot = collect(
+    collect(view.el, (e) => e.classList.contains('cd-assets'))[0],
+    (e) => e.classList.contains('cd-card-errslot'))[0];
+  assert.equal(collect(slot,
+    (e) => e.classList.contains('cd-err-jump')).length, 0,
+    'không có nút nhảy khi không biết ô đích');
+  assert.match(slot.textContent, /chưa có tài sản/);
+});
+
+test('D-048 view: row_id chứa ký tự selector lạ → giữ dòng chữ, không crash', async () => {
+  const { model, view } = await build(test, { draft: false });
+  model.state.fieldErrors = [
+    { row_id: 'c"1[x]', field: 'ho_ten', code: 'required' },
+    { row_id: 'c1', field: 'ho_ten', code: 'required' }];
+  model.dismissNotice();
+  const slot = collect(
+    collect(view.el, (e) => e.classList.contains('cd-people'))[0],
+    (e) => e.classList.contains('cd-card-errslot'))[0];
+  assert.match(slot.textContent, /Họ tên/);
+  const btns = collect(slot,
+    (e) => e.classList.contains('cd-err-jump'));
+  assert.equal(btns.length, 1,
+    'chỉ row_id an toàn có nút nhảy');
+  let focused = false;
+  const input = fid(view.el, 'p:c1:ho_ten');
+  input.focus = () => { focused = true; };
+  btns[0].onclick();
+  assert.equal(focused, true, 'nút hợp lệ vẫn nhảy đúng ô');
 });
 
 // ---------- R16 / N1 / N9 ----------

@@ -1304,7 +1304,7 @@ test('asset_limit — cho phép 5 tài sản, từ chối tài sản thứ 6 ở
   for (let i = 1; i <= M.MAX_ASSETS; i += 1) {
     assert.ok(model.addAsset({ so_serial: `MM${String(i).padStart(6, '0')}` }));
   }
-  assert.equal(model.addAsset({ so_serial: 'MM000006' }), null);
+  assert.equal(model.addAsset({ so_serial: 'MM000006', so_thua_dat: '1', so_to_ban_do: '1' }), null);
   assert.equal(model.state.stage.assets.length, M.MAX_ASSETS);
 });
 
@@ -1314,7 +1314,7 @@ test('asset serial: new/cleared rỗng giữ "" và wire gửi chuỗi rỗng', 
   const person = model.addPerson({ ho_ten: 'Chủ đất' });
   model.setOwnerRow(person.row_id);
 
-  const asset = model.addAsset();
+  const asset = model.addAsset({ so_thua_dat: '1', so_to_ban_do: '1' });
   assert.equal(asset.so_serial, '');
 
   model.updateAssetField(asset.row_id, 'so_serial', '  RAW  ');
@@ -1532,7 +1532,7 @@ test('pool = committed Stage − personId dang gan tren draft Diagram', async ()
 test('pool: person vua them tren case da luu xuat hien ngay va gan duoc truoc Luu', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.openCase(43);
-  const row = model.addPerson({ ho_ten: 'Draft chưa lưu' });
+  const row = model.addPerson({ ho_ten: 'Draft chưa lưu', ngay_chet: '2021-01-01' });
   assert.equal(model.pool().people.length, 1);
   assert.equal(model.pool().people[0].row_id, row.row_id);
   assert.equal(model.isStageEmpty(), false);
@@ -1712,7 +1712,8 @@ test('lastOwnerCascadeNodes: pre-check N khong touch draft, khong goi engine', (
     { row_id: 'c1', ho_ten: 'Owner' },
     { row_id: 'c2', ho_ten: 'Con' },
     { row_id: 'c3', ho_ten: 'Chau' }],
-    assets: [{ row_id: 'a1', so_serial: 'MM000001' }] };
+    assets: [{ row_id: 'a1', so_serial: 'MM000001',
+               so_thua_dat: '12', so_to_ban_do: '3' }] };
   s.stage = structuredClone(s.committed);
   s.stage.owner_row_id = 'c1';
   s.committedDiagram = { version: M.DIAGRAM_VERSION, domain: 'inheritance',
@@ -1790,10 +1791,10 @@ test('toggleNodePosition/setNodeRelation/addSlot: no-op tren two_party', async (
 test('applyAssignDefaults: owner → ownPositions het; node khac → own=[], receive=[] (= từ chối)', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.newDraft();                          // MIN-136: 1 node owner
-  const a = model.addPerson({ ho_ten: 'Owner' });
+  const a = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
   const b = model.addPerson({ ho_ten: 'Heir' });
-  model.addAsset({ so_serial: 'MM000001' });
-  model.addAsset({ so_serial: 'MM000002' });
+  model.addAsset({ so_serial: 'MM000001', so_thua_dat: '1', so_to_ban_do: '1' });
+  model.addAsset({ so_serial: 'MM000002', so_thua_dat: '1', so_to_ban_do: '1' });
   // Gan owner → ownPositions default [1,2], receive giu rong
   model.assignPerson('owner', a.row_id);
   const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
@@ -1814,22 +1815,22 @@ test('applyAssignDefaults: owner → ownPositions het; node khac → own=[], rec
 test('position defaults: owner assigned without assets expands with every added asset', async () => {
   const { model } = makeModel({});
   await model.newDraft();
-  const person = model.addPerson({ ho_ten: 'Owner' });
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
   model.assignPerson('owner', person.row_id);
   const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
   assert.deepEqual(owner.ownPositions, []);
-  model.addAsset({ so_serial: 'G1-1' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.deepEqual(owner.ownPositions, [1]);
-  model.addAsset({ so_serial: 'G1-2' });
+  model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.deepEqual(owner.ownPositions, [1, 2]);
 });
 
 test('position defaults: removing an asset shrinks untouched ownership', async () => {
   const { model } = makeModel({});
   await model.newDraft();
-  const person = model.addPerson({ ho_ten: 'Owner' });
-  model.addAsset({ so_serial: 'G1-1' });
-  const removed = model.addAsset({ so_serial: 'G1-2' });
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  const removed = model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
   model.assignPerson('owner', person.row_id);
   const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
   assert.deepEqual(owner.ownPositions, [1, 2]);
@@ -1841,16 +1842,16 @@ for (const empty of [false, true]) {
   test(`position defaults: manual ownership ${empty ? 'empty' : 'subset'} survives add and repeated saves`, async () => {
     const { model, client } = makeModel({});
     await model.newDraft();
-    const person = model.addPerson({ ho_ten: 'Owner' });
-    model.addAsset({ so_serial: 'G1-1' });
-    if (!empty) model.addAsset({ so_serial: 'G1-2' });
+    const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+    model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+    if (!empty) model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
     model.assignPerson('owner', person.row_id);
     model.toggleNodePosition('owner', 'own', 1);
     const expected = empty ? [] : [2];
-    model.addAsset({ so_serial: 'G1-3' });
+    model.addAsset({ so_serial: 'G1-3', so_thua_dat: '1', so_to_ban_do: '1' });
     assert.deepEqual(model.state.diagram.nodes[0].ownPositions, expected);
     assert.equal((await model.saveCase()).ok, true);
-    model.addAsset({ so_serial: 'G1-4' });
+    model.addAsset({ so_serial: 'G1-4', so_thua_dat: '1', so_to_ban_do: '1' });
     assert.equal((await model.saveCase()).ok, true);
     const sent = client.calls.filter((c) =>
       c.command === 'notary.workspace_save_case');
@@ -1864,9 +1865,9 @@ for (const empty of [false, true]) {
 test('position defaults: saveCase sends ownership after adding first asset without diagram edits', async () => {
   const { model, client } = makeModel({});
   await model.newDraft();
-  const person = model.addPerson({ ho_ten: 'Owner' });
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
   model.assignPerson('owner', person.row_id);
-  model.addAsset({ so_serial: 'G1-1' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.equal((await model.saveCase()).ok, true);
   const call = client.calls.find((c) => c.command === 'notary.workspace_save_case');
   assert.deepEqual(call.payload.diagram.state.nodes[0].ownPositions, [1]);
@@ -1876,13 +1877,13 @@ test('position defaults: saveCase sends ownership after adding first asset witho
 test('position defaults: empty owner stays empty when another node owns assets', async () => {
   const { model } = makeModel({});
   await model.newDraft();
-  const person = model.addPerson({ ho_ten: 'Owner' });
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
   const other = model.addPerson({ ho_ten: 'Other owner' });
   model.assignPerson('owner', person.row_id);
   const slot = model.addSlot();
   model.assignPerson(slot.id, other.row_id);
   model.toggleNodePosition(slot.id, 'own', 1);
-  model.addAsset({ so_serial: 'G1-1' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.deepEqual(model.state.diagram.nodes[0].ownPositions, []);
   assert.deepEqual(slot.ownPositions, [1]);
 });
@@ -1890,9 +1891,9 @@ test('position defaults: empty owner stays empty when another node owns assets',
 test('WP5 node tests: drop 2nd person → own=[], receive=[]; add asset doesn\'t change unticked; owner gets new position', async () => {
   const { model } = makeModel({});
   await model.newDraft();
-  const ownerPerson = model.addPerson({ ho_ten: 'Owner' });
+  const ownerPerson = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
   const secondPerson = model.addPerson({ ho_ten: 'Second' });
-  model.addAsset({ so_serial: 'A1' });
+  model.addAsset({ so_serial: 'A1', so_thua_dat: '1', so_to_ban_do: '1' });
 
   // Drop owner → owner gets all positions
   model.assignPerson('owner', ownerPerson.row_id);
@@ -1908,7 +1909,7 @@ test('WP5 node tests: drop 2nd person → own=[], receive=[]; add asset doesn\'t
   assert.deepEqual(secondNode.receivePositions, []);
 
   // Add asset doesn't change unticked; owner gets new position
-  model.addAsset({ so_serial: 'A2' });
+  model.addAsset({ so_serial: 'A2', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.deepEqual(ownerNode.ownPositions, [1, 2]);
   assert.deepEqual(secondNode.ownPositions, []);
   assert.deepEqual(secondNode.receivePositions, []);
@@ -1916,7 +1917,7 @@ test('WP5 node tests: drop 2nd person → own=[], receive=[]; add asset doesn\'t
   // Adding asset appends position only to people who already ticked that kind
   model.toggleNodePosition(slot.id, 'receive', 1);
   assert.deepEqual(secondNode.receivePositions, [1]);
-  model.addAsset({ so_serial: 'A3' });
+  model.addAsset({ so_serial: 'A3', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.deepEqual(ownerNode.ownPositions, [1, 2, 3]);
   assert.deepEqual(secondNode.receivePositions, [1, 3]);
   assert.deepEqual(secondNode.ownPositions, []);
@@ -1925,9 +1926,9 @@ test('WP5 node tests: drop 2nd person → own=[], receive=[]; add asset doesn\'t
 test('position defaults: saveCase synchronizes defaults before capturing payload', async () => {
   const { model, client } = makeModel({});
   await model.newDraft();
-  const person = model.addPerson({ ho_ten: 'Owner' });
-  model.addAsset({ so_serial: 'G1-1' });
-  model.addAsset({ so_serial: 'G1-2' });
+  const person = model.addPerson({ ho_ten: 'Owner', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
+  model.addAsset({ so_serial: 'G1-2', so_thua_dat: '1', so_to_ban_do: '1' });
   model.assignPerson('owner', person.row_id);
   // Represent an untouched partial default loaded into the draft buffer.
   model.state.diagram.nodes[0].ownPositions = [1];
@@ -1942,14 +1943,14 @@ test('position defaults: newDraft and openCase reset manual selection tracking',
   await model.openCase(42);
   model.toggleNodePosition('owner', 'own', 1);
   await model.openCase(42);
-  model.addAsset({ so_serial: 'G1-3' });
+  model.addAsset({ so_serial: 'G1-3', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.deepEqual(model.state.diagram.nodes.find((n) =>
     n.id === 'owner').ownPositions, [1, 2, 3]);
   model.toggleNodePosition('owner', 'own', 1);
   await model.newDraft();
-  const person = model.addPerson({ ho_ten: 'New owner' });
+  const person = model.addPerson({ ho_ten: 'New owner', ngay_chet: '2021-01-01' });
   model.assignPerson('owner', person.row_id);
-  model.addAsset({ so_serial: 'G1-1' });
+  model.addAsset({ so_serial: 'G1-1', so_thua_dat: '1', so_to_ban_do: '1' });
   assert.deepEqual(model.state.diagram.nodes[0].ownPositions, [1]);
 });
 
@@ -2388,7 +2389,7 @@ test('locked case: moi mutation draft la no-op — addPerson/addAsset/update/rem
 
   // Stage mutations — tra null, khong doi draft, khong dirty
   assert.equal(model.addPerson({ ho_ten: 'X' }), null);
-  assert.equal(model.addAsset({ so_serial: 'S1' }), null);
+  assert.equal(model.addAsset({ so_serial: 'S1', so_thua_dat: '1', so_to_ban_do: '1' }), null);
   assert.equal(s.stage.people.length, 2);
   assert.equal(s.stage.assets.length, 1);
   const pid = s.stage.people[0].row_id;
@@ -2724,7 +2725,7 @@ test('W1: hồ sơ mới bấm Xuất → tự tạo + lưu trước rồi xuấ
   await model.newDraft();
   const person = model.addPerson({ ho_ten: 'Nguyễn Văn A' });
   assert.ok(model.setOwnerRow(person.row_id));
-  assert.ok(model.addAsset({ so_serial: 'S1' }));
+  assert.ok(model.addAsset({ so_serial: 'S1', so_thua_dat: '1', so_to_ban_do: '1' }));
   const r = await model.exportWord(
     ['Mau thue nha.docx'], { file_token: 'dest' },
     { templateDir: { file_token: 'tok-tpl' } });
@@ -2893,7 +2894,7 @@ function sourceStage() {
       owner_row_id: owner,
       people: [
         { row_id: owner, entity_id: 12, ho_ten: 'Người Chủ',
-          gioi_tinh: null, ngay_sinh: '1950', ngay_chet: null,
+          gioi_tinh: null, ngay_sinh: '1950', ngay_chet: '2020-01-01',
           so_giay_to: '001', ngay_cap: null, noi_cap: null,
           dia_chi: null, place_of_origin: null,
           loai_giay_to: null, loai_dia_chi: null },
@@ -2905,13 +2906,13 @@ function sourceStage() {
       ],
       assets: [
         { row_id: asset, entity_id: 21, so_serial: 'SRC 001',
-          so_vao_so: null, so_thua_dat: null, so_to_ban_do: null,
+          so_vao_so: null, so_thua_dat: '1', so_to_ban_do: '1',
           dia_chi: null, loai_so: null, hinh_thuc_su_dung: null,
           thoi_han: '2063', nguon_goc: null, ngay_cap: null,
           co_quan_cap: null, land_rows: null },
         { row_id: crypto.randomUUID(), entity_id: null,
-          so_serial: '', so_vao_so: null, so_thua_dat: null,
-          so_to_ban_do: null, dia_chi: null, loai_so: null,
+          so_serial: '', so_vao_so: null, so_thua_dat: '2',
+          so_to_ban_do: '2', dia_chi: null, loai_so: null,
           hinh_thuc_su_dung: null, thoi_han: null, nguon_goc: null,
           ngay_cap: null, co_quan_cap: null, land_rows: [] },
       ],
@@ -3135,7 +3136,7 @@ test('newTwoPartyState: canonical p1..p30 — export dung cho test/view', async 
 test('newDraft: draft diagram dung stage nhap — assign tu stage, pool tu stage', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.newDraft();
-  const row = model.addPerson({ ho_ten: 'Người Nháp' });
+  const row = model.addPerson({ ho_ten: 'Người Nháp', ngay_chet: '2020-01-01' });
   assert.ok(row);
   assert.equal(model.pool().people.length, 1);
   assert.equal(model.assignPerson('owner', row.row_id), true);
@@ -3147,7 +3148,7 @@ test('newDraft: draft diagram dung stage nhap — assign tu stage, pool tu stage
 test('movePerson: move vao node trong / swap / unassign ve Pool — owner mirror theo pointer', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.newDraft();
-  const a = model.addPerson({ ho_ten: 'A' });
+  const a = model.addPerson({ ho_ten: 'A', ngay_chet: '2020-01-01' });
   const b = model.addPerson({ ho_ten: 'B' });
   const sp = model.addSlot();                    // slot thu cong (API noi bo)
   model.assignPerson('owner', a.row_id);
@@ -3179,8 +3180,8 @@ test('updateCaseMeta: nhap local; saveCase gui meta day du + idempotency_key', a
   assert.equal(model.updateCaseMeta('document_type', 'thoa_thuan'), true);
   assert.equal(model.updateCaseMeta('noi_niem_yet', 'xã Yên Sở'), true);
   assert.equal(model.updateCaseMeta('bogus', 'x'), false);
-  const owner = model.addPerson({ ho_ten: 'Người Chết' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  const owner = model.addPerson({ ho_ten: 'Người Chết', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   model.assignPerson('owner', owner.row_id);
   const draftId = model.state.draftId;
   const r = await model.saveCase();
@@ -3210,7 +3211,7 @@ test('saveCase two_party: payload khong owner_row_id, case_type two_party', asyn
   await model.newDraft('two_party');
   model.addPerson({ ho_ten: 'Bên A 1' });
   model.addPerson({ ho_ten: 'Bên B 1' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   const ps = model.state.stage.people;
   model.assignPerson('p1', ps[0].row_id);
   model.assignPerson('p16', ps[1].row_id);
@@ -3255,8 +3256,8 @@ test('saveCase: retry sau loi mang giu draftId → created:true mot lan, khong t
   const client = fakeClient({});
   const model = M.createModel({ client, uuid });
   await model.newDraft();
-  const owner = model.addPerson({ ho_ten: 'Người Chết' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  const owner = model.addPerson({ ho_ten: 'Người Chết', ngay_chet: '2020-01-01' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   model.assignPerson('owner', owner.row_id);
   const draftId = model.state.draftId;
   const orig = client.run.bind(client);
@@ -3290,7 +3291,7 @@ test('saveCase: stage_validation_error giu nhap + fieldErrors', async () => {
   const { model } = makeModel(seedCases('empty'));
   await model.newDraft();
   const bad = model.addPerson({ ho_ten: '   ' });  // ho_ten trong → required
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   model.setOwnerRow(bad.row_id);                  // pointer hop le → toi
                                                   // duoc field check
   const r = await model.saveCase();
@@ -3304,7 +3305,7 @@ test('saveCase new: thieu owner → workspace_owner_required, nhap giu nguyen', 
   const { model } = makeModel(seedCases('empty'));
   await model.newDraft();
   model.addPerson({ ho_ten: 'Ai Do' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   const r = await model.saveCase();
   assert.equal(r.ok, false);
   assert.equal(r.error.code, 'workspace_owner_required');
@@ -3314,7 +3315,7 @@ test('saveCase new: thieu owner → workspace_owner_required, nhap giu nguyen', 
 test('evaluateDiagram tren nhap: gui case.case_type + stage, khong gui case_id', async () => {
   const { model, client } = makeModel(seedCases('empty'));
   await model.newDraft();
-  const owner = model.addPerson({ ho_ten: 'Người Chết' });
+  const owner = model.addPerson({ ho_ten: 'Người Chết', ngay_chet: '2020-01-01' });
   model.assignPerson('owner', owner.row_id);
   const r = await model.evaluateDiagram();
   assert.equal(r.ok, true);
@@ -3375,7 +3376,7 @@ test('ca nhap va case cu chi persist khi nguoi dung bam Luu ho so', async () => 
   const { model, client } = makeModel(seedCases('ready'));
   await model.openCase(42);
   model.addPerson({ ho_ten: 'A' });
-  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x' });
+  model.addAsset({ so_serial: 'AA000001', dia_chi: 'x', so_thua_dat: '1', so_to_ban_do: '1' });
   model.assignPerson('spouse', model.state.stage.people.at(-1).row_id);
   // Sửa buffer không phát command ghi nào.
   assert.equal(client.calls.filter((c) => c.command.includes('save') ||
@@ -3617,7 +3618,8 @@ function seedSaveCaseModel(client) {
   s.unsupported = false;
   s.capabilities = { intake: [], diagram: true, word_export: true };
   s.committed = { people: [{ row_id: 'c1', ho_ten: 'Người Đã Lưu' }],
-                  assets: [{ row_id: 'a1', so_serial: 'S-001' }] };
+                  assets: [{ row_id: 'a1', so_serial: 'S-001',
+                             so_thua_dat: '1', so_to_ban_do: '1' }] };
   s.stage = structuredClone(s.committed);
   s.stage.owner_row_id = 'c1';
   s.committedDiagram = { version: 3, domain: 'inheritance', nodes: [
@@ -3986,7 +3988,7 @@ test('G3 addAsset: chi don loi danh sach assets, giu loi khac', async () => {
     { row_id: 'a1', field: 'so_serial', code: 'required', message: 'bat buoc' },
   ];
 
-  assert.ok(model.addAsset({ so_serial: 'G1-9' }));
+  assert.ok(model.addAsset({ so_serial: 'G1-9', so_thua_dat: '1', so_to_ban_do: '1' }));
   assert.deepEqual(model.state.fieldErrors,
                    [{ row_id: 'a1', field: 'so_serial', code: 'required',
                       message: 'bat buoc' }]);
@@ -4004,4 +4006,101 @@ test('G3 addPerson: chi don loi danh sach people, giu loi khac', async () => {
   assert.deepEqual(model.state.fieldErrors,
                    [{ row_id: 'a1', field: 'so_serial', code: 'required',
                       message: 'bat buoc' }]);
+});
+
+// ---- D-048 (owner S5b): tài sản bắt buộc so_thua_dat + so_to_ban_do ----
+
+test('D-048 saveCase: thiếu số thửa/tờ bản đồ → chặn client, không gửi wire', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  // Xóa sạch 2 trường bắt buộc của tài sản đầu (giữ dòng khác hợp lệ).
+  model.updateAssetField(model.state.stage.assets[0].row_id, 'so_thua_dat', '');
+  model.updateAssetField(model.state.stage.assets[0].row_id, 'so_to_ban_do', '');
+  const savesBefore = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case').length;
+  const r = await model.saveCase();
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, 'stage_validation_error');
+  const fe = r.error.details.field_errors;
+  assert.equal(fe.length, 2);
+  assert.deepEqual(
+    fe.map((e) => e.field).sort(), ['so_thua_dat', 'so_to_ban_do']);
+  for (const e of fe) {
+    assert.equal(e.row_id, model.state.stage.assets[0].row_id);
+    assert.equal(e.code, 'required');
+  }
+  const savesAfter = client.calls.filter(
+    (c) => c.command === 'notary.workspace_save_case').length;
+  assert.equal(savesAfter, savesBefore, 'không gọi IPC khi thiếu trường bắt buộc');
+  // Stage giữ nguyên draft (không chuyển trạng thái lưu); '' được model
+  // chuẩn hóa thành null theo ASSET_FIELDS.
+  assert.ok(model.state.stage.assets[0].so_thua_dat == null,
+            'giá trị vẫn trống trong draft');
+});
+
+test('D-048 saveCase: đủ số thửa + tờ bản đồ → đi tiếp tới wire', async () => {
+  const { model, client } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const r = await model.saveCase();
+  if (!r.ok && r.error.code === 'stage_validation_error') {
+    assert.fail('tài sản fixture hợp lệ mà vẫn bị chặn: ' +
+                JSON.stringify(r.error.details));
+  }
+  assert.ok(client.calls.some(
+    (c) => c.command === 'notary.workspace_save_case'));
+});
+
+test('D-048 updateField: lưu bị chặn → sửa đủ trường → gỡ lỗi row đó', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const a0 = model.state.stage.assets[0];
+  model.updateAssetField(a0.row_id, 'so_thua_dat', '');
+  model.updateAssetField(a0.row_id, 'so_to_ban_do', '');
+  const first = await model.saveCase();
+  assert.equal(first.ok, false);
+  assert.equal(model.state.fieldErrors.filter(
+    (e) => e.field === 'so_thua_dat' || e.field === 'so_to_ban_do').length, 2);
+  model.updateAssetField(a0.row_id, 'so_thua_dat', '99');
+  const left = model.state.fieldErrors.filter(
+    (e) => e.field === 'so_thua_dat' || e.field === 'so_to_ban_do');
+  assert.equal(left.length, 1);
+  assert.equal(left[0].field, 'so_to_ban_do');
+  // Sửa nốt → save không còn bị chặn bởi gate này.
+  model.updateAssetField(a0.row_id, 'so_to_ban_do', '8');
+  const second = await model.saveCase();
+  if (!second.ok && second.error.code === 'stage_validation_error') {
+    assert.fail('đã sửa đủ trường mà vẫn chặn: ' +
+                JSON.stringify(second.error.details));
+  }
+});
+
+// ---- Luật A (D-048 v2): người còn sống không gán làm chủ đất ----
+
+test('Luật A assignPerson owner: người còn sống → chặn; đã mất → cho', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const alive = model.addPerson({ ho_ten: 'Còn Sống' });
+  assert.ok(alive);
+  assert.equal(model.assignPerson('owner', alive.row_id), false,
+               'người còn sống không gán được vào owner');
+  const dead = model.addPerson({ ho_ten: 'Đã Mất', ngay_chet: '2020-01-02' });
+  assert.ok(dead);
+  assert.equal(model.assignPerson('owner', dead.row_id), true);
+});
+
+test('Luật A movePerson sang owner: người còn sống → chặn', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const alive = model.addPerson({ ho_ten: 'Còn Sống' });
+  assert.equal(model.movePerson(alive.row_id, 'owner'), false);
+});
+
+test('Luật A pool.personDropBlock: flag forOwnerSlot đúng ý', async () => {
+  const { model } = makeModel(seedCases('ready'));
+  await model.openCase(42);
+  const alive = model.addPerson({ ho_ten: 'Còn Sống' });
+  assert.equal(model.personDropBlock(alive.row_id, true) != null, true,
+               'slot owner: người còn sống bị chặn');
+  assert.equal(model.personDropBlock(alive.row_id, false), null,
+               'slot thường: người còn sống vẫn thả được');
 });

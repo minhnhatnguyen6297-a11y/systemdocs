@@ -690,9 +690,11 @@ function createNotaryModuleView(deps) {
     errorSink = { assets: [], people: [], stage: [] };
   }
 
-  function pushError(card, text) {
+  function pushError(card, rowId, field, text) {
     if (!text || !errorSink[card]) return;
-    if (!errorSink[card].includes(text)) errorSink[card].push(text);
+    if (errorSink[card].some((e) => e.text === text &&
+      e.row_id === rowId && e.field === field)) return;
+    errorSink[card].push({ row_id: rowId, field, text });
   }
 
   function rowCard(rowId) {
@@ -730,7 +732,8 @@ function createNotaryModuleView(deps) {
     const card = rowCard(rowId) || 'people';
     const rl = rowLabelOf(card, rowId) || '';
     for (const fe of errs) {
-      pushError(card, `${rl} · ${fieldLabelOf(card, field)}: ${errLine(fe)}`);
+      pushError(card, rowId, field,
+        `${rl} · ${fieldLabelOf(card, field)}: ${errLine(fe)}`);
     }
     return errs.length;
   }
@@ -741,12 +744,12 @@ function createNotaryModuleView(deps) {
     const errors = s.fieldErrors || [];
     for (const f of ['people', 'owner_row_id']) {
       for (const er of errors.filter((e) => e.field === f)) {
-        pushError('people', er.code === 'required' && CARD_REQUIRED_TEXT.people
+        pushError('people', null, f, er.code === 'required' && CARD_REQUIRED_TEXT.people
           ? CARD_REQUIRED_TEXT.people : errLine(er));
       }
     }
     for (const er of errors.filter((e) => e.field === 'assets')) {
-      pushError('assets', er.code === 'required' && CARD_REQUIRED_TEXT.assets
+      pushError('assets', null, 'assets', er.code === 'required' && CARD_REQUIRED_TEXT.assets
         ? CARD_REQUIRED_TEXT.assets : errLine(er));
     }
     // Lỗi field không có ô trên bảng (noi_cap/place_of_origin/field lạ).
@@ -763,7 +766,7 @@ function createNotaryModuleView(deps) {
         if (shown.has(er.field) || er.field === key) continue;
       }
       const rl = rowLabelOf(card, er.row_id) || '';
-      pushError(card,
+      pushError(card, er.row_id, er.field,
         `${rl} · ${fieldLabelOf(card, er.field)}: ${errLine(er)}`);
     }
     // Lỗi không gắn field nhưng có row (hiếm) → card của row.
@@ -774,15 +777,56 @@ function createNotaryModuleView(deps) {
         ((err.details && err.details.fields &&
           err.details.fields[0] && err.details.fields[0].row_id) || null);
       const card = rowId ? rowCard(rowId) : null;
-      pushError(card || 'stage', errText(err));
+      pushError(card || 'stage', null, null, errText(err));
     }
-    if (localSaveError) pushError(localSaveError.card, localSaveError.text);
+    if (localSaveError) {
+      pushError(localSaveError.card, null, null, localSaveError.text);
+    }
+  }
+
+  // R13/D-048: mỗi dòng lỗi là NÚT — bấm cuộn tới + focus + highlight
+  // ngắn ô lỗi (data-fid `card:row_id:field`). Khi không biết ô đích
+  // (lỗi cấp danh sách/stage) giữ dòng chữ thường.
+  const FID_FOR_FIELD = { land_rows: 'land' };
+  // row_id/field đến từ data có thể chứa ký tự selector — chỉ tra cứu
+  // khi an toàn (alnum, _ - :). Không hợp lệ → giữ dòng chữ thường.
+  const fidRisky = /[^A-Za-z0-9_\-:]/;
+
+  function errTargetFid(card, text) {
+    const rowId = text && text.row_id;
+    if (!rowId) return null;
+    const field = FID_FOR_FIELD[text.field] || text.field || null;
+    const fid = `${card === 'assets' ? 'a' : 'p'}:${rowId}:${field}`;
+    return fidRisky.test(fid) ? null : fid;
+  }
+
+  function scrollToField(el) {
+    if (typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    try { el.focus({ preventScroll: true }); } catch (e) {
+      try { el.focus(); } catch (e2) { /* không focus được */ }
+    }
+    el.classList.add('cd-err-flash');
+    setTimeout(() => el.classList.remove('cd-err-flash'), 1200);
   }
 
   function fillErrorSlot(slot, card) {
     slot.dataset.card = card;
     for (const text of errorSink[card] || []) {
-      slot.append(h('div', 'error small', text));
+      const fid = errTargetFid(card, text);
+      if (!fid) {
+        slot.append(h('div', 'error small', text.text));
+        continue;
+      }
+      const b = h('button', 'error small cd-err-jump', text.text);
+      b.type = 'button';
+      b.setAttribute('aria-label', `Đi tới ô lỗi: ${text.text}`);
+      b.onclick = () => {
+        const el = root.querySelector(`[data-fid="${fid}"]`);
+        if (el) scrollToField(el);
+      };
+      slot.append(b);
     }
     return slot;
   }

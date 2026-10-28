@@ -182,9 +182,43 @@ function personDateIssue(value) {
 
 const PERSON_DATE_FIELDS_CHECK = ['ngay_sinh', 'ngay_chet', 'ngay_cap'];
 
-function personDropBlockReason(people, rowId) {
+// D-048 (owner S5b): mức tối thiểu của dòng Tài sản là 2 trường —
+// số thửa đất + số tờ bản đồ. Còn trống → chặn Lưu hồ sơ ngay ở client
+// (không gửi wire), lỗi gắn row_id + field để view đỏ ô và tên đúng
+// trường ở dòng lỗi.
+const ASSET_REQUIRED_FIELDS = ['so_thua_dat', 'so_to_ban_do'];
+
+function assetRequiredIssue(assets) {
+  const errs = [];
+  for (const a of (assets || [])) {
+    if (!a) continue;
+    for (const f of ASSET_REQUIRED_FIELDS) {
+      const v = a[f];
+      if (v == null || !String(v).trim()) {
+        errs.push({ row_id: a.row_id, field: f, code: 'required',
+                    message: errTextRequiredAsset(f) });
+      }
+    }
+  }
+  return errs;
+}
+
+// Nhãn hiển thị tiếng Việt theo ASSET_FIELD_ROWS ở view (view tự có bản
+// chuẩn); model chỉ dùng cho message lỗi live.
+function errTextRequiredAsset(field) {
+  return field === 'so_thua_dat' ? 'Số thửa đất bắt buộc'
+    : field === 'so_to_ban_do' ? 'Số tờ bản đồ bắt buộc'
+    : 'Mục bắt buộc chưa có giá trị';
+}
+
+function personDropBlockReason(people, rowId, forOwnerSlot) {
   const row = (people || []).find((p) => p && p.row_id === rowId);
   if (!row) return null;
+  // Luật A (D-048 v2): người CÒN SỐNG (ngày mất trống) không được gán
+  // vào vị trí chủ đất trên sơ đồ — chặn từ pool, không cần chờ wire.
+  if (forOwnerSlot && !String(row.ngay_chet || '').trim()) {
+    return 'Chỉ người đã mất mới gán được làm chủ đất';
+  }
   for (const field of PERSON_DATE_FIELDS_CHECK) {
     if (personDateIssue(row[field])) return 'Không thả được: ngày không hợp lệ';
   }
@@ -1072,6 +1106,20 @@ function createModel(deps) {
                      : 'Loại việc chưa hỗ trợ') };
     }
     syncPositionDefaults();
+    // D-048 (S5b): thiếu số thửa/tờ bản đồ → chặn Lưu trước IPC, lỗi
+    // gắn row_id + field như lỗi backend (view đỏ ô + dòng lỗi card).
+    // Chỉ áp khi owner đã chọn: owner-required là điều kiện tiên quyết
+    // cấp cao hơn, không bị gate trường che.
+    const reqErrs = state.stage.owner_row_id
+      ? assetRequiredIssue(state.stage.assets) : [];
+    if (reqErrs.length) {
+      state.saveRejected = true;
+      for (const e of reqErrs) state.fieldErrors.push(e);
+      emit();
+      return { ok: false, error: errObj('stage_validation_error',
+        `${reqErrs.length} lỗi field trong Stage`,
+        { field_errors: reqErrs }) };
+    }
     const caseId = state.caseId;
     const s = session;
     const meta = {};
@@ -1637,7 +1685,10 @@ function createModel(deps) {
     const already = (state.diagram.nodes || []).some(
       (n) => n && !n.deleted && n.personId === rowId);
     if (rowId && !already &&
-        personDropBlockReason(state.stage.people, rowId)) return false;
+        personDropBlockReason(state.stage.people, rowId,
+          diagramDomain() === CASE_TYPE_INHERITANCE && nodeId === 'owner')) {
+      return false;
+    }
     // Node 'owner' la mirror cua stage.owner_row_id — gan qua setter de
     // pointer stage cap nhat cung (contract §13.4).
     if (diagramDomain() === CASE_TYPE_INHERITANCE &&
@@ -1697,7 +1748,11 @@ function createModel(deps) {
     // Thẻ có ngày sai không thả từ Stage/Pool lên sơ đồ. Gỡ về Pool,
     // và thẻ đã nằm trên sơ đồ, vẫn được.
     if (targetNodeId != null && !sourceNode &&
-        personDropBlockReason(state.stage.people, rowId)) return false;
+        personDropBlockReason(state.stage.people, rowId,
+          diagramDomain() === CASE_TYPE_INHERITANCE &&
+          targetNodeId === 'owner')) {
+      return false;
+    }
     if (targetNodeId == null) {
       if (!sourceNode) return false;
       if (diagramDomain() === CASE_TYPE_INHERITANCE &&
@@ -2783,7 +2838,8 @@ function createModel(deps) {
     removeStageRow, fieldErrorsFor,
     pool,
     addSlot, assignPerson, movePerson, clearAutoParent,
-    personDropBlock: (rowId) => personDropBlockReason(state.stage.people, rowId),
+    personDropBlock: (rowId, forOwnerSlot) =>
+      personDropBlockReason(state.stage.people, rowId, forOwnerSlot),
     setNodeFlag, toggleNodePosition, setNodeRelation, nodeRemovalImpact, removeNode,
     evaluateDiagram, reconcileRequiredSlots,
     captureDraftSnapshot, restoreDraftSnapshot, removeCard,
