@@ -1373,6 +1373,10 @@ print(json.dumps(run_inheritance_case({'version':2,'nodes':nodes}, {r['row_id']:
   assert.equal(toasts.length, 1, 'Phải hiện đúng 1 toast khi cascade');
   assert.match(toasts[0].textContent, /Đã đưa 3 người về Danh sách chờ · Hoàn tác/);
 
+  // Toast timeout phải là 15s (không phải timeout ngắn cũ)
+  assert.equal(DIAGRAM.UNDO_TOAST_TIMEOUT_MS, 15000,
+    'Undo toast phải giữ 15 giây');
+
   // (4) Hoàn tác restores identical state
   const undoBtn = findBtns(toasts[0], 'Hoàn tác')[0];
   assert.ok(undoBtn, 'Phải có nút Hoàn tác trong toast');
@@ -1381,6 +1385,22 @@ print(json.dumps(run_inheritance_case({'version':2,'nodes':nodes}, {r['row_id']:
   assert.equal(byCls(document, 'toast').length, 0, 'Toast phải đóng sau khi Hoàn tác');
   assert.deepEqual(model.state.diagram, beforeA, 'Hoàn tác phải khôi phục y nguyên sơ đồ trước khi gỡ');
 
+  // (4b) Toast mới vẫn giữ 15s và có nút × "Đóng thông báo"; bấm × chỉ
+  // đóng toast, không hoàn tác.
+  const cardA1 = collect(view.el, e => e.dataset.nodeId === 'owner')[0];
+  await findBtns(cardA1, '↩')[0].onclick();
+  const toasts1 = byCls(document, 'toast');
+  assert.equal(toasts1.length, 1, 'Cascade lần nữa vẫn hiện toast');
+  const closeBtn = findBtns(toasts1[0], '×')[0];
+  assert.ok(closeBtn, 'Phải có nút đóng × trong toast');
+  assert.equal(closeBtn.getAttribute('aria-label'), 'Đóng thông báo');
+  closeBtn.click();
+  assert.equal(byCls(document, 'toast').length, 0, 'Bấm × phải đóng toast');
+  assert.deepEqual(model.state.diagram.nodes.filter(n => !n.deleted).map(n => n.id),
+    ['owner'], 'Bấm × chỉ đóng toast, không hoàn tác sơ đồ');
+  model.movePerson(pA.row_id, 'owner');
+  await model.evaluateDiagram();
+
   // (5) Toggle off → no toast
   const toggle = collect(view.el, e => e.tagName === 'INPUT' && e.type === 'checkbox' && e.getAttribute('aria-label') === 'Thông báo khi gỡ')[0];
   assert.ok(toggle, 'Phải có công tắc Thông báo khi gỡ');
@@ -1388,8 +1408,8 @@ print(json.dumps(run_inheritance_case({'version':2,'nodes':nodes}, {r['row_id']:
   toggle.checked = false;
   toggle.onchange();
 
-  const cardA2 = collect(view.el, e => e.dataset.nodeId === 'owner')[0];
-  await findBtns(cardA2, '↩')[0].onclick();
+  const cardA3 = collect(view.el, e => e.dataset.nodeId === 'owner')[0];
+  await findBtns(cardA3, '↩')[0].onclick();
 
   assert.equal(byCls(document, 'toast').length, 0, 'Công tắc tắt → gỡ cascade hoàn toàn im lặng, không toast');
   assert.deepEqual(model.state.diagram.nodes.filter(n => !n.deleted).map(n => n.id), ['owner']);

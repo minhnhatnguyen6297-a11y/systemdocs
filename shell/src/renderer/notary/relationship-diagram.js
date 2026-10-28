@@ -551,6 +551,8 @@ function emptySlotRole(n, live = [], people = []) {
   return SLOT_LABEL[n.id] || 'Ô trống';
 }
 const REMOVAL_NOTIFY_KEY = 'notary.diagram.notify_on_remove';
+// Undo toast giữ hiển thị 15s (hoặc tới khi bấm ×/Hoàn tác).
+const UNDO_TOAST_TIMEOUT_MS = 15000;
 const _memStorage = new Map();
 
 function isRemovalNotifyEnabled() {
@@ -986,14 +988,18 @@ function createDiagramPane(ctx) {
       Promise.resolve(onUndo()).catch(() => {});
     });
     undoBtn.setAttribute('aria-label', 'Hoàn tác');
-    item.append(msg, sep, undoBtn);
+    const closeBtn = btn('×', 'toast-close js-toast-close', () => {
+      dismissActiveToast();
+    });
+    closeBtn.setAttribute('aria-label', 'Đóng thông báo');
+    item.append(msg, sep, undoBtn, closeBtn);
     box.append(item);
     const timer = setTimeout(() => {
       if (activeUndoToast && activeUndoToast.el === item) {
         item.remove();
         activeUndoToast = null;
       }
-    }, 5000);
+    }, UNDO_TOAST_TIMEOUT_MS);
     activeUndoToast = {
       el: item,
       dismiss() {
@@ -1957,6 +1963,7 @@ function createDiagramPane(ctx) {
     removeCard: handleCardRemoval,
     isRemovalNotifyEnabled,
     setRemovalNotifyEnabled,
+    UNDO_TOAST_TIMEOUT_MS,
   };
 }
 
@@ -1965,6 +1972,7 @@ const G1_NOTARY_DIAGRAM = {
   isRemovalNotifyEnabled,
   setRemovalNotifyEnabled,
   REMOVAL_NOTIFY_KEY,
+  UNDO_TOAST_TIMEOUT_MS,
   // Export cho test thuan: layout thua ke + so cho canonical —
   // pure functions, khong can DOM/model.
   _internals: { layoutInheritance, emptySlotRole, slotNum, NODE_W, NODE_H, PAD,
