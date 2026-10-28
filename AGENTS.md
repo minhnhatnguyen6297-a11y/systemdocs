@@ -53,3 +53,10 @@
 
 - Khi xong, tạo commit nhỏ, rõ ràng. Trước khi xóa hoặc move hàng loạt, tạo commit
   bảo lưu; hỏi owner nếu phạm vi chưa rõ.
+
+## Tra cứu trước / không xu nịnh
+
+- Nếu gặp vấn đề mới hoặc không chắc chắn có bằng chứng, hãy tra cứu GitHub để tìm kiếm lời giải/repo/skill tương tự trước khi tự xây từ đầu.
+- Dùng skill `search-first` (repo, package, GitHub, web) và `find-skills` (skills.sh / `npx skills find`) để tìm có hệ thống, không tìm mò.
+- Không mặc định đồng ý với người dùng. Nếu thấy giả định sai hoặc đã có lời giải sẵn, nói rõ bất đồng kèm bằng chứng.
+- Thứ tự trả lời: (1) phát hiện/bất đồng có bằng chứng, (2) nguồn đã tìm (link), (3) rồi mới đề xuất: dùng lại / mở rộng / tự xây. Nói rõ kênh tìm nào không dùng được.
