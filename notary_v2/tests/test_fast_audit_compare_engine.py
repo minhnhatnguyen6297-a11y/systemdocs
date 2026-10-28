@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 import sys
 
 from services.fast_audit.compare_engine import CompareEngine
@@ -229,7 +230,7 @@ def test_import_does_not_load_word_engine():
             "import sys; import services.fast_audit; assert 'services.word_engine' not in sys.modules",
         ],
         check=True,
-        cwd=".",
+        cwd=Path(__file__).resolve().parents[1],  # notary_v2/, không phụ thuộc cwd (#19)
     )
 
 
