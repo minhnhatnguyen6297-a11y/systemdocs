@@ -3,7 +3,7 @@
 Hai loại quyết định:
 
 - **File quyết định** `decision-N - <tiêu đề>.md` hoặc `decision-<slug>.md`: hệ thống, quy trình, từng task.
-- **Sổ nghiệp vụ thừa kế** [`decision-80`](decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md): một file, nhiều mục `D-NNN` (D-001…D-049), append-only.
+- **Sổ nghiệp vụ thừa kế** [`decision-80`](decision-80-so-quyet-dinh-nghiep-vu-thua-ke.md): một file, nhiều mục `D-NNN` (D-001…D-050), append-only.
 
 Quy ước trích dẫn: luôn ghi kèm file, ví dụ `decision-80 §D-041`. `D-041` (vợ/chồng) **khác** `decision-41` (tra cứu hành chính).
 Quyết định bị thay: đổi Trạng thái thành "Bị thay bởi …", không xoá, không đánh số lại.

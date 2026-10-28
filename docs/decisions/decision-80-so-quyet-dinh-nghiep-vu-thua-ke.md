@@ -350,3 +350,9 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Ngày:** 27/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** giới hạn phạm vi
 - **Quyết định:** sơ đồ chỉ dùng cho hồ sơ thừa kế; hai người còn sống không suy ra loại giao dịch.
 - **Nguồn:** decision v2 ("App không suy loại giao dịch").
+
+### D-050 — Người còn sống được làm Chủ đất; bác bỏ "luật A"
+- **Ngày:** 28/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** luật (khớp engine `living_owner`)
+- **Quyết định:** người còn sống được làm Chủ đất. "Luật A" (chặn người còn sống làm Chủ đất) bị bác bỏ.
+- **Hệ quả:** revert `e943fde` (nhánh `agent/omp/diagram-rules-v2`): "luật A" không thuộc D-048, mâu thuẫn engine `living_owner` và làm hỏng 11 test reconcile; fixture đã được khôi phục.
+- **Nguồn:** owner 28/10/2026.
