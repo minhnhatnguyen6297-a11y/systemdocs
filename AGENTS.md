@@ -1,33 +1,53 @@
-﻿# AGENTS.md — luật làm việc trong systemdocs
+# AGENTS.md — luật làm việc trong systemdocs
 
-## Dùng BMAD
+## Workflow: Superpowers (thử nghiệm, nhánh `agent/omp/superpowers-trial`)
 
-- Dùng workflow BMAD và customization của repo trong `_bmad/custom/`; đọc skill
-  tương ứng trước khi dùng. Không dựng flow song song.
-- Code tối giản; artifact và handoff ngắn gọn; trao đổi với user tự nhiên, dễ hiểu.
+- Dùng skill Superpowers cài ở mức project: `.omp/extensions/superpowers/`
+  (bootstrap `using-superpowers` tự nạp). Luồng: brainstorming → writing-plans →
+  test-driven-development (red/green thật) → requesting-code-review →
+  verification-before-completion. Việc ngắn, rõ: không cần ceremony dài nhưng
+  vẫn test trước rồi mới code.
+- BMAD đã gỡ khỏi repo này. Không dùng skill `bmad-*` (đã ẩn trong
+  `.omp/config.yml`). Không nâng cấp BMAD lên v7. Bản BMAD cũ: tag
+  `bmad-archive-20261028`.
+- Không dùng Orca, không cài 1DevTool. Không chạy script khôi phục lạ từ archive.
+- Code tối giản; trao đổi với user tự nhiên, dễ hiểu.
+
+## Nhánh và worktree
+
+- Không bao giờ code trên `main`/nhánh mặc định (`consolidate/monorepo`).
+- Mỗi việc một nhánh `agent/<agent>/<slug>` trong worktree riêng ở
+  `~/workspace/worktrees/<agent>-<slug>`; ghi vào worktree registry
+  (`~/workspace/goals/*/hidden_files/worktree-registry.md`).
+- Không đụng worktree của agent khác. Không push khi chưa được owner duyệt.
+
+## Test và dữ liệu
+
+- Chạy pytest với `--basetemp ~/workspace/tmp-pytest/<tên-việc>` (không dùng /tmp
+  mặc định), chạy từ root repo, ví dụ:
+  `python -m pytest notary_v2/tests -q --basetemp ~/workspace/tmp-pytest/<tên-việc>`.
+- Chỉ dùng dữ liệu giả lập (synthetic). Không đưa hồ sơ, CCCD, tên thật hay dữ
+  liệu công chứng thật vào test, fixture, log hay commit.
+- Không in hoặc ghi token/secret.
 
 ## Nguồn chuẩn
 
 | Nội dung | Nơi lưu |
 |---|---|
-| Hành vi | `_bmad-output/specs/` |
-| Quyết định đã chốt (LÀ GÌ + TẠI SAO) | `_bmad-output/decisions/` |
-| Artifact workflow | `_bmad-output/` |
-| Lịch sử | `_bmad-output/archive/` |
+| Hành vi (spec) | `docs/specs/` |
+| Quyết định đã chốt (LÀ GÌ + TẠI SAO) | `docs/decisions/` |
+| Plan triển khai | `docs/plans/` |
+| Nghiên cứu, brief | `docs/planning/` |
+| Brainstorm | `docs/brainstorming/` |
+| Lịch sử | `docs/archive/` |
 | Quan hệ code | `graphify-out/` |
 
 - Spec quyết định hành vi; code chứng minh hiện trạng. Đổi hành vi thì cập nhật
   spec liên quan trước khi sửa code.
-- Ghi quyết định của owner vào `_bmad-output/decisions/` trong phiên hiện tại.
-  Task, handoff và file tạm nằm trong `_bmad-output/tmp/`.
+- Ghi quyết định của owner vào `docs/decisions/` trong phiên hiện tại.
+  File tạm nằm trong `docs/tmp/` (ignored).
 - Đọc `graphify-out/` trước khi dò code thủ công.
-
-## Trình bày
-
-- Chỉ tạo file HTML trong `_bmad-output/tmp/` cho plan, spec, brainstorming hoặc
-  minh họa cấu trúc; chat, trạng thái, phân tích, review và báo cáo thường trả lời
-  trong hội thoại.
-- HTML plan/spec là lớp trình bày; Markdown và artifact BMAD vẫn là nguồn chuẩn.
+- Plan/spec viết bằng Markdown; không còn export HTML plan.
 
 ## Commit
 

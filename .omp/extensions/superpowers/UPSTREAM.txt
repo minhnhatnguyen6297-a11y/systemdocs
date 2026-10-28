@@ -1,0 +1,1 @@
+obra/superpowers @ 2ce8aa1 (v7.0.1), copied from https://github.com/obra/superpowers on 2026-10-28

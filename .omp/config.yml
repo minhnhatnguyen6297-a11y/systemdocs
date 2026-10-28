@@ -1,0 +1,34 @@
+# Project-level omp settings for the Superpowers trial.
+# Hide globally-installed BMAD skills in this project only (global ~/.omp/agent/skills untouched).
+disabledExtensions:
+  - skill:bmad
+  - skill:bmad-advanced-elicitation
+  - skill:bmad-agent-analyst
+  - skill:bmad-agent-architect
+  - skill:bmad-agent-dev
+  - skill:bmad-agent-pm
+  - skill:bmad-agent-ux-designer
+  - skill:bmad-architecture
+  - skill:bmad-brainstorming
+  - skill:bmad-build
+  - skill:bmad-build-auto
+  - skill:bmad-code-review
+  - skill:bmad-correct-course
+  - skill:bmad-customize
+  - skill:bmad-deep-recon
+  - skill:bmad-forge-idea
+  - skill:bmad-party-mode
+  - skill:bmad-prd
+  - skill:bmad-preview-ticketing
+  - skill:bmad-prfaq
+  - skill:bmad-product-brief
+  - skill:bmad-project-context
+  - skill:bmad-qa-generate-e2e-tests
+  - skill:bmad-retrospective
+  - skill:bmad-review
+  - skill:bmad-spec
+  - skill:bmad-ticket
+  - skill:bmad-ux
+  - skill:bmad-walkthrough
+  - skill:bmod-core-tools
+  - skill:bmod-method
