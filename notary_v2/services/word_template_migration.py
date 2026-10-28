@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import unicodedata
 import uuid
@@ -194,6 +195,44 @@ def is_template_candidate(path: Path) -> bool:
     return True
 
 
+def _iter_files_following_links(root: Path):
+    """Yield mọi file dưới ``root``, ĐI THEO cả junction/symlink thư mục.
+
+    ``Path.rglob`` (Python 3.13+) không đệ quy vào thư mục link nên file nằm
+    sau junction không được liệt kê để loại trừ — chúng sẽ âm thầm biến mất
+    khỏi manifest thay vì hiện trong ``excluded``. Đi tay để thấy đủ.
+
+    Mỗi nhánh mang theo realpath của tổ tiên; gặp lại một realpath đã có
+    trên chính nhánh đó nghĩa là vòng link -> dừng nhánh, không lặp vô hạn."""
+    stack: list[tuple[Path, frozenset[str]]] = [(Path(root), frozenset())]
+    while stack:
+        directory, ancestors = stack.pop()
+        try:
+            real = os.path.normcase(os.path.realpath(str(directory)))
+        except OSError:
+            continue
+        if real in ancestors:
+            continue
+        chain = ancestors | {real}
+        try:
+            with os.scandir(directory) as entries:
+                children = sorted(entries, key=lambda entry: entry.name)
+        except OSError:
+            continue
+        subdirs: list[Path] = []
+        for entry in children:
+            path = directory / entry.name
+            try:
+                if entry.is_dir():
+                    subdirs.append(path)
+                elif entry.is_file():
+                    yield path
+            except OSError:
+                continue
+        # đẩy ngược để pop() duyệt theo thứ tự tên
+        stack.extend((path, chain) for path in reversed(subdirs))
+
+
 def scan_source_templates(src_dir: Path) -> tuple[list[Path], list[str]]:
     """Liệt kê mẫu hợp lệ và cả file bị loại trừ (để manifest ghi rõ).
 
@@ -208,16 +247,24 @@ def scan_source_templates(src_dir: Path) -> tuple[list[Path], list[str]]:
         src_root_key = ""
     kept: list[Path] = []
     excluded: list[str] = []
-    for path in sorted(src_dir.rglob("*")):
-        if not path.is_file():
-            continue
-        if src_root_key and not _contained_key(_norm_key(path), src_root_key):
+    seen_real: set[str] = set()
+    for path in sorted(_iter_files_following_links(src_dir)):
+        path_key = _norm_key(path)
+        if src_root_key and not _contained_key(path_key, src_root_key):
             excluded.append(path.relative_to(src_dir).as_posix())
             continue
-        if is_template_candidate(path):
-            kept.append(path)
-        else:
+        if not is_template_candidate(path):
             excluded.append(path.relative_to(src_dir).as_posix())
+            continue
+        # Junction/symlink TRONG src trỏ tới thư mục khác trong src: đi được
+        # cả hai đường nên cùng một file thật xuất hiện 2 lần. Chỉ giữ đường
+        # đầu (theo thứ tự tên) — nếu không sẽ migrate trùng, đếm file_count
+        # sai. File trùng bị bỏ khỏi ``kept`` chứ không vào ``excluded``:
+        # nó vẫn được migrate qua đường còn lại.
+        if path_key in seen_real:
+            continue
+        seen_real.add(path_key)
+        kept.append(path)
     return kept, excluded
 
 
