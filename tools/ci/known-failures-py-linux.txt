@@ -3,12 +3,8 @@
 # Nguyên nhân chính (đếm từ dòng E): path Windows 'path khong tuyet doi'/file_scope_not_supported (fileref.py chỉ nhận ổ đĩa X:\),
 # thiếu word_templates/*.docx, thiếu frontend/static. Phần lớn là do app nhắm Windows -> job windows-latest đo riêng.
 # Mỗi dòng gắn issue nhóm nguyên nhân: #15 path Windows, #16 resource theo cwd, #18 junction, #19 linh tinh.
-notary_v2/tests/test_document_conversion_poc.py::test_canonical_golden_manifest_hashes_and_routes  # #19 (xem issue)
-notary_v2/tests/test_fast_audit_compare_engine.py::test_import_does_not_load_word_engine  # #19 (xem issue)
 notary_v2/tests/test_naia12_e2e_migrate_export.py::TestPreflightWriteTargets::test_junction_escape_target_refused  # #18 (xem issue)
 notary_v2/tests/test_naia12_e2e_migrate_export.py::TestPreflightWriteTargets::test_report_junction_refused  # #18 (xem issue)
 notary_v2/tests/test_naia12_e2e_migrate_export.py::test_report_fallback_target_existing_never_overwritten  # #18 (xem issue)
 notary_v2/tests/test_word_template_migration.py::test_scan_source_templates_excludes_files_via_junctioned_dir  # #18 (xem issue)
 notary_v2/tests/test_word_template_migration.py::test_write_guard_blocks_junction_swapped_after_copy  # #18 (xem issue)
-notary_v2/tests/test_word_template_migration.py::test_write_guard_blocks_same_path_swap_before_rewrite  # #19 (xem issue)
-shell/test/test_notary_mock_adapter.py::TestWordExport::test_batch_writes_real_docx  # #19 (xem issue)

@@ -1178,6 +1178,10 @@ def test_write_guard_blocks_same_path_swap_before_rewrite(
             # Thay inode TẠI CÙNG PATH — realpath không đổi nên chỉ fd
             # ràng buộc inode (fstat) mới phân biệt được file của run
             # với file cạnh tranh.
+            # Giữ inode cũ sống (hard link) để FS không tái dùng ngay số
+            # inode vừa giải phóng (ext4/overlayfs trên Linux hay làm vậy,
+            # NTFS thì không) -> inode mới chắc chắn khác (#19).
+            os.link(path, tmp_path / "keep-old-inode")
             Path(path).unlink()
             Path(path).write_bytes(sentinel)
         return real_open(self, path, what)

@@ -10,6 +10,25 @@ from typing import Any, Mapping
 
 CONTRACT_VERSION = "v0.experimental"
 
+# mimetypes.guess_type đọc registry trên Windows, máy thiếu Office trả None
+# cho .docx/.xlsx -> media_type lệch theo máy. Bảng cố định cho định dạng
+# POC hỗ trợ; đuôi khác mới hỏi mimetypes.
+_MEDIA_TYPES = {
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
+
+
+def guess_media_type(source_path: Path) -> str | None:
+    known = _MEDIA_TYPES.get(Path(source_path).suffix.lower())
+    if known:
+        return known
+    return mimetypes.guess_type(str(source_path))[0]
+
 
 @dataclass(frozen=True)
 class Source:
@@ -119,7 +138,7 @@ class ConversionEnvelope:
 
     @classmethod
     def for_source(cls, source_path: Path, source_bytes: bytes) -> "ConversionEnvelope":
-        media_type, _ = mimetypes.guess_type(str(source_path))
+        media_type = guess_media_type(source_path)
         digest = hashlib.sha256(source_bytes).hexdigest()
         return cls(
             source=Source(
