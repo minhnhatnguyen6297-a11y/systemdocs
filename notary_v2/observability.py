@@ -2,6 +2,8 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
+import pii_redact
+
 
 _FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 _DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -57,4 +59,6 @@ def configure_process_logging(service_name: str) -> str:
     _ensure_handler(root_logger, logging.StreamHandler, level=level)
     _ensure_handler(root_logger, RotatingFileHandler, target_path=file_path, level=level)
 
+    # Che PII/duong dan/token tren moi handler cua root (stream + file).
+    pii_redact.attach_filter(root_logger)
     return file_path

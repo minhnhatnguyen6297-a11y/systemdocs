@@ -46,3 +46,25 @@
   chứng / chưa kiểm chứng, và nêu giả định.
 - Không skip test để cho xanh: lỗi đã biết ghi vào `tools/ci/known-failures-*.txt`
   kèm issue ref. Chuẩn "xong": `docs/definition-of-done.md`.
+
+## Báo lỗi phải có bằng chứng
+
+Mọi issue lỗi (người hay agent tạo) dùng form `.github/ISSUE_TEMPLATE/bug_report.yml`. Issue trống đã bị tắt.
+
+Agent khi báo lỗi phải đính kèm đủ:
+
+1. **Nhánh + commit SHA** đang chạy khi thấy lỗi.
+2. **Lệnh tái hiện chính xác** (hoặc tên test đang fail), chạy được từ gốc repo.
+3. **Đoạn log** liên quan của app và sidecar (vài chục dòng quanh lỗi, không dán cả file).
+4. **Ảnh chụp/video** (ví dụ ảnh từ harness CDP trong `/workspace/usability`, `/workspace/e2e-run`).
+5. Kết quả mong đợi vs thực tế, môi trường.
+
+Log cố định: app ghi `<userData>/logs/main.log` và `sidecar.log` (xoay vòng 5 MB × 3 bản; userData = `%APPDATA%\g1-shell` trên Windows, `~/.config/g1-shell` trên Linux; bản test là `g1-shell-test`). Script đọc mặc định từ đây.
+
+Sinh nội dung nhanh: `tools/file-bug.sh --title "..." --repro "lệnh" [--log file]... [--shot file.png]` → in markdown ra stdout và chép ảnh vào `docs/evidence/<mã>/`. Script không tạo issue.
+
+**Đính kèm ảnh khi không có trình duyệt:** API GitHub không upload được file đính kèm issue. Cách dùng: commit ảnh/log vào `docs/evidence/<mã>/` trên nhánh riêng `evidence/<mã>` (không merge vào nhánh chính), push nhánh đó, rồi dẫn link `https://github.com/<owner>/<repo>/blob/evidence/<mã>/docs/evidence/<mã>/<file>?raw=true` trong issue. **Repo này PUBLIC**: mọi ảnh/log push lên nhánh `evidence/*` ai cũng xem được — chỉ dùng dữ liệu giả lập, đã che đường dẫn/token. Mã là ngày-giờ + slug, sau khi có số issue thì ghi số issue vào README trong thư mục.
+
+**Chỉ dữ liệu giả lập.** Không chụp/ghi log có dữ liệu công dân thật.
+
+Issue lỗi thiếu một trong các mục trên → gắn nhãn `needs-evidence` và **không được xử lý** cho đến khi bổ sung. Agent nhận việc từ issue như vậy: hỏi bổ sung, không tự đoán.
