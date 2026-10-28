@@ -737,13 +737,15 @@ def test_source_stage_create_keeps_source_identity_over_min_id(
     finally:
         session.close()
 
-    # Hint không tồn tại → stage_validation_error gắn row/field.
+    # Hint không tồn tại → bỏ hint, resolve lại theo neo (8688107: entity_id
+    # là hint nội bộ, không chặn Lưu). Không còn hint hợp lệ → resolver
+    # neo chuẩn chọn identity khớp neo (min-ID = low), không phải ID rác.
     bad_base = svc.source_latest()["stage"]
     bad = {**bad_base, "people": [
         {**bad_base["people"][0], "entity_id": 987654}] +
         bad_base["people"][1:]}
-    with pytest.raises(WorkspaceError) as exc:
-        _create_case(db, bad, meta=_meta_for(dataset, "F8A"),
-                     state=_state_for(bad))
-    assert exc.value.code == "stage_validation_error"
-    assert exc.value.details["field_errors"][0]["field"] == "entity_id"
+    created3 = _create_case(db, bad, meta=_meta_for(dataset, "F8A"),
+                            state=_state_for(bad))
+    resolved = created3["stage"]["people"][0]["entity_id"]
+    assert resolved != 987654
+    assert resolved == low.id
