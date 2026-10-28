@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 root = Path(os.environ.get('G1_VISUAL_SPIKE_TEST_DIR',
-    Path(__file__).resolve().parents[2] / '_bmad-output/tmp/visual-bug-reporting/checks'))
+    Path(__file__).resolve().parents[2] / 'docs/tmp/visual-bug-reporting/checks'))
 results = json.loads((root / 'evidence/e2e-results.json').read_text())
 report = json.loads((root / results['reports'][1]).read_text())
 im = Image.open(root / Path(*results['reports'][1].split('/')[:-1]) / report['screenshot']['file']).convert('RGB')

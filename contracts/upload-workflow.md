@@ -5,7 +5,7 @@
 `electron-system-shell` · **Kênh mang:** `desktopcommand.v1`
 ([`desktop-command.md`](./desktop-command.md)) + shape `g1.module.v1`
 ([`g1-module-data.md`](./g1-module-data.md)) · **Spec UI:**
-[`../_bmad-output/specs/upload_lab/ui.md`](../_bmad-output/specs/upload_lab/ui.md)
+[`../docs/specs/upload_lab/ui.md`](../docs/specs/upload_lab/ui.md)
 
 Contract giữa **Electron shell (module `upload` — nhãn "Upload Lab")** và
 **Python sidecar** cho nghiệp vụ quét hồ sơ Word, audit sổ công chứng Excel và

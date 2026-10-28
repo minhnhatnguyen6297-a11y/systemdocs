@@ -3,8 +3,8 @@
 /* Case-drafting view — khung UI tab Soạn hồ sơ (MIN-111 → MIN-129 P6 →
  * MIN-133 W2 mật độ cao).
  *
- * SOT bo cuc: mockup MIN-133 đã duyệt (_bmad-output/archive/linear-tasks/MIN-133/mockup/
- * mockup-1440x775.png) trên nền bản mẫu P6 (_bmad-output/specs/ui/prototypes):
+ * SOT bo cuc: mockup MIN-133 đã duyệt (docs/archive/linear-tasks/MIN-133/mockup/
+ * mockup-1440x775.png) trên nền bản mẫu P6 (docs/specs/ui/prototypes):
  *   - Thanh trên DUY NHẤT (.cd-topbar, ~42px): tab cục bộ (Tổng quan /
  *     Soạn / Word) | loại việc, Nhập file, Zalo (disabled placeholder)
  *     ……… Hủy thay đổi, Lưu hồ sơ/Cập nhật (chấm dirty = tín hiệu chưa
@@ -82,7 +82,7 @@ const ASSET_FIELD_ROWS = [
 const GIOI_TINH_OPTS = [['', '—'], ['Nam', 'Nam'], ['Nữ', 'Nữ']];
 
 // Mã loại đất canonical backend
-// (_bmad-output/specs/notary_v2/input/property-rules.md §loai_dat).
+// (docs/specs/notary_v2/input/property-rules.md §loai_dat).
 // Giá trị ngoài danh sách được giữ làm option riêng — không mất dữ liệu.
 const LAND_TYPE_CODES = ['ONT', 'ODT', 'CLN', 'NTS', 'LUC', 'BHK',
                          'SKC', 'TMD', 'DV', 'DGT', 'DKV', 'DHT'];
@@ -255,7 +255,7 @@ function createNotaryModuleView(deps) {
     return box;
   }
 
-  // ---------- modal canonical (_bmad-output/specs/ui/README.md / styles.css .modal-*) ----------
+  // ---------- modal canonical (docs/specs/ui/README.md / styles.css .modal-*) ----------
   // wrap gắn vào .cd-root (không phải body) để cd-* trong dialog vẫn nằm
   // dưới scope module; position:fixed vẫn phủ viewport.
   // opts: {wide} → .modal.wide (≤1100px); {bare} → builder tự thêm

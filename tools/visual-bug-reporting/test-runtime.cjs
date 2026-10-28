@@ -16,5 +16,5 @@ function installed(relative) {
 const python = process.env.G1_PYTHON || installed('notary_v2/venv/Scripts/python.exe');
 const playwright = path.resolve(path.dirname(python), '../Lib/site-packages/playwright/driver/package');
 const electron = installed('shell/node_modules/electron/dist/electron.exe');
-const testRoot = path.resolve(process.env.G1_VISUAL_SPIKE_TEST_DIR || path.join(repo, '_bmad-output/tmp/visual-bug-reporting/checks'));
+const testRoot = path.resolve(process.env.G1_VISUAL_SPIKE_TEST_DIR || path.join(repo, 'docs/tmp/visual-bug-reporting/checks'));
 module.exports = { repo, shared, python, playwright, electron, testRoot };

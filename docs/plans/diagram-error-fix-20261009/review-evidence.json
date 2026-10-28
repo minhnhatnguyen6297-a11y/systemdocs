@@ -1,0 +1,347 @@
+{
+  "baseline_revision": "e7094312e212578e0d129d599edd5617ca0adf64",
+  "observed_branch": "consolidate/monorepo",
+  "application_root": "D:/systemdocs",
+  "review_date": "2026-10-09",
+  "planning_status": "draft; implementation not started",
+  "existing_node_tests": {
+    "command": "node --test test/notary-diagram.test.mjs test/notary-case-drafting-static.test.mjs",
+    "cwd": "D:/systemdocs/shell",
+    "tests": 55,
+    "passed": 55,
+    "failed": 0,
+    "node_version": "26.7.0"
+  },
+  "browser_probe": {
+    "method": "Headless native Chrome, classic script tags and real DOM; only in-memory source variants",
+    "browserVersion": "154.0.8037.98",
+    "results": [
+      {
+        "variant": "current",
+        "load": {
+          "catalogKeys": [
+            "ERROR_CATALOG",
+            "describeError",
+            "errText"
+          ],
+          "diagramLoaded": true
+        },
+        "checks": [
+          {
+            "scenario": "evaluate",
+            "outcome": "throws",
+            "failure": {
+              "type": "TypeError",
+              "message": "relErrText is not a function"
+            },
+            "notices": [],
+            "stateError": null,
+            "busy": null
+          },
+          {
+            "scenario": "render-errors",
+            "outcome": "throws",
+            "failure": {
+              "type": "TypeError",
+              "message": "relErrText is not a function"
+            },
+            "notices": [],
+            "stateError": null,
+            "busy": null
+          },
+          {
+            "scenario": "save",
+            "outcome": "throws",
+            "failure": {
+              "type": "TypeError",
+              "message": "relErrText is not a function"
+            },
+            "notices": [],
+            "stateError": null,
+            "busy": null
+          },
+          {
+            "scenario": "real-model-evaluate",
+            "outcome": "throws",
+            "failure": {
+              "type": "TypeError",
+              "message": "relErrText is not a function"
+            },
+            "notices": [],
+            "stateError": {
+              "code": "stage_validation_error",
+              "message": "synthetic"
+            },
+            "busy": null
+          },
+          {
+            "scenario": "debounced-evaluate",
+            "outcome": "observed",
+            "unhandled": [
+              "relErrText is not a function"
+            ],
+            "notices": []
+          }
+        ],
+        "pageErrors": []
+      },
+      {
+        "variant": "alias",
+        "load": {
+          "catalogKeys": [
+            "ERROR_CATALOG",
+            "describeError",
+            "errText"
+          ],
+          "diagramLoaded": true
+        },
+        "checks": [
+          {
+            "scenario": "evaluate",
+            "outcome": "returned",
+            "failure": null,
+            "notices": [
+              [
+                "Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)",
+                true
+              ]
+            ],
+            "stateError": null,
+            "busy": null
+          },
+          {
+            "scenario": "render-errors",
+            "outcome": "returned",
+            "failure": null,
+            "notices": [],
+            "stateError": null,
+            "busy": null
+          },
+          {
+            "scenario": "save",
+            "outcome": "returned",
+            "failure": null,
+            "notices": [
+              [
+                "Hồ sơ đã khóa — Mọi thao tác chỉ đọc — mở khóa ở engine trước khi sửa. (workspace_locked)",
+                true
+              ]
+            ],
+            "stateError": null,
+            "busy": null
+          },
+          {
+            "scenario": "real-model-evaluate",
+            "outcome": "returned",
+            "failure": null,
+            "notices": [
+              [
+                "Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)",
+                true
+              ]
+            ],
+            "stateError": {
+              "code": "stage_validation_error",
+              "message": "synthetic"
+            },
+            "busy": null
+          },
+          {
+            "scenario": "debounced-evaluate",
+            "outcome": "observed",
+            "unhandled": [],
+            "notices": [
+              [
+                "Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)",
+                true
+              ]
+            ]
+          }
+        ],
+        "pageErrors": []
+      },
+      {
+        "variant": "rename",
+        "load": {
+          "catalogKeys": [
+            "ERROR_CATALOG",
+            "describeError",
+            "errText"
+          ],
+          "diagramLoaded": false
+        },
+        "pageErrors": [
+          "Failed to execute 'appendChild' on 'Node': Identifier 'errText' has already been declared"
+        ]
+      }
+    ]
+  },
+  "node_probe": {
+    "sourceRoot": "D:/systemdocs",
+    "method": "Node vm classic scripts with existing DOM stub; variants only in memory",
+    "results": [
+      {
+        "name": "current: catalog export",
+        "outcome": "loaded",
+        "exports": [
+          "ERROR_CATALOG",
+          "describeError",
+          "errText"
+        ],
+        "bindingType": "undefined"
+      },
+      {
+        "name": "current: evaluate error",
+        "outcome": "throws",
+        "type": "TypeError",
+        "message": "relErrText is not a function",
+        "stack": "TypeError: relErrText is not a function\n    at runEvaluate (notary/relationship-diagram.js:312:14)\n    at async El.onclick (notary/relationship-diagram.js:1302:23)\n    at async file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:72:5\n    at async record (file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:60:33)\n    at async file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:69:3"
+      },
+      {
+        "name": "current: render diagramErrors",
+        "outcome": "throws",
+        "type": "TypeError",
+        "message": "relErrText is not a function",
+        "stack": "TypeError: relErrText is not a function\n    at diagramRegionEl (notary/relationship-diagram.js:1278:38)\n    at Object.build (notary/relationship-diagram.js:1353:17)\n    at file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:77:18\n    at record (file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:60:39)\n    at file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:75:9"
+      },
+      {
+        "name": "current: save error",
+        "outcome": "throws",
+        "type": "TypeError",
+        "message": "relErrText is not a function",
+        "stack": "TypeError: relErrText is not a function\n    at El.onclick (notary/relationship-diagram.js:1333:16)\n    at async file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:83:5\n    at async record (file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:60:33)\n    at async file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:80:3"
+      },
+      {
+        "name": "alias: catalog export",
+        "outcome": "loaded",
+        "exports": [
+          "ERROR_CATALOG",
+          "describeError",
+          "errText"
+        ],
+        "bindingType": "function"
+      },
+      {
+        "name": "alias: evaluate error",
+        "outcome": "returned",
+        "notices": [
+          [
+            "Dữ liệu Stage chưa hợp lệ — Sửa các ô/dòng đánh dấu đỏ rồi lưu lại. (stage_validation_error)",
+            true
+          ]
+        ]
+      },
+      {
+        "name": "alias: render diagramErrors",
+        "outcome": "rendered",
+        "errors": [
+          "Sơ đồ chưa hợp lệ — Xem chi tiết trong phần cảnh báo dưới sơ đồ. (diagram_invalid_state)"
+        ]
+      },
+      {
+        "name": "alias: save error",
+        "outcome": "returned",
+        "notices": [
+          [
+            "Hồ sơ đã khóa — Mọi thao tác chỉ đọc — mở khóa ở engine trước khi sửa. (workspace_locked)",
+            true
+          ]
+        ]
+      },
+      {
+        "name": "current: catalog absent masks bug",
+        "outcome": "returned",
+        "notices": [
+          [
+            "stage_validation_error: synthetic",
+            true
+          ]
+        ]
+      },
+      {
+        "name": "rename: duplicate declarations in combined script",
+        "outcome": "throws",
+        "type": "SyntaxError",
+        "message": "Identifier 'errText' has already been declared",
+        "stack": "evalmachine.<anonymous>:309\nconst errText = (typeof window !== 'undefined' && window.G1_NOTARY_ERRORS)\n      ^\n\nSyntaxError: Identifier 'errText' has already been declared\n    at new Script (node:vm:118:7)\n    at file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:95:3\n    at record (file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:60:39)\n    at file:///D:/systemdocs/docs/tmp/review-37-reports-20261009/probe.mjs:92:7"
+      },
+      {
+        "name": "current: real model emits banner state before toast failure",
+        "outcome": "observed",
+        "failure": "relErrText is not a function",
+        "stateError": {
+          "code": "stage_validation_error",
+          "message": "synthetic"
+        },
+        "busy": null,
+        "notices": []
+      },
+      {
+        "name": "current: model swallows render subscriber failure",
+        "outcome": "returned",
+        "returned": {
+          "ok": false,
+          "error": {
+            "code": "diagram_invalid_state",
+            "details": {
+              "errors": [
+                {
+                  "code": "diagram_invalid_state",
+                  "message": "synthetic"
+                }
+              ]
+            }
+          }
+        },
+        "renderFailures": 1,
+        "diagramErrors": [
+          {
+            "code": "diagram_invalid_state",
+            "message": "synthetic"
+          }
+        ]
+      }
+    ]
+  },
+  "source_hashes": {
+    "shell/src/renderer/notary/relationship-diagram.js": {
+      "root_sha256": "66cecad7e4ad6c84af3e441a1440c0ca23051631b362f42f416311f1cad45745",
+      "spike_sha256": "715f694608ca75a8dd3bd692bdc59a407cbf0ba68d439dd245cc10b0e73b66f3",
+      "same_normalized_lines": true
+    },
+    "shell/src/renderer/notary/error-catalog.js": {
+      "root_sha256": "cacbf8f9439ef3de575cdd14627de9fe94cb03b6f308edb53bef5d61e3945dd9",
+      "spike_sha256": "cacbf8f9439ef3de575cdd14627de9fe94cb03b6f308edb53bef5d61e3945dd9",
+      "same_normalized_lines": true
+    },
+    "shell/src/renderer/notary/case-drafting-model.js": {
+      "root_sha256": "5d952ab90026c435e54fd980cb1c8ca7e59f9e7452ed23999e50aef3b38c47d8",
+      "spike_sha256": "c01250e3393bda6e3de0a2519b562b76a68472da00256d0d21ee04c88e5fc27e",
+      "same_normalized_lines": true
+    },
+    "shell/src/renderer/index.html": {
+      "root_sha256": "7612eabf9d7d20a6f559a258930df9b7de43e903a5fb556d0d858c69bf302f1b",
+      "spike_sha256": "7612eabf9d7d20a6f559a258930df9b7de43e903a5fb556d0d858c69bf302f1b",
+      "same_normalized_lines": true
+    },
+    "shell/sidecar/notary_mock_adapter.py": {
+      "root_sha256": "df8d991bf66dcf3dea5744f50110bc968674ef21bd36974452eee3a421d43366",
+      "spike_sha256": "df8d991bf66dcf3dea5744f50110bc968674ef21bd36974452eee3a421d43366",
+      "same_normalized_lines": true
+    }
+  },
+  "report_inventory_summary": {
+    "json": 37,
+    "png": 32,
+    "logo": 18,
+    "fixture_buttons": 7,
+    "outside_e2e": 12,
+    "missing_png_subset_of_logo": 5,
+    "manual_provenance": "inferred, not captured by report schema"
+  },
+  "limitations": [
+    "Error results injected with synthetic clients for Chrome probe, not full Electron production backend.",
+    "Source variants were applied in memory only; source on disk remains broken.",
+    "Original twelve arbitrary notes were discarded and cannot be recovered from reports."
+  ]
+}

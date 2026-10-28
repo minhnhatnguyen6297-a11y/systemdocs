@@ -6,9 +6,9 @@ Ctrl+Shift+B → click a control → enter a short note (1–240 characters) →
 
 Default private storage is outside maintained code:
 
-- `_bmad-output/tmp/visual-bug-reporting/reports/`: schema-v2 JSON and native wireframe PNG.
-- `_bmad-output/tmp/visual-bug-reporting/runtime/`: isolated synthetic Notary, Upload, output and Electron profile.
-- `_bmad-output/tmp/visual-bug-reporting/checks/`: test profiles, reports and evidence.
+- `docs/tmp/visual-bug-reporting/reports/`: schema-v2 JSON and native wireframe PNG.
+- `docs/tmp/visual-bug-reporting/runtime/`: isolated synthetic Notary, Upload, output and Electron profile.
+- `docs/tmp/visual-bug-reporting/checks/`: test profiles, reports and evidence.
 
 These directories are Git-ignored. `G1_VISUAL_SPIKE_RUNTIME` and `G1_VISUAL_SPIKE_SINK` override runtime/report roots for trusted local tests; `G1_VISUAL_SPIKE_TEST_DIR` selects a separate test evidence root. Historical source profiles/reports are archival backups, not automatically imported into active app storage. The current prototype uses synthetic Notary data and wireframe screenshots; it cannot diagnose typography/color fidelity.
 
@@ -36,4 +36,4 @@ Schema v2 persists only matched registry identities (normalized `{row}`/`{tabId}
 
 Confidence: `explicit-control-map` > `component-ancestry` > `module-ancestry` > `heuristic-static-id` > `unmapped`. JS declarations and CSS anchors are scanned live per save; missing anchors are `stale:true`, never guessed lines. Owners are rendering ownership/context, not causal fix locations. Source candidates remain a separate ancestor-context tier.
 
-Authoritative behavior: `../../_bmad-output/specs/shared/visual-bug-spike.md`. Historical source-linkage evidence remains under ignored `_bmad-output/tmp/visual-bug-source-linkage/` in the source archive; it is not current cutover verification.
+Authoritative behavior: `../../docs/specs/shared/visual-bug-spike.md`. Historical source-linkage evidence remains under ignored `docs/tmp/visual-bug-source-linkage/` in the source archive; it is not current cutover verification.

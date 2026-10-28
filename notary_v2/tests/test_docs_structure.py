@@ -22,11 +22,11 @@ TRACKED_PATHS = set(
     ).stdout.splitlines()
 )
 MODULE_READMES = (
-    "_bmad-output/specs/notary_v2/README.md",
-    "_bmad-output/specs/notary_v2/input/README.md",
-    "_bmad-output/specs/notary_v2/input/zalo/README.md",
-    "_bmad-output/specs/notary_v2/diagram/README.md",
-    "_bmad-output/specs/notary_v2/diagram/inheritance/README.md",
+    "docs/specs/notary_v2/README.md",
+    "docs/specs/notary_v2/input/README.md",
+    "docs/specs/notary_v2/input/zalo/README.md",
+    "docs/specs/notary_v2/diagram/README.md",
+    "docs/specs/notary_v2/diagram/inheritance/README.md",
 )
 LEGACY_DOC_DIRS = (
     "docs/plans",
@@ -55,7 +55,7 @@ def test_module_readmes_declare_routing_metadata():
         assert re.search(r"\*\*Trạng thái:\*\*", text), f"{path}: missing status"
 
 def test_module_markdown_targets_exist():
-    for readme in (GIT_ROOT / "_bmad-output/specs/notary_v2").rglob("*.md"):
+    for readme in (GIT_ROOT / "docs/specs/notary_v2").rglob("*.md"):
         text = readme.read_text(encoding="utf-8")
         targets = set(re.findall(r"\[[^\]]*\]\(([^)\s]+)\)", text))
         for target in targets:

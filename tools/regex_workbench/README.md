@@ -4,7 +4,7 @@ Owner NAIA-4 ngày 02/10/2026 chọn `engine/` làm lõi regex chung. Document
 Intake gọi trực tiếp runner cho DOCX; bản đồ XML/nguồn và Word export ở dịch
 vụ riêng, UI dev vẫn độc lập. Profile transfer 1.1.2 bổ sung `asset_groups`
 (nhãn Tài sản thứ N) và `land_rows` (nhãn Loại đất) bằng cùng regex guard.
-Xem [luồng sản phẩm](../../_bmad-output/specs/notary_v2/input/docx-import.md).
+Xem [luồng sản phẩm](../../docs/specs/notary_v2/input/docx-import.md).
 
 Công cụ độc lập cho dev: dán một văn bản công chứng hoàn chỉnh, chạy profile
 regex, xem cấu trúc vùng và các trường trích xuất kèm provenance. UI tham

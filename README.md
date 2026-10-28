@@ -6,7 +6,7 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 
 ## Bắt đầu đọc
 
-1. Đọc [spec toàn hệ thống](./_bmad-output/specs/README.md).
+1. Đọc [spec toàn hệ thống](./docs/specs/README.md).
 2. Chọn module trong cây dưới.
 3. Đi qua README của từng thư mục cha tới feature cần sửa.
 4. Đọc contract và source được spec lá dẫn tới.
@@ -14,7 +14,7 @@ Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại
 ## Cây tài liệu
 
 ```text
-_bmad-output/specs/
+docs/specs/
 ├── README.md                       # Tầm nhìn, ranh giới, kiến trúc và câu hỏi toàn hệ thống
 ├── shared/
 │   └── administrative-lookup.md    # Lõi tra cứu tên xã/tỉnh dùng chung
@@ -75,7 +75,7 @@ Ví dụ feature **Nhập liệu**:
 
 Không cần mục rỗng. Kiến trúc hay câu hỏi chỉ ảnh hưởng Nhập liệu nằm ngay trong
 spec Nhập liệu. Nếu ảnh hưởng cả Stage và Diagram, đặt ở README `notary_v2`.
-Nếu ảnh hưởng nhiều module, đặt ở `_bmad-output/specs/README.md`.
+Nếu ảnh hưởng nhiều module, đặt ở `docs/specs/README.md`.
 
 ## Module và runtime
 
@@ -96,7 +96,7 @@ Chạy `run-dev.bat` ở gốc repo → Ctrl+Shift+B → chọn phần tử → 
 Save report. Launcher dùng lại `run.bat`, không cần đường dẫn máy cố định hoặc
 `rtk`. Đây là cùng app nhưng **Notary mock, dữ liệu/profile thử tách riêng**,
 không phải dữ liệu công chứng production. Báo cáo JSON/PNG nằm ở thư mục ignored
-`_bmad-output/tmp/visual-bug-reporting/reports/`; ghi chú được giữ nguyên văn,
+`docs/tmp/visual-bug-reporting/reports/`; ghi chú được giữ nguyên văn,
 phải kiểm tra dữ liệu riêng tư trước khi chia sẻ. App đóng gói không bật tool này.
 Xem [hướng dẫn và kiểm chứng](./tools/visual-bug-reporting/README.md).
 
@@ -106,39 +106,17 @@ Xem [hướng dẫn và kiểm chứng](./tools/visual-bug-reporting/README.md).
 | Chỗ | Dùng cho |
 |---|---|
 | [`contracts/`](./contracts/README.md) | Contract đã duyệt và schema máy đọc |
-| `_bmad-output/specs/` | SOT đặc tả hành vi (spec quyết định, code chứng minh) |
-| `_bmad-output/decisions/` | Quyết định đã chốt: LÀ GÌ và TẠI SAO |
+| `docs/specs/` | SOT đặc tả hành vi (spec quyết định, code chứng minh) |
+| `docs/decisions/` | Quyết định đã chốt: LÀ GÌ và TẠI SAO |
 | `graphify-out/` | Snapshot để tìm quan hệ code; không phải spec |
-| `_bmad-output/` | Artifact workflow BMAD (plans, review, archive) |
+| `docs/plans/`, `docs/planning/`, `docs/brainstorming/`, `docs/archive/` | Plan, nghiên cứu, brainstorm, lịch sử |
 | `.tmp/`, `.cache/`, `logs/`, `artifacts/` | File tạm, không commit |
 
 Trước khi sửa tài liệu, đọc [luật agent](./AGENTS.md).
 
-## Plan/spec trực quan trong BMAD
+## Workflow agent
 
-`bmad-build` và `bmad-spec` tích hợp HTML qua các field BMAD hỗ trợ
-(`persistent_facts`, `activation_steps_append`) trong `_bmad/custom/`. Cả hai nạp
-[contract authoring](./_bmad/custom/html-plan/authoring.md) và
-[spec hành vi](./_bmad-output/specs/shared/visual-html-plans.md); không gọi
-skill HTML riêng.
-Build trình bày HTML sau điều tra và tự kiểm tra, trước khi trình bày plan/xin
-duyệt; với oneshot cần minh họa thì trước implementation. Spec trình bày sau
-self-validation và trước khi trả kết quả. Agent viết theo cấu trúc
-Thariq: cây hành vi và exhibit, mock app theo UI đã inspect; không bọc Markdown.
-Markdown/memory BMAD vẫn là nguồn chuẩn.
-
-Từ root repo, đóng gói ví dụ bằng Node:
-
-```sh
-node _bmad/custom/html-plan/runtime/pack.mjs _bmad/custom/html-plan/examples/notary-diagram-errors.html --root .
-```
-
-Mở `notary-diagram-errors.packed.html` cùng thư mục trong browser. Với task mới,
-agent viết `_bmad-output/tmp/<slug>/plan.html` hoặc `spec.html`, thay input trong
-command, xem cây đóng/mở và từng state rồi giao link `.packed.html` bấm được.
-Không dùng dữ liệu ví dụ làm mặc định cho plan tương lai.
-
-**Giới hạn:** customization là chỉ dẫn agent, không phải hook cưỡng chế, generator
-hay runtime tự mở browser. Task nhỏ không bị ép lựa chọn hoặc gate mới; Respond là
-phụ, chưa xem không phải đồng ý. Pack thành công không chứng minh mock đúng: vẫn
-cần kiểm tra bằng mắt hoặc báo rõ chưa kiểm tra được.
+Agent dùng [Superpowers](https://github.com/obra/superpowers) cài ở mức project
+(`.omp/extensions/superpowers/`): brainstorm → plan → TDD → review. Plan/spec viết
+bằng Markdown trong `docs/plans/` và `docs/specs/`. BMAD cũ (`_bmad/`) và tool
+HTML-plan đã gỡ; bản lưu ở tag git `bmad-archive-20261028`.

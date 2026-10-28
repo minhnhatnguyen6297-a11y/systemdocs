@@ -13,10 +13,10 @@ MIN-62 được giữ trong Git/Linear và không bị tài liệu này thay th�
 ## 1. Vocabulary dùng lại (không nhân bản)
 
 - `IdentityEvidence` — field set Draft tại
-  [`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) mục 4.1. Contract G1 này
+  [`../docs/specs/README.md`](../docs/specs/README.md) mục 4.1. Contract G1 này
   chỉ thêm binding ở mục 3; nó không publish shape xuyên sản phẩm.
 - Tiến trình trạng thái `SOURCE → RAW → NORMALIZED → INFERRED → CONFIRMED` —
-  xem [`../_bmad-output/specs/README.md`](../_bmad-output/specs/README.md) mục 4. Dữ liệu chưa
+  xem [`../docs/specs/README.md`](../docs/specs/README.md) mục 4. Dữ liệu chưa
   xác nhận không bao giờ thành sự thật nghiệp vụ.
 - Chuẩn hóa định danh — `contracts/entities.md` (CCCD 12 số; serial GCN
   `[A-Z]{2}\d{6,8}`; số công chứng `xxx/yyyy`; thửa+tờ là cặp).

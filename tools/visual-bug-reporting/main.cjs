@@ -6,7 +6,7 @@ const { randomUUID } = require('crypto');
 const { validate } = require('./policy.cjs');
 const { resolveOwnership } = require('./linkage.cjs');
 const ROOT = __dirname;
-const LOCAL = path.resolve(ROOT, '../../_bmad-output/tmp/visual-bug-reporting');
+const LOCAL = path.resolve(ROOT, '../../docs/tmp/visual-bug-reporting');
 function isolate(app, shellRoot) {
   const runtime = path.resolve(process.env.G1_VISUAL_SPIKE_RUNTIME || path.join(LOCAL, 'runtime'));
   const profile = path.join(runtime, 'profile');

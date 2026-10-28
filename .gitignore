@@ -26,15 +26,12 @@ Thumbs.db
 .DS_Store
 
 # Agent scratch & temp — bãi rác chính thức, không commit
-_bmad-output/tmp/
+docs/tmp/
 .tmp/
 .cache/
 logs/
 artifacts/
 
-# Generated BMAD workflow snapshots and packed example output
-_bmad/render/
-_bmad/custom/html-plan/examples/*.packed.html
 
 # Local samples and worktree recovery; never commit personal sample data.
 
