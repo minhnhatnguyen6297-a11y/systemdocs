@@ -130,4 +130,7 @@ jobs:
       - run: pip install -r shell/sidecar/requirements.txt -r notary_v2/requirements.txt
       - working-directory: shell
         run: npm ci --no-audit --no-fund
+      # Electron >= 40 bỏ postinstall: binary tải qua bin `install-electron`.
+      - working-directory: shell
+        run: npx --no-install install-electron
       - run: G1_PYTHON="$(command -v python)" tools/ci/e2e-smoke.sh
