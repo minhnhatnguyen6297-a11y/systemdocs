@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from fractions import Fraction
+import re
 from typing import Any, Mapping
 
 
@@ -38,13 +39,17 @@ def _parse_death_date(value: Any) -> date | None:
     if isinstance(value, date):
         return value
 
-    text = str(value).strip()
+    text = " ".join(str(value).split())
     if not text:
         return None
-    if len(text) == 4 and text.isdigit():
+    if text.isdigit() and len(text) == 4:
         return date(int(text), 1, 1)
-    if len(text) == 10 and text[2] == "/" and text[5] == "/":
-        return datetime.strptime(text, "%d/%m/%Y").date()
+    if re.fullmatch(r"\d{1,2}\s*/\s*\d{1,2}\s*/\s*\d{4}", text):
+        day, month, year = (int(part) for part in text.split("/"))
+        try:
+            return date(year, month, day)
+        except ValueError as exc:
+            raise ValueError(f"Ngày chết không hợp lệ: {text}") from exc
     try:
         return date.fromisoformat(text[:10])
     except ValueError as exc:

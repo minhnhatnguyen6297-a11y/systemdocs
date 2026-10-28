@@ -194,6 +194,27 @@ def test_full_death_date_is_preserved_while_year_only_uses_first_of_january():
     assert _parse_death_date("2026") == date(2026, 1, 1)
 
 
+def test_death_date_tolerates_loose_spacing():
+    assert _parse_death_date(" 23/07/2026 ") == date(2026, 7, 23)
+    assert _parse_death_date(" 2026 ") == date(2026, 1, 1)
+    assert _parse_death_date("23 / 07 / 2026") == date(2026, 7, 23)
+    assert _parse_death_date("23/7/2026") == date(2026, 7, 23)
+
+
+def test_death_date_rejects_nonexistent_and_garbled_dates():
+    for bad in ["31/02/2020", "32/01/2020", "13/13/2020", "abc", "20-6-30"]:
+        with pytest.raises(ValueError) as exc_info:
+            _parse_death_date(bad)
+        assert str(exc_info.value) == f"Ngày chết không hợp lệ: {bad}"
+
+
+def test_death_date_rejects_nonsense_types():
+    for bad in [[], {}, object()]:
+        with pytest.raises(ValueError) as exc_info:
+            _parse_death_date(bad)
+        assert "Ngày chết không hợp lệ" in str(exc_info.value)
+
+
 def test_five_living_land_owners_each_keep_one_fifth():
     ids = {"A", "B", "C", "D", "E"}
     result = _run({person_id: None for person_id in ids}, owners=ids)
