@@ -1065,6 +1065,16 @@ function fakeClient(seed) {
 function seedCases(...names) {
   const cases = {};
   for (const n of names) {
+    // 0a58acc (issue 13) bỏ fixture 'locked' khỏi mock/sidecar: backend không
+    // khóa soạn nữa. Model vẫn giữ nhánh `locked` (schema wire vẫn có cờ) nên
+    // test client dựng case 44 khóa từ 'done' — chỉ trong JS, không dùng chung.
+    if (n === 'locked') {
+      const doc = loadFixture('done');
+      for (const [id, c] of Object.entries(doc.cases)) {
+        cases[id] = { ...c, status: 'locked', locked: true };
+      }
+      continue;
+    }
     const doc = loadFixture(n);
     Object.assign(cases, doc.cases);
   }
