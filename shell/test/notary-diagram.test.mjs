@@ -1868,3 +1868,23 @@ test('vai tro theo gioi tinh: me cua con (aria node, chip, o trong, hint, vo)', 
   assert.match(spouseCard.getAttribute('aria-label'),
     /— vợ của Lý Ông Chủ/, 'nguoi Nu o cho vo/chong → "vợ của ..."');
 });
+
+test("'Không có vợ/con': ô chỉ hiện cho người đã mất, bật đặt cờ node", async (t) => {
+  const { model, view } = await build(t, { mode: 'case', seed: {
+    people: [{ row_id: 'c1', ho_ten: 'Người Mẫu Mất', ngay_chet: '2020-05-10' },
+             { row_id: 'c2', ho_ten: 'Người Mẫu Sống' }],
+    nodes: [{ id: 'owner', personId: 'c1', parentSlotIds: [],
+      spouseSlotId: null, ownPositions: [1], receivePositions: [],
+      hidden: false, deleted: false },
+    { id: 'child_1', personId: 'c2', parentSlotIds: ['owner'],
+      spouseSlotId: null, ownPositions: [], receivePositions: [1],
+      hidden: false, deleted: false }],
+  } });
+  const boxes = byCls(view.el, 'js-no-spouse-children');
+  assert.equal(boxes.length, 1, 'chỉ người đã mất có ô');
+  assert.equal(boxes[0].checked, false, 'không tự bật');
+  boxes[0].checked = true;
+  boxes[0].onchange();
+  const owner = model.state.diagram.nodes.find((n) => n.id === 'owner');
+  assert.equal(owner.noSpouseChildren, true);
+});

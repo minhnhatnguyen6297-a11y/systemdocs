@@ -1260,6 +1260,21 @@ function createDiagramPane(ctx) {
       warning.code === 'missing_death_date' && warning.personId === n.personId)) {
       card.append(h('div', 'cd-badge cd-badge-warn', 'thiếu ngày mất'));
     }
+    // 'Không có vợ/con': chỉ cho người đã mất trên sơ đồ thừa kế — xác
+    // nhận để engine thôi đòi ô Vợ/chồng, Con (không tự bật).
+    if (!isTp() && p && String(p.ngay_chet || '').trim()) {
+      const wrap = h('label', 'cd-node-nospouse small');
+      const cb = h('input', 'js-no-spouse-children');
+      cb.type = 'checkbox';
+      cb.checked = !!n.noSpouseChildren;
+      cb.setAttribute('aria-label', `Không có vợ/con — ${name}`);
+      cb.onclick = (ev) => { if (ev && ev.stopPropagation) ev.stopPropagation(); };
+      cb.onchange = () => {
+        model.setNodeFlag(n.id, 'noSpouseChildren', cb.checked);
+      };
+      wrap.append(cb, h('span', '', 'Không có vợ/con'));
+      card.append(wrap);
+    }
     // Luật A (D-048 v2): node owner mirror stage.owner_row_id — người
     // còn sống ở đây là trạng thái không hợp lệ (đã bị chặn gán mới,
     // nhưng dữ liệu cũ có thể còn). Nhãn chỉ đọc, không auto-gỡ.

@@ -41,7 +41,9 @@ const PERSON_FIELDS = ['ho_ten', 'gioi_tinh', 'ngay_sinh', 'ngay_chet',
 const ASSET_FIELDS = ['so_serial', 'so_vao_so',
   'so_thua_dat', 'so_to_ban_do', 'dia_chi', 'loai_so',
   'hinh_thuc_su_dung', 'nguon_goc', 'ngay_cap', 'co_quan_cap'];
-const NODE_BOOL_FIELDS = ['hidden', 'deleted'];
+// noSpouseChildren: 'Không có vợ/con' — người dùng xác nhận, engine
+// không đòi ô Vợ/chồng, Con cho người này.
+const NODE_BOOL_FIELDS = ['hidden', 'deleted', 'noSpouseChildren'];
 const NODE_POSITION_FIELDS = ['ownPositions', 'receivePositions'];
 
 // Meta cho phep sua — khop payload.case §13.6 + đợt 3 (MIN-141).

@@ -1171,3 +1171,10 @@
 .cd-toggle-checkbox {
   cursor: pointer;
 }
+.cd-node-nospouse {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  cursor: pointer;
+}
