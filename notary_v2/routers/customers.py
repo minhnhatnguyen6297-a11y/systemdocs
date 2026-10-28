@@ -1,6 +1,7 @@
 """Customer router: CRUD + Excel import."""
 
 import io
+from pathlib import Path
 from typing import Any, Dict, Optional
 from sqlalchemy.exc import IntegrityError
 
@@ -25,7 +26,8 @@ from services.document_intake.excel_parse import (  # noqa: F401 — re-export c
 )
 
 router = APIRouter()
-templates = Jinja2Templates(directory="frontend/templates")
+BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
 
 EXCEL_COLUMNS = ["ho_ten", "gioi_tinh", "ngay_sinh", "ngay_chet", "so_giay_to", "ngay_cap", "dia_chi"]
 DATE_FIELDS = {"ngay_sinh", "ngay_chet", "ngay_cap"}

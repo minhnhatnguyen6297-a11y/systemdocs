@@ -5,13 +5,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import Optional
 from datetime import date, datetime
+from pathlib import Path
 
 from database import (get_db, MAX_LAND_ROWS, _land_area_to_float,
                       _land_row_field)
 from models import Property, PropertyLandRow
 
 router = APIRouter()
-templates = Jinja2Templates(directory="frontend/templates")
+BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
 
 
 def parse_date(s):

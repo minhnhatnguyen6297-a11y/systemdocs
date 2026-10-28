@@ -7,6 +7,8 @@ from fastapi import HTTPException, UploadFile
 
 from routers import ocr_ai
 
+_TEST_DIR = Path(__file__).resolve().parent.parent
+
 
 def make_upload(filename: str, content: bytes = b"fake-image") -> UploadFile:
     return UploadFile(filename=filename, file=io.BytesIO(content))
@@ -14,8 +16,8 @@ def make_upload(filename: str, content: bytes = b"fake-image") -> UploadFile:
 
 class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
     def test_active_cloud_path_is_qwen_only(self):
-        server = Path("routers/ocr_ai.py").read_text(encoding="utf-8")
-        form = Path("frontend/templates/cases/form.html").read_text(encoding="utf-8")
+        server = (_TEST_DIR / "routers" / "ocr_ai.py").read_text(encoding="utf-8")
+        form = (_TEST_DIR / "frontend" / "templates" / "cases" / "form.html").read_text(encoding="utf-8")
 
         self.assertNotIn("zxing", server.lower())
         self.assertNotIn("source_priority", server)

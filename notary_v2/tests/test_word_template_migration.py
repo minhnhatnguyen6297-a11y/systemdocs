@@ -11,7 +11,7 @@ from docx import Document
 
 from services import word_template_migration as wtm
 
-SRC = Path("word_templates")
+SRC = Path(__file__).resolve().parent.parent / "word_templates"
 
 
 def _docx(path: Path, paragraphs: list[str]) -> Path:
