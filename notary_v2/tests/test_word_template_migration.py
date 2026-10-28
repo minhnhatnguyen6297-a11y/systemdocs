@@ -51,6 +51,20 @@ def test_scan_source_templates_reports_excluded_files(tmp_path):
     assert "xlsx/data.xlsx" in excluded
 
 
+def test_scan_source_templates_dedupes_in_root_dir_alias(tmp_path):
+    """Junction trỏ sang thư mục khác TRONG src: file thật vào kept đúng 1
+    lần — migrate 2 lần sẽ ghi trùng đích và đếm file_count sai."""
+    src = tmp_path / "src"
+    _docx(src / "2026" / "mau.docx", ["x"])
+    if not _make_dir_link(src / "Latest", src / "2026"):
+        pytest.skip("môi trường không tạo được junction/symlink thư mục")
+
+    kept, excluded = wtm.scan_source_templates(src)
+
+    assert [p.relative_to(src).as_posix() for p in kept] == ["2026/mau.docx"]
+    assert excluded == []
+
+
 def test_real_docm_is_excluded_and_reported_before_any_write(tmp_path, monkeypatch):
     import zipfile
 
@@ -845,7 +859,9 @@ def test_write_guard_blocks_junction_swapped_after_copy(tmp_path, monkeypatch):
             real_dir = path.parent
             moved = path.parent.parent / "sub_real"
             real_dir.rename(moved)
-            os.system(f'cmd /c mklink /J "{real_dir}" "{sentinel}" >nul')
+            if not _make_dir_link(real_dir, sentinel):
+                moved.rename(real_dir)
+                pytest.skip("môi trường không tạo được junction/symlink")
             assert real_dir.is_symlink() or wtm._real_path(real_dir) != real_dir
         return result
 

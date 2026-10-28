@@ -9,6 +9,7 @@ Các test này phủ đúng phản ví dụ Leader review tại 86967d6:
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,24 @@ def _docx(path: Path, paragraphs: list[str]) -> Path:
         doc.add_paragraph(text)
     doc.save(str(path))
     return path
+
+
+def _make_dir_link(link: Path, target: Path) -> bool:
+    """Tạo junction (``mklink /J``, không cần admin) trên Windows, symlink
+    thư mục ở nơi khác. KHÔNG dùng ``cmd /c ... >nul``: trên Linux ``>nul``
+    tạo file rác tên ``nul`` và mklink không chạy, guard không được kiểm."""
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True)
+        if result.returncode == 0:
+            return True
+    try:
+        os.symlink(str(target), str(link), target_is_directory=True)
+        return True
+    except (OSError, NotImplementedError):
+        return False
 
 
 # ----------------------------------------------------------- preflight
@@ -71,7 +90,8 @@ class TestPreflightWriteTargets:
         outside = tmp_path / "outside"
         outside.mkdir()
         escape = out / "migrated"
-        os.system(f'cmd /c mklink /J "{escape}" "{outside}" >nul')
+        if not _make_dir_link(escape, outside):
+            pytest.skip("môi trường không tạo được junction/symlink thư mục")
         assert escape.is_symlink() or wtm._real_path(escape) != escape
         with pytest.raises(ValueError):
             e2e._preflight_write_targets(
@@ -99,7 +119,8 @@ class TestPreflightWriteTargets:
         target_dir = tmp_path / "elsewhere"
         target_dir.mkdir()
         report = out / "e2e_report.json"
-        os.system(f'cmd /c mklink /J "{report}" "{target_dir}" >nul')
+        if not _make_dir_link(report, target_dir):
+            pytest.skip("môi trường không tạo được junction/symlink thư mục")
         with pytest.raises(FileExistsError):
             e2e._preflight_write_targets(
                 src, out, [out / "migrated"], report)

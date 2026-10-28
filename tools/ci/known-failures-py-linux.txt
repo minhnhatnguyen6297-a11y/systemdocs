@@ -2,9 +2,4 @@
 # Linux, Python 3.13.5 (/workspace/venv2): 159 failed, 1354 passed, 11 skipped.
 # Nguyên nhân chính (đếm từ dòng E): path Windows 'path khong tuyet doi'/file_scope_not_supported (fileref.py chỉ nhận ổ đĩa X:\),
 # thiếu word_templates/*.docx, thiếu frontend/static. Phần lớn là do app nhắm Windows -> job windows-latest đo riêng.
-# Mỗi dòng gắn issue nhóm nguyên nhân: #15 path Windows, #16 resource theo cwd, #18 junction, #19 linh tinh.
-notary_v2/tests/test_naia12_e2e_migrate_export.py::TestPreflightWriteTargets::test_junction_escape_target_refused  # #18 (xem issue)
-notary_v2/tests/test_naia12_e2e_migrate_export.py::TestPreflightWriteTargets::test_report_junction_refused  # #18 (xem issue)
-notary_v2/tests/test_naia12_e2e_migrate_export.py::test_report_fallback_target_existing_never_overwritten  # #18 (xem issue)
-notary_v2/tests/test_word_template_migration.py::test_scan_source_templates_excludes_files_via_junctioned_dir  # #18 (xem issue)
-notary_v2/tests/test_word_template_migration.py::test_write_guard_blocks_junction_swapped_after_copy  # #18 (xem issue)
+# Mỗi dòng gắn issue nhóm nguyên nhân: #15 path Windows, #16 resource theo cwd, #19 linh tinh (#18 junction đã sửa).

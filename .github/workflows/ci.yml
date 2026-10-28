@@ -74,11 +74,9 @@ jobs:
           name: pytest-linux
           path: pytest.txt
 
-  # App nhắm Windows (fileref chỉ nhận đường dẫn X:\...). Chưa đo baseline trên Windows
-  # => non-blocking tới khi có known-failures-py-windows.txt từ lần chạy đầu.
+  # App nhắm Windows. Từ khi gộp #15-#19 Windows xanh 0 lỗi => job BẮT BUỘC (không continue-on-error).
   pytest-windows:
     runs-on: windows-latest
-    continue-on-error: true
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
