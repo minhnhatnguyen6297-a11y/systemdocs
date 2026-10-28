@@ -1,5 +1,7 @@
 # AGENTS.md — luật làm việc trong systemdocs
 
+> Đọc [`docs/STACK.md`](docs/STACK.md) trước (stack, nơi lưu, vòng chuẩn). Mục lục nguồn chuẩn: [`docs/README.md`](docs/README.md).
+
 ## Dùng BMAD
 
 - Dùng workflow BMAD và customization của repo trong `_bmad/custom/`; đọc skill
@@ -130,6 +132,12 @@
 - Không tách mỗi feature nhỏ thành file mới. Chỉ mở tài liệu chuyên sâu khi cần;
   không nạp archive mặc định và không nâng Draft thành đã duyệt khi gom tài liệu.
 - Khi quyết định đổi, cập nhật spec và decision cùng phiên; tiến độ để trong backlog.
+
+## Dẫn nguồn trước khi hỏi hoặc kết luận
+
+- Trước khi hỏi owner câu nghiệp vụ hoặc đưa kết luận: dẫn `file:dòng`, mã `D-xxx`, hoặc số issue.
+- Tìm không ra ⇒ ghi rõ "chưa kiểm chứng"; không đoán.
+- Chỉ dùng thuật ngữ có trong [`docs/glossary.md`](docs/glossary.md).
 
 ## Trình bày
 

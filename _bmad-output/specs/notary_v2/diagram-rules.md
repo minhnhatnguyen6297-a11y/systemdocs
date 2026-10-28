@@ -342,7 +342,7 @@ vẫn giữ hiện trạng, không được dùng nhánh fallback đó làm ngu�
 - Spec nghiệp vụ v2 cũ là draft; workflow/code đang chạy không tự biến mọi đề
   xuất trong draft thành quy tắc hiện hành.
 - Owner đã chốt riêng việc lưu `incomplete` ngày 15/10/2026 trong phần Lỗi và ngoại lệ. Quyết định
-  này không duyệt toàn bộ [`business-rules.md`](../../archive/specs-before-consolidation-20261015/notary_v2/diagram/inheritance/business-rules.md), không
+  này không duyệt toàn bộ [`business-rules.md`](diagram/inheritance/business-rules.md), không
   mở quyền lưu `invalid`/`unsupported`, và chưa chứng minh runtime đã tuân thủ.
 - Còn rủi ro migration giữa `case_state_json.diagram.*`, `engine_state_json`,
   `diagram_payload` và projection legacy. Save phải ưu tiên state canonical,
