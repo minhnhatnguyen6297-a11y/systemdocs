@@ -145,6 +145,9 @@
               "id": "owner",
               "personId": "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
               "parentSlotIds": [],
+              "spouseSlotIds": [
+                "spouse"
+              ],
               "spouseSlotId": "spouse",
               "ownPositions": [
                 1,
@@ -158,6 +161,9 @@
               "id": "spouse",
               "personId": "22222222-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
               "parentSlotIds": [],
+              "spouseSlotIds": [
+                "owner"
+              ],
               "spouseSlotId": "owner",
               "ownPositions": [],
               "receivePositions": [
@@ -174,6 +180,7 @@
                 "owner",
                 "spouse"
               ],
+              "spouseSlotIds": [],
               "spouseSlotId": null,
               "ownPositions": [],
               "receivePositions": [
@@ -190,6 +197,7 @@
                 "owner",
                 "spouse"
               ],
+              "spouseSlotIds": [],
               "spouseSlotId": null,
               "ownPositions": [],
               "receivePositions": [
@@ -206,6 +214,7 @@
                 "owner",
                 "spouse"
               ],
+              "spouseSlotIds": [],
               "spouseSlotId": null,
               "ownPositions": [],
               "receivePositions": [
@@ -222,6 +231,7 @@
                 "owner",
                 "spouse"
               ],
+              "spouseSlotIds": [],
               "spouseSlotId": null,
               "ownPositions": [],
               "receivePositions": [
