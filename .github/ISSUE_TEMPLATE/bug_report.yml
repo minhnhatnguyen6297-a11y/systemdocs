@@ -1,0 +1,83 @@
+name: Báo lỗi (bắt buộc có bằng chứng)
+description: Báo lỗi kèm log, ảnh, lệnh tái hiện và commit SHA. Thiếu bằng chứng → gắn needs-evidence, chưa xử lý.
+title: "[Lỗi] "
+labels: ["bug", "chua-phan-loai"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Chỉ dùng dữ liệu giả lập.** Không đưa dữ liệu công dân thật (họ tên, CCCD, địa chỉ, số thửa…) vào log, ảnh hay video. Che hoặc thay bằng dữ liệu test trước khi đính kèm.
+        Có thể sinh sẵn nội dung bằng `tools/file-bug.sh` (xem AGENTS.md, mục "Báo lỗi phải có bằng chứng").
+  - type: input
+    id: commit
+    attributes:
+      label: Nhánh + commit SHA
+      description: Kết quả của `git rev-parse --abbrev-ref HEAD` và `git rev-parse HEAD`.
+      placeholder: "consolidate/monorepo @ 1a2b3c4d…"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Bước tái hiện
+      description: Đánh số từng bước, đủ để người khác làm lại y hệt.
+      placeholder: |
+        1. Mở app bằng run-dev.bat
+        2. Vào màn …
+        3. Bấm …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Kết quả mong đợi
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Kết quả thực tế
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log / stack trace
+      description: Dán đoạn log liên quan của app (Electron) và sidecar (Python). Tự động hiển thị dạng code, không cần ```.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: media
+    attributes:
+      label: Ảnh chụp / video
+      description: Kéo-thả file vào đây, hoặc dán link tới file đã commit trong docs/evidence/<mã-lỗi>/. Chỉ dữ liệu giả lập.
+    validations:
+      required: true
+  - type: textarea
+    id: repro_cmd
+    attributes:
+      label: Lệnh test tái hiện hoặc tên test đang fail
+      description: Lệnh chính xác, chạy từ gốc repo.
+      placeholder: "pytest shell/test/test_upload_e2e.py::test_xxx -x"
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Môi trường
+      description: Hệ điều hành, bản Electron/Node/Python, chạy dev hay bản đóng gói.
+      placeholder: |
+        - OS: Windows 11 23H2
+        - Electron: …  Node: …  Python: …
+        - Chế độ: dev (run-dev.bat) / packaged
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Xác nhận
+      options:
+        - label: Log, ảnh, video chỉ chứa dữ liệu giả lập, không có dữ liệu công dân thật.
+          required: true

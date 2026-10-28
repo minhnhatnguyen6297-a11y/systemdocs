@@ -33,3 +33,23 @@
 
 - Khi xong, tạo commit nhỏ, rõ ràng. Trước khi xóa hoặc move hàng loạt, tạo commit
   bảo lưu; hỏi owner nếu phạm vi chưa rõ.
+
+## Báo lỗi phải có bằng chứng
+
+Mọi issue lỗi (người hay agent tạo) dùng form `.github/ISSUE_TEMPLATE/bug_report.yml`. Issue trống đã bị tắt.
+
+Agent khi báo lỗi phải đính kèm đủ:
+
+1. **Nhánh + commit SHA** đang chạy khi thấy lỗi.
+2. **Lệnh tái hiện chính xác** (hoặc tên test đang fail), chạy được từ gốc repo.
+3. **Đoạn log** liên quan của app và sidecar (vài chục dòng quanh lỗi, không dán cả file).
+4. **Ảnh chụp/video** (ví dụ ảnh từ harness CDP trong `/workspace/usability`, `/workspace/e2e-run`).
+5. Kết quả mong đợi vs thực tế, môi trường.
+
+Sinh nội dung nhanh: `tools/file-bug.sh --title "..." --repro "lệnh" [--log file]... [--shot file.png]` → in markdown ra stdout và chép ảnh vào `docs/evidence/<mã>/`. Script không tạo issue.
+
+**Đính kèm ảnh khi không có trình duyệt:** API GitHub không upload được file đính kèm issue. Cách dùng: commit ảnh/log vào `docs/evidence/<mã>/` trên nhánh riêng `evidence/<mã>` (không merge vào nhánh chính), push nhánh đó, rồi dẫn link `https://github.com/<owner>/<repo>/blob/evidence/<mã>/docs/evidence/<mã>/<file>?raw=true` trong issue. Dùng link `blob/...?raw=true` thay vì `raw.githubusercontent.com` vì repo private: link blob dùng phiên đăng nhập GitHub nên hiển thị được cho người có quyền. Mã là ngày-giờ + slug, sau khi có số issue thì ghi số issue vào README trong thư mục.
+
+**Chỉ dữ liệu giả lập.** Không chụp/ghi log có dữ liệu công dân thật.
+
+Issue lỗi thiếu một trong các mục trên → gắn nhãn `needs-evidence` và **không được xử lý** cho đến khi bổ sung. Agent nhận việc từ issue như vậy: hỏi bổ sung, không tự đoán.
