@@ -2,6 +2,9 @@ from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
+_PCDS_TEMPLATE = (Path(__file__).resolve().parent.parent
+                  / "word_templates" / "1. PCDS .docx")
+
 import pytest
 from docx import Document
 
@@ -1063,7 +1066,8 @@ def test_list_public_builtin_templates_hides_reference_and_snake_case_templates(
 
 
 def test_placeholder_catalog_documents_vietnamese_contract_without_snake_case_public_contract():
-    catalog = Path("word_templates/placeholder_mapping.md").read_text(encoding="utf-8")
+    catalog = (Path(__file__).resolve().parent.parent
+               / "word_templates" / "placeholder_mapping.md").read_text(encoding="utf-8")
 
     assert "[Người N - Họ tên]" in catalog
     assert "[Người nhận N - Họ tên]" in catalog
@@ -1401,7 +1405,7 @@ def test_real_pcds_template_resolves_two_properties_into_one_document():
             ],
         ),
     )
-    doc = Document("word_templates/1. PCDS .docx")
+    doc = Document(_PCDS_TEMPLATE)
 
     replace_in_doc(doc, build_template_mapping(case))
 
@@ -1452,7 +1456,7 @@ def test_more_than_twenty_heirs_raises():
 
 
 def test_pcds_template_no_old_critical_placeholders():
-    doc = Document("word_templates/1. PCDS .docx")
+    doc = Document(_PCDS_TEMPLATE)
     all_texts = []
     for p in doc.paragraphs:
         all_texts.append(p.text)

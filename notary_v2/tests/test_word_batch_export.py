@@ -22,7 +22,8 @@ from services import word_batch_export as wbe
 from services import word_engine
 
 
-BUILTIN_TEMPLATE = Path("word_templates/1. PCDS .docx")
+BUILTIN_TEMPLATE = (Path(__file__).resolve().parent.parent
+                    / "word_templates" / "1. PCDS .docx")
 
 
 # ---------------------------------------------------------------- fixtures
