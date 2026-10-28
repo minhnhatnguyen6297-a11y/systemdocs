@@ -2336,7 +2336,7 @@ function createModel(deps) {
       }
       if (k !== 'land_rows' && f && f.normalized_value == null && (f.source_refs || []).some((ref) =>
           ['ambiguous', 'error', 'warning_nonstandard'].includes(ref.core_state)) && !f.reviewed) {
-        state.notice = `${k}: hãy chọn hoặc sửa giá trị trước khi đưa vào Stage`;
+        state.notice = `${k}: hãy chọn hoặc sửa giá trị trước khi đưa vào hồ sơ`;
         emit();
         return null;
       }
@@ -2347,7 +2347,7 @@ function createModel(deps) {
       try {
         fields.land_rows = JSON.parse(fields.land_rows);
         if (Array.isArray(fields.land_rows) && fields.land_rows.length > 20) {
-          state.notice = 'Stage giữ tối đa 20 cụm đất; hãy bỏ bớt dòng trước khi đưa vào Stage'; emit(); return null;
+          state.notice = 'Hồ sơ giữ tối đa 20 cụm đất; hãy bỏ bớt dòng trước khi đưa vào hồ sơ'; emit(); return null;
         }
         if (!Array.isArray(fields.land_rows) ||
             fields.land_rows.some((r) => !r || typeof r !== 'object' || Array.isArray(r))) throw new Error();
@@ -2357,7 +2357,7 @@ function createModel(deps) {
     }
     const row = sug.target === 'asset'
       ? addAsset(fields) : addPerson(fields);
-    if (!row) { state.notice = 'Stage đã đủ chỗ; gợi ý vẫn được giữ để xử lý sau'; emit(); return null; }
+    if (!row) { state.notice = 'Hồ sơ đã đủ chỗ; gợi ý vẫn được giữ để xử lý sau'; emit(); return null; }
     if (ref) {
       state.docxImport = state.docxImport || { version: 1, sources: [] };
       let source = state.docxImport.sources.find((s) => s.source_id === ref.source_id);

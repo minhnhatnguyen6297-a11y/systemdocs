@@ -898,7 +898,7 @@ function createDiagramPane(ctx) {
       } else {
         const empty = nodes.filter((n) => !n.personId);
         if (empty.length) {
-          body.append(h('div', 'muted', 'Slot đang trống:'));
+          body.append(h('div', 'muted', 'Ô đang trống:'));
           const grid = h('div', 'cd-tight');
           for (const n of empty) {
             grid.append(btn(`Gán vào “${refName(n)}”`, 'secondary sm',
@@ -912,7 +912,7 @@ function createDiagramPane(ctx) {
           (n) => n.personId && n.personId !== row.row_id);
         if (others.length) {
           body.append(h('div', 'muted',
-            'Đổi chỗ với slot đã có người:'));
+            'Đổi chỗ với ô đã có người:'));
           const grid = h('div', 'cd-tight');
           for (const n of others) {
             grid.append(btn(
@@ -979,7 +979,7 @@ function createDiagramPane(ctx) {
     }
     const item = h('div', 'toast toast-undo');
     item.setAttribute('role', 'status');
-    const msg = h('span', 'toast-text', `Đã đưa ${count} người về Pool`);
+    const msg = h('span', 'toast-text', `Đã đưa ${count} người về Danh sách chờ`);
     const sep = h('span', 'toast-sep', ' · ');
     const undoBtn = btn('Hoàn tác', 'toast-action js-toast-undo', () => {
       dismissActiveToast();
@@ -1061,7 +1061,7 @@ function createDiagramPane(ctx) {
       }
     }
     const msg = h('p', 'cd-confirm-owner-msg',
-      `Bỏ chủ đất cuối cùng sẽ đưa ${n} người về danh sách. Tiếp tục?`);
+      `Bỏ chủ đất cuối cùng sẽ đưa ${n} người về Danh sách chờ. Tiếp tục?`);
     msg.id = 'cd-confirm-owner-msg';
     box.append(msg);
     const foot = h('div', 'modal-actions');
@@ -1184,8 +1184,8 @@ function createDiagramPane(ctx) {
       const un = btn('↩', 'cd-mini-btn js-node-unassign js-card-remove', () =>
         handleCardRemoval(n.personId)
       );
-      un.title = 'Bỏ gán — trả người về Pool';
-      un.setAttribute('aria-label', `Bỏ gán ${name} về Pool`);
+      un.title = 'Bỏ gán — trả người về Danh sách chờ';
+      un.setAttribute('aria-label', `Bỏ gán ${name} về Danh sách chờ`);
       acts.append(mv, un);
       card.append(acts);
     }
@@ -1269,7 +1269,7 @@ function createDiagramPane(ctx) {
       const del = btn('×', 'icon-x', () => {
         model.movePerson(n.personId, null);
       });
-      del.title = `Bỏ ${p.ho_ten || ''} khỏi chỗ ${num} (về Pool)`;
+      del.title = `Bỏ ${p.ho_ten || ''} khỏi chỗ ${num} (về Danh sách chờ)`;
       del.setAttribute('aria-label', `Bỏ khỏi chỗ ${num}`);
       del.disabled = ro;
       acts.append(mv, del);
@@ -1494,7 +1494,14 @@ function createDiagramPane(ctx) {
         item.append(h('div', 'cd-breakdown-head',
           `${nameOf(bd.personId)} — tổng ${bd.total ?? '—'}`));
         for (const t of bd.terms || []) {
-          const bits = [`${t.kind ?? 'term'}: ${t.fraction ?? '—'}`];
+          const KIND_LABEL = {
+            base: 'cơ bản',
+            inheritance: 'thừa kế',
+            representation: 'thế vị',
+            term: 'phần',
+          };
+          const bits = [
+            `${KIND_LABEL[t.kind] || t.kind || 'phần'}: ${t.fraction ?? '—'}`];
           if (t.sourcePersonId) {
             bits.push(`từ ${nameOf(t.sourcePersonId)}`);
           }
@@ -1603,13 +1610,13 @@ function createDiagramPane(ctx) {
     const s = model.state;
     const pane = h('div', 'cd-pool');
     const head = h('div', 'cd-pool-head');
-    const title = h('h3', 'cd-pool-title', 'Pool');
+    const title = h('h3', 'cd-pool-title', 'Danh sách chờ');
     head.append(title);
     const search = h('input', 'cd-pool-search');
     search.type = 'search';
-    search.placeholder = 'Lọc pool…';
+    search.placeholder = 'Lọc danh sách chờ…';
     search.value = poolQuery;
-    search.setAttribute('aria-label', 'Lọc pool theo tên/serial');
+    search.setAttribute('aria-label', 'Lọc danh sách chờ theo tên/số giấy tờ');
     search.oninput = () => {
       poolQuery = search.value.trim().toLowerCase();
       renderPool();
@@ -1642,7 +1649,7 @@ function createDiagramPane(ctx) {
     function renderPool() {
       box.innerHTML = '';
       const poolPeople = model.pool().people;
-      title.textContent = `Pool (${poolPeople.length})`;
+      title.textContent = `Danh sách chờ (${poolPeople.length})`;
       const pp = poolPeople.filter((r) => poolMatch(r, poolQuery));
       if (!(model.state.stage.people || []).length) {
         box.append(face(L.faceEmpty('Chưa có người.')));
@@ -1650,7 +1657,7 @@ function createDiagramPane(ctx) {
       }
       if (!pp.length) {
         box.append(face(L.faceEmpty(
-          poolQuery ? 'Không khớp bộ lọc.' : 'Pool trống.')));
+          poolQuery ? 'Không khớp bộ lọc.' : 'Danh sách chờ trống.')));
         return;
       }
       // Ten trung: dong phu phan biet (sinh/CCCD) theo ban mau — khong
@@ -1680,9 +1687,9 @@ function createDiagramPane(ctx) {
     const s = h('div', 'splitter-v');
     s.tabIndex = 0;
     s.setAttribute('role', 'separator');
-    s.setAttribute('aria-label', 'Đổi chiều rộng Pool / sơ đồ');
+    s.setAttribute('aria-label', 'Đổi chiều rộng Danh sách chờ / sơ đồ');
     s.setAttribute('aria-orientation', 'vertical');
-    s.title = 'Kéo hoặc ←/→ để đổi chiều rộng Pool / sơ đồ';
+    s.title = 'Kéo hoặc ←/→ để đổi chiều rộng Danh sách chờ / sơ đồ';
     s.addEventListener('mousedown', (e) => {
       poolDrag = { el: poolEl, sp: s, x: e.clientX };
       s.classList.add('active');
@@ -1731,7 +1738,7 @@ function createDiagramPane(ctx) {
       // Slot da xoa giu trong du lieu draft (engine bo qua) — bao so
       // dem de nguoi dung biet chung khong bien mat vo co.
       extra.append(h('div', 'muted small',
-        `${deletedCount} slot đã xóa (vẫn giữ trong dữ liệu draft).`));
+        `${deletedCount} ô đã xóa (vẫn giữ trong dữ liệu nháp).`));
     }
     for (const w of s.diagramWarnings || []) {
       // Shape hon hop: compose warnings la string, engine warnings la
@@ -1889,7 +1896,7 @@ function createDiagramPane(ctx) {
         s.evaluatedRevision !== s.revision;
       if (staleEval) {
         tools.append(h('span', 'pill warn',
-          'Stage đã đổi kể từ lần đánh giá'));
+          'Hồ sơ đã đổi kể từ lần đánh giá'));
       }
     }
     tools.append(zoomClusterEl());
@@ -1899,7 +1906,7 @@ function createDiagramPane(ctx) {
     tools.append(expand);
     if (!tp) {
       const toggleWrap = h('label', 'cd-toggle-setting');
-      toggleWrap.title = 'Thông báo và cho phép hoàn tác khi gỡ thẻ làm người khác bị đưa về Pool';
+      toggleWrap.title = 'Thông báo và cho phép hoàn tác khi gỡ thẻ làm người khác bị đưa về Danh sách chờ';
       const toggle = h('input', 'cd-toggle-checkbox js-toggle-notify-on-remove');
       toggle.type = 'checkbox';
       toggle.checked = isRemovalNotifyEnabled();

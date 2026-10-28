@@ -358,9 +358,9 @@ test('reopening Intake exposes pending ambiguity for correction without another 
   const area=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Diện tích')[0];
   assert.equal(area.value,'-5');assert.match(reopened.box.textContent,/Diện tích cần/);
   area.value='10';area.onchange();
-  const serial=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Serial giấy chứng nhận')[0];
+  const serial=collect(reopened.box,e=>e.tagName==='INPUT' && e.getAttribute('aria-label')==='Kiểm tra Số giấy tờ (GCN)')[0];
   serial.value='YY123456';serial.onchange();
-  button(reopened.box,'Đưa vào Stage').onclick();
+  button(reopened.box,'Đưa vào hồ sơ').onclick();
   assert.equal(model.state.stage.assets[0].so_serial,'YY123456');
   assert.equal(model.state.suggestions.length,0);assert.equal(backendCalls,0);
 });
@@ -401,8 +401,8 @@ test('review dialog displays evidence and capacity rejection keeps the visible c
   model.state.suggestions.push(suggestion());
   const { ctx, box } = dialogContext(model); INTAKE.createIntakeDialog(ctx).open();
   assert.match(box.textContent, /Xem chữ gốc và vị trí/);
-  button(box, 'Đưa vào Stage').onclick();
-  assert.match(box.textContent, /Đưa vào Stage/);
+  button(box, 'Đưa vào hồ sơ').onclick();
+  assert.match(box.textContent, /Đưa vào hồ sơ/);
   assert.equal(model.state.suggestions.length, 1);
 });
 

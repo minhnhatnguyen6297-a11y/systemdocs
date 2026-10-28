@@ -105,11 +105,11 @@ const ERROR_CATALOG = {
       'trên sơ đồ thừa kế.',
   },
   stage: {
-    title: 'Dữ liệu Stage chưa hợp lệ',
+    title: 'Dữ liệu hồ sơ chưa hợp lệ',
     hint: 'Sửa các ô/dòng đánh dấu đỏ rồi lưu lại.',
   },
   stage_validation_error: {
-    title: 'Dữ liệu Stage chưa hợp lệ',
+    title: 'Dữ liệu hồ sơ chưa hợp lệ',
     hint: 'Sửa các ô/dòng đánh dấu đỏ rồi lưu lại.',
   },
   validation_error: { title: 'Dữ liệu không hợp lệ' },
@@ -125,12 +125,12 @@ const ERROR_CATALOG = {
     title: 'Sơ đồ không đúng loại việc của hồ sơ',
   },
   diagram_reference_outside_stage: {
-    title: 'Sơ đồ tham chiếu người không còn trong Stage',
-    hint: 'Người đó có thể đã bị xóa khỏi Stage — gán lại trên sơ đồ.',
+    title: 'Sơ đồ tham chiếu người không còn trong hồ sơ',
+    hint: 'Người đó có thể đã bị xóa khỏi hồ sơ — gán lại trên sơ đồ.',
   },
 
   // ---- Field-level (trong details.fields của stage_validation_error) ----
-  required: { title: 'Trường bắt buộc chưa có giá trị' },
+  required: { title: 'Mục bắt buộc chưa có giá trị' },
   row: { title: 'Dòng dữ liệu không hợp lệ' },
   invalid_date: {
     title: 'Ngày không hợp lệ',
@@ -153,7 +153,7 @@ const ERROR_CATALOG = {
       'các nhánh trên sơ đồ.',
   },
   unknown_person: {
-    title: 'Sơ đồ tham chiếu người không có trong Stage',
+    title: 'Sơ đồ tham chiếu người không có trong hồ sơ',
   },
   duplicate_person: {
     title: 'Một người đang nằm trên nhiều ô sơ đồ',
@@ -179,7 +179,7 @@ const ERROR_CATALOG = {
   invalid_spouse: { title: 'Quan hệ vợ/chồng không hợp lệ' },
   invalid_position: {
     title: 'Vị trí tài sản trên ô sơ đồ không hợp lệ',
-    hint: 'Vị trí phải nằm trong số tài sản hiện có ở Stage.',
+    hint: 'Vị trí phải nằm trong số tài sản hiện có ở hồ sơ.',
   },
   missing_position: { title: 'Một ô thiếu vị trí tài sản bắt buộc' },
   invalid_death_date: {
@@ -229,7 +229,7 @@ const ERROR_CATALOG = {
     title: 'Loại văn bản bị chọn trùng',
   },
   'word.too_many_people': {
-    title: 'Quá 20 người trong Stage',
+    title: 'Quá 20 người trong hồ sơ',
   },
 
   // ---- Khác ----

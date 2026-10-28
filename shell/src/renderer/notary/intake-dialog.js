@@ -28,7 +28,7 @@ const INTAKE_FILTERS = [
 ];
 const INTAKE_FIELD_LABEL = {
   ho_ten: 'Họ tên', so_giay_to: 'Số giấy tờ', ngay_sinh: 'Ngày sinh', ngay_chet: 'Ngày chết',
-  ngay_cap: 'Ngày cấp', noi_cap: 'Nơi cấp', dia_chi: 'Địa chỉ', so_serial: 'Serial giấy chứng nhận',
+  ngay_cap: 'Ngày cấp', noi_cap: 'Nơi cấp', dia_chi: 'Địa chỉ', so_serial: 'Số giấy tờ (GCN)',
   so_vao_so: 'Số vào sổ', so_thua_dat: 'Số thửa đất', so_to_ban_do: 'Số tờ bản đồ',
   dien_tich: 'Diện tích', co_quan_cap: 'Cơ quan cấp', land_rows: 'Cụm đất',
   gioi_tinh: 'Giới tính', loai_dat: 'Loại đất', thoi_han: 'Thời hạn', nguon_goc: 'Nguồn gốc',
@@ -232,10 +232,10 @@ function createIntakeDialog(ctx) {
         card.append(h('div', 'muted warn-text', w.message || w.code));
       }
       const actions = h('div', 'toolbar');
-      const put = btn('Đưa vào Stage', 'primary sm', () => {
+      const put = btn('Đưa vào hồ sơ', 'primary sm', () => {
         const row = model.acceptSuggestion(sug.suggestion_id);
         if (row) card.remove();
-        else notify(model.state.notice || 'Gợi ý chưa được đưa vào Stage', true);
+        else notify(model.state.notice || 'Gợi ý chưa được đưa vào hồ sơ', true);
       });
       put.disabled = !model.canWrite();
       const drop = btn('Bỏ qua', 'ghost sm', () => {

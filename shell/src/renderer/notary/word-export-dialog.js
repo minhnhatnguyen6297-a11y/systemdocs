@@ -27,7 +27,7 @@ const WORD_BLOCK_LABEL = {
   // Chỉ còn lý do KỸ THUẬT (owner 23/10/2026 phần W): thiếu dữ kiện không
   // khoá file nữa — nó thành dòng "thiếu: …" trong kết quả từng file.
   'word.too_many_assets': 'Quá nhiều tài sản (tối đa 5)',
-  'word.too_many_people': 'Quá nhiều người trong Stage',
+  'word.too_many_people': 'Quá nhiều người trong hồ sơ',
   'word.too_many_signers': 'Quá nhiều người ký',
   'word.template_missing': 'Văn bản không còn mẫu trong thư mục',
   'word.original_mapping_invalid': 'Hãy kiểm tra và xác nhận lại các vị trí Word gốc',

@@ -942,7 +942,7 @@ test('word people limit uses the Vietnamese catalog message and keeps raw diagno
   const message = 'ValueError: word.too_many_people';
   const error = { code: 'word.too_many_people', message };
   const described = ERRORS.describeError(error);
-  assert.equal(described.title, 'Quá 20 người trong Stage');
+  assert.equal(described.title, 'Quá 20 người trong hồ sơ');
   assert.equal(described.raw, message);
   assert.equal(ERRORS.errText(error), described.title);
 });

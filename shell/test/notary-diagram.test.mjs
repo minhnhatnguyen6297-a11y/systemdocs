@@ -682,18 +682,18 @@ test('cach tinh hien hang 2/3 va du 7 vai tieng Viet, giu nguyen phan so engine'
     seed: { people: INH_PEOPLE, nodes: seedSlots() } });
   await findBtns(view.el, 'Xem cách tính')[0].onclick();
   const lines = byCls(view.el, 'cd-explain').map((e) => e.textContent);
-  assert.equal(lines[0], 'base: 1/51');
-  assert.match(lines[1], /inheritance: 2\/17 · từ Người Đã Lưu · hàng 2/);
+  assert.equal(lines[0], 'cơ bản: 1/51');
+  assert.match(lines[1], /thừa kế: 2\/17 · từ Người Đã Lưu · hàng 2/);
   for (const role of ['ông/bà nội/ngoại', 'anh/chị/em ruột',
     'cháu ruột (người để lại là ông/bà)']) assert.ok(lines[1].includes(role));
-  assert.match(lines[2], /inheritance: 7\/51 · từ Vợ Hai · hàng 3/);
+  assert.match(lines[2], /thừa kế: 7\/51 · từ Vợ Hai · hàng 3/);
   for (const role of ['cụ nội/ngoại', 'bác/chú/cậu/cô/dì ruột',
     'cháu ruột (người để lại là bác/chú/cậu/cô/dì)', 'chắt ruột']) {
     assert.ok(lines[2].includes(role));
   }
   assert.ok(!lines[1].includes('qua ') && !lines[2].includes('qua '),
     'hang 2/3 la nhan truc tiep, khong phai the vi');
-  assert.equal(lines[3], 'representation: 5/17 · từ Người Đã Lưu · qua Vợ Hai');
+  assert.equal(lines[3], 'thế vị: 5/17 · từ Người Đã Lưu · qua Vợ Hai');
   assert.match(byCls(view.el, 'cd-calc')[0].textContent, /56.86%phần cuối 29\/51/);
 });
 
@@ -1368,10 +1368,10 @@ print(json.dumps(run_inheritance_case({'version':2,'nodes':nodes}, {r['row_id']:
   assert.equal(activeNodes[0].personId, null, 'Ô owner phải trống');
   assert.equal(byCls(view.el, 'cd-pool-card').length, 4, 'Cả 4 người A, B, C, D đều đã về Pool');
 
-  // Toast shown: "Đã đưa 3 người về Pool · Hoàn tác"
+  // Toast shown: "Đã đưa 3 người về Danh sách chờ · Hoàn tác"
   const toasts = byCls(document, 'toast');
   assert.equal(toasts.length, 1, 'Phải hiện đúng 1 toast khi cascade');
-  assert.match(toasts[0].textContent, /Đã đưa 3 người về Pool · Hoàn tác/);
+  assert.match(toasts[0].textContent, /Đã đưa 3 người về Danh sách chờ · Hoàn tác/);
 
   // (4) Hoàn tác restores identical state
   const undoBtn = findBtns(toasts[0], 'Hoàn tác')[0];

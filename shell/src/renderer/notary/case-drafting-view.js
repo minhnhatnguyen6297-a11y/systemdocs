@@ -86,7 +86,7 @@ const PERSON_FIELD_LABELS = {
 // cụm đất trong popup Loại đất; giá trị lẻ lịch sử giữ trong master,
 // báo qua warning orphan_thoi_han — không còn ô nhập.
 const ASSET_FIELD_ROWS = [
-  ['so_serial', 'Số serial'],
+  ['so_serial', 'Số giấy tờ (GCN)'],
   ['so_vao_so', 'Số vào sổ'],
   ['so_thua_dat', 'Thửa đất'],
   ['so_to_ban_do', 'Tờ bản đồ'],
@@ -606,7 +606,7 @@ function createNotaryModuleView(deps) {
     const intakeB = btn('Nhập file', '', () => openIntakeDialog(null));
     intakeB.disabled = !model.canWrite() ||
       !(s.capabilities.intake || []).length;
-    intakeB.title = 'Nhập file/ảnh/tài liệu → gợi ý (chưa vào Stage)';
+    intakeB.title = 'Nhập file/ảnh/tài liệu → gợi ý (chưa vào hồ sơ)';
     bar.append(intakeB);
     bar.append(h('span', 'cd-spacer', ''));
     // Pill trạng thái chỉ khi thật sự có (locked/unsupported/stale) —
@@ -1417,7 +1417,7 @@ function createNotaryModuleView(deps) {
         const x = h('button', 'icon-x', '×');
         x.type = 'button';
         x.title = `Xóa Tài sản ${i + 1}`;
-        x.setAttribute('aria-label', `Xóa Tài sản ${i + 1} (draft)`);
+        x.setAttribute('aria-label', `Xóa Tài sản ${i + 1} (bản nháp)`);
         x.dataset.fid = `adel:${a.row_id}`;
         x.onclick = () => removeAssetAt(a, i);
         head.append(x);
@@ -2009,7 +2009,7 @@ function createNotaryModuleView(deps) {
     pc.append(pHead);
     const pBody = h('div', 'card-body cd-stage-body');
     if (!s.stage.people.length) {
-      const e = face(L.faceEmpty('Chưa có người nào trong Stage.'));
+      const e = face(L.faceEmpty('Chưa có người nào trong hồ sơ.'));
       const b = btn('+ Thêm người đầu tiên', '', () => model.addPerson());
       b.disabled = !model.canWrite();
       e.append(b);
@@ -2055,7 +2055,7 @@ function createNotaryModuleView(deps) {
       head.append(h('span', 'cd-suggest-text', fieldBits.join(' · ')));
       card.append(head);
       const actions = h('div', 'toolbar');
-      const put = btn('Đưa vào Stage', 'primary sm', () => {
+      const put = btn('Đưa vào hồ sơ', 'primary sm', () => {
         model.acceptSuggestion(sug.suggestion_id);
       });
       put.disabled = !model.canWrite();
@@ -2201,7 +2201,7 @@ function createNotaryModuleView(deps) {
     if (model.hasUnsaved()) {
       const ok = await confirm({
         title: 'Thay đổi chưa lưu',
-        body: 'Stage/Sơ đồ còn bản nháp chưa lưu — mở hồ sơ khác sẽ mất ' +
+        body: 'Hồ sơ/Sơ đồ còn bản nháp chưa lưu — mở hồ sơ khác sẽ mất ' +
           'bản nháp hiện tại.',
         confirmLabel: 'Bỏ nháp và mở',
         cancelLabel: 'Ở lại',
