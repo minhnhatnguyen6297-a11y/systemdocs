@@ -993,7 +993,9 @@ def _fake_run_scan(
                             "so_cong_chung": contract_no,
                             "nhom_hop_dong": "Chuyen nhuong quyen su dung dat",
                             "loai_tai_san": "Quyen su dung dat",
-                            "tai_san": f"Thua dat so {index}",
+                            # A09-A: tài sản chỉ render từ dạng có cấu trúc
+                            # (thửa + tờ), chuỗi tự do -> missing: tai_san.
+                            "tai_san": f"Thửa đất số {index}, tờ bản đồ số 2",
                         },
                         "raw": {"file_goc": str(docx)},
                     },
