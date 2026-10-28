@@ -427,6 +427,11 @@ def _sanitize_v3_nodes(raw_nodes: Any, valid_row_ids: set) -> list[dict]:
             "receivePositions": _sanitize_positions(
                 raw.get("receivePositions")),
         })
+        # 'Không có vợ/con' — người dùng xác nhận người này không có
+        # vợ/chồng và con → engine không đòi ô Vợ/chồng, Con. Chỉ lưu khi
+        # bật để state cũ giữ nguyên hình dạng.
+        if _coerce_bool(raw.get("noSpouseChildren"), False):
+            out[-1]["noSpouseChildren"] = True
     return _scrub_v2_links(out)
 
 
@@ -486,6 +491,8 @@ def _v3_to_v2_nodes(nodes: list[dict]) -> list[dict]:
             "spouseSlotId": n.get("spouseSlotId"),
             "isLandOwner": bool(n.get("ownPositions")),
             "willReceive": bool(n.get("receivePositions")),
+            "noSpouseChildren": _coerce_bool(
+                n.get("noSpouseChildren"), False),
             "hidden": _coerce_bool(n.get("hidden"), False),
             "deleted": _coerce_bool(n.get("deleted"), False),
         })

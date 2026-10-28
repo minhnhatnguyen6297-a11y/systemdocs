@@ -155,6 +155,7 @@ def _validate_and_build_graph(
                 _person_id(item) for item in spouse_ids if _person_id(item)
             ],
             **boolean_values,
+            "noSpouseChildren": raw.get("noSpouseChildren") is True,
         }
         nodes[slot_id] = node
 
@@ -400,6 +401,13 @@ def _required_slot_table(graph, active_estates):
                 roles.append("spouse")
             if groups or "spouse" in roles or is_owner:
                 roles.append("child")
+            # 'Không có vợ/con' đã xác nhận và chưa có vợ/chồng/con nào
+            # trên sơ đồ → không đòi thêm ô Vợ/chồng, Con.
+            if (node.get("noSpouseChildren") and not any(groups.values())
+                    and not has_existing_spouse(person_id)):
+                roles = [r for r in roles if r not in ("spouse", "child")]
+                if not roles:
+                    return
         slots = []
         for role in roles:
             if role in ("father", "mother"):

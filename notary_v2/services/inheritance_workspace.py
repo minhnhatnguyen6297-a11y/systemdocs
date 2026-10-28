@@ -52,7 +52,7 @@ from services.case_workspace import (
 _INHERITANCE_NODE_FIELDS = {
     "id", "personId", "parentSlotIds", "spouseSlotId", "spouseSlotIds",
     "spouseSuggestionId", "ownPositions",
-    "receivePositions", "hidden", "deleted"}
+    "receivePositions", "hidden", "deleted", "noSpouseChildren"}
 _TWO_PARTY_NODE_FIELDS = {"id", "personId", "hidden", "deleted"}
 _TWO_PARTY_IDS = tuple(f"p{i}" for i in range(1, 31))
 _TWO_PARTY_ID_SET = set(_TWO_PARTY_IDS)

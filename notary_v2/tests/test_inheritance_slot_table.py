@@ -287,3 +287,20 @@ def test_symmetric_spouse_pair_keeps_the_only_con_group_on_the_owner():
     assert set(by_anchor) == {"owner", "spouse"}
     assert by_anchor["spouse"]["slotTypes"] == ["father", "mother"]
     assert _role_ordinals(by_anchor["owner"], "child") == [0, 1]
+
+
+def test_no_spouse_children_flag_drops_spouse_and_child_slots():
+    """'Không có vợ/con': người đã mất được xác nhận không có vợ/con."""
+    nodes = [
+        {"id": "slot_A", "personId": "A", "parentSlotIds": [], "spouseSlotIds": [],
+         "isLandOwner": True, "willReceive": True, "ownPositions": [1],
+         "receivePositions": [1]},
+        {"id": "slot_C", "personId": "C", "parentSlotIds": ["slot_A"],
+         "spouseSlotIds": [], "isLandOwner": False, "willReceive": True,
+         "ownPositions": [], "receivePositions": [1], "noSpouseChildren": True},
+    ]
+    people = {"A": {"row_id": "A", "ngay_chet": "2020"},
+              "C": {"row_id": "C", "ngay_chet": "2021"}}
+    result = run_inheritance_case({"version": 2, "nodes": nodes}, people)
+    assert [r for r in result["requiredSlots"] if r["anchorSlotId"] == "slot_C"] == []
+    assert _required_slots(nodes, {"people": list(people.values())}) == result["requiredSlots"]
