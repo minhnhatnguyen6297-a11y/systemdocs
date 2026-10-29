@@ -251,7 +251,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật
 - **Quyết định:** mỗi thửa đất là một tài sản; tối đa 5 tài sản mỗi hồ sơ.
 - **Lý do:** hồ sơ thật có hơn 3 thửa.
-- **Hệ quả:** thay D-029. Sửa R-06; code `MAX_ASSETS` chưa sửa (§8).
+- **Hệ quả:** thay D-029. Sửa R-06; code `MAX_ASSETS` = 5 ở server (case_workspace.py) và client (case-drafting-model.js), có test asset_limit.
 - **Nguồn:** owner 26/10/2026, sau phân tích 476 hồ sơ thật.
 
 ### D-037 — Đất hộ gia đình: không có khái niệm riêng
