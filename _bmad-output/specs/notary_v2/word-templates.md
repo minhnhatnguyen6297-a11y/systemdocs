@@ -107,7 +107,7 @@ không tự thành người mới và không dùng để đối chiếu/đếm l
 Sổ tiết kiệm và bảo hiểm **tạm dừng**: nhận diện sự hiện diện và gắn cờ
 "loại tài sản chưa hỗ trợ", không bóc dòng (Owner 06/10/2026).
 Thiếu trường vẫn cho kiểm tra và bổ sung ở Stage; quy tắc kiểm tra khi Lưu
-hồ sơ MIN-141 giữ nguyên. Đủ 3 tài sản thì gợi ý tiếp theo vẫn còn, kèm lời báo hết chỗ.
+hồ sơ MIN-141 giữ nguyên. Đủ 5 tài sản thì gợi ý tiếp theo vẫn còn, kèm lời báo hết chỗ.
 
 Owner TASK-10.3 (08/10/2026): lỗi gõ/dính chữ không cần chức năng mới.
 Phần regex lấy được điền vào các ô tương ứng đang có ở Stage để sửa;

@@ -109,7 +109,6 @@
 
 | Quy tắc | Hiện trạng code |
 |---|---|
-| R-06 | Hồ sơ/UI giới hạn 3; Word 5. Owner nâng lên 5 (D-036): **phải sửa** `MAX_ASSETS` lên 5 — chưa làm. |
 | R-07, R-08 | Quy đổi `yyyy` → 01/01 khi tính đã có; chưa có `mm/yyyy`; chưa kiểm hiển thị luôn giữ nguyên chuỗi nhập ở mọi đầu ra; chưa có trạng thái "chết trước, không rõ ngày" (D-032). |
 | R-18 | Engine không kiểm độ sâu, đi xuống không giới hạn. |
 | R-23 | Bước chuyển dữ liệu gộp dấu theo tài sản thành một cờ chung; engine tính một kết quả cho mọi tài sản. |
