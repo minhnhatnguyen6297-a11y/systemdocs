@@ -1,3 +1,1 @@
 # Lỗi pytest đã biết trên windows-latest. Định dạng như known-failures-py-linux.txt.
-shell/test/test_notary_adapter_contract.py::test_diagram_save_engine_invalid_rejected_state_preserved  # #31 chờ quyết định nghiệp vụ (owner hoãn), không đổi hành vi
-shell/test/test_notary_adapter_contract.py::test_diagram_evaluate_draft_owner_required  # #31 chờ quyết định nghiệp vụ (owner hoãn), không đổi hành vi

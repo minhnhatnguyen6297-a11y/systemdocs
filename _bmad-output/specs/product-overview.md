@@ -223,8 +223,10 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   độc lập sạch. [#4](../backlog/bug-diagram-error-messages.md).
 - Hiệu chỉnh G2 vòng sửa lỗi E2E 23/10: khi Lưu hồ sơ bị
   `diagram_invalid_state`, toast hiện lỗi sơ đồ đầu tiên, thiếu chi tiết thì
-  hiện lỗi tổng. `missing_land_owner` chỉ rõ thiếu chip Chủ trên vị trí tài
-  sản, không hướng dẫn gán lại người đã có trên sơ đồ.
+  hiện lỗi tổng. **D-051 (#31, 29/10/2026):** thiếu Chủ đất không còn chặn
+  `diagram_save`/`diagram_evaluate` (kể cả nháp không `case_id`); cảnh báo
+  `diagram.missing_land_owner` hiện `chưa có Chủ đất`. Save giữ nháp, tăng
+  revision và giữ cảnh báo khi mở lại; lỗi cấu trúc khác vẫn chặn.
 - **Luật sơ đồ v2 — owner 27/10/2026, WP0 spec; WP1 triển khai có giới hạn:** ô do engine tạo/xóa;
   người dùng chỉ thao tác thẻ và Chủ/Nhận. Ô chủ đất mặc định Chủ, mọi ô
   khác không tích (= từ chối), không tự điền Nhận. Gỡ không modal; chỉ cascade

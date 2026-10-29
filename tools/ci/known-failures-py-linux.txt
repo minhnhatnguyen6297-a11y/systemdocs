@@ -3,5 +3,3 @@
 # Nguyên nhân chính (đếm từ dòng E): path Windows 'path khong tuyet doi'/file_scope_not_supported (fileref.py chỉ nhận ổ đĩa X:\),
 # thiếu word_templates/*.docx, thiếu frontend/static. Phần lớn là do app nhắm Windows -> job windows-latest đo riêng.
 # Mỗi dòng gắn issue nhóm nguyên nhân: #15 path Windows, #16 resource theo cwd, #19 linh tinh (#18 junction đã sửa).
-shell/test/test_notary_adapter_contract.py::test_diagram_save_engine_invalid_rejected_state_preserved  # #31 chờ quyết định nghiệp vụ (owner hoãn), không đổi hành vi
-shell/test/test_notary_adapter_contract.py::test_diagram_evaluate_draft_owner_required  # #31 chờ quyết định nghiệp vụ (owner hoãn), không đổi hành vi
