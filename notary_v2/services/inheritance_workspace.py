@@ -228,27 +228,33 @@ def _validate_diagram_wire(state: Any) -> list:
                     errors.append({
                         "code": "dangling_spouse",
                         "message": f"nodes[{i}] spouseSlotIds '{spouse_id}' không tồn tại"})
-        # Cycle trên cạnh cha-con.
+        # Cycle trên cạnh cha-con. DFS ba màu (trắng/xám/đen): cạnh tới node
+        # xám là vòng thật; node đen đã xong nên tới bằng đường thứ hai
+        # (hình kim cương) không phải vòng.
         children = {}
         for node in node_by_id.values():
             for p in node.get("parentSlotIds") or []:
                 if p in node_by_id:
                     children.setdefault(p, set()).add(node["id"])
+        color = {}
         for start in node_by_id:
-            stack, seen, path = [start], set(), set()
+            if start in color:
+                continue
+            color[start] = "gray"
+            stack = [(start, iter(children.get(start) or ()))]
             while stack:
-                cur = stack.pop()
-                if cur in path:
+                cur, pending = stack[-1]
+                child = next(pending, None)
+                if child is None:
+                    color[cur] = "black"
+                    stack.pop()
+                elif child not in color:
+                    color[child] = "gray"
+                    stack.append((child, iter(children.get(child) or ())))
+                elif color[child] == "gray":
                     errors.append({
                         "code": "ancestry_cycle",
-                        "message": f"vòng tổ tiên qua node '{cur}'"})
-                    stack = []
-                    break
-                if cur in seen:
-                    continue
-                seen.add(cur)
-                path.add(cur)
-                stack.extend(children.get(cur) or ())
+                        "message": f"vòng tổ tiên qua node '{child}'"})
     return errors
 
 
