@@ -347,7 +347,7 @@ class AnalyzeImagesTests(unittest.IsolatedAsyncioTestCase):
         ]
 
         async def fake_call(*args, **kwargs):
-            return outputs.pop(0)
+            return outputs[{"qr-front.jpg": 0, "back.jpg": 1}[kwargs["filename"]]]
 
         with (
             mock.patch.object(ocr_ai, "_get_api_key", return_value="test-key"),

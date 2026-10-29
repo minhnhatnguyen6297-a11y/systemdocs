@@ -32,6 +32,8 @@ FIELD_ORDER = [
     "ho_ten",
     "so_giay_to",
     "ngay_sinh",
+    "chi_co_nam_sinh",
+    "loai_giay_to",
     "gioi_tinh",
     "dia_chi",
     "ngay_cap",
@@ -74,7 +76,8 @@ def evaluate(cases: list[dict]) -> list[dict]:
                     "field": field,
                     "expected": want,
                     "got": got,
-                    "ok": normalize_value(want) == normalize_value(got),
+                    "ok": (type(got) is bool and got == want) if type(want) is bool
+                          else normalize_value(want) == normalize_value(got),
                 }
             )
         results.append(

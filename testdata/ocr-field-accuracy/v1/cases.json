@@ -15,6 +15,8 @@
     ],
     "expected": {
       "ho_ten": "Nguyễn Văn An",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "012000000001",
       "ngay_sinh": "15/08/1995",
       "gioi_tinh": "Nam",
@@ -41,6 +43,8 @@
     ],
     "expected": {
       "ho_ten": "Trần Thị Mai Hương",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "038000000002",
       "ngay_sinh": "02/03/1988",
       "gioi_tinh": "Nữ",
@@ -65,6 +69,8 @@
     ],
     "expected": {
       "ho_ten": "Lê Quốc Bảo",
+      "loai_giay_to": "Căn cước",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "079000000003",
       "ngay_sinh": "21/11/2001",
       "gioi_tinh": "Nam",
@@ -88,6 +94,8 @@
     ],
     "expected": {
       "ho_ten": "Phạm Minh Tuấn",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "001000000004",
       "ngay_sinh": "07/09/1979",
       "gioi_tinh": "Nam",
@@ -112,6 +120,8 @@
     ],
     "expected": {
       "ho_ten": "Vũ Thị Thanh Hà",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "036000000005",
       "ngay_sinh": "30/12/1993",
       "gioi_tinh": "Nữ",
@@ -136,6 +146,8 @@
     ],
     "expected": {
       "ho_ten": "Đặng Hữu Phước",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "048000000006",
       "ngay_sinh": "09/05/1986",
       "gioi_tinh": "Nam",
@@ -162,6 +174,8 @@
     ],
     "expected": {
       "ho_ten": "Bùi Ngọc Lan",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "025000000007",
       "ngay_sinh": "14/02/2000",
       "gioi_tinh": "Nữ",
@@ -187,6 +201,8 @@
     ],
     "expected": {
       "ho_ten": "Hoàng Văn Sơn",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "092000000008",
       "ngay_sinh": "01/01/1968",
       "gioi_tinh": "Nam",
@@ -209,11 +225,13 @@
     ],
     "expected": {
       "so_giay_to": "012000000011",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "ho_ten": "NGUYEN VAN AN",
       "ngay_sinh": "01/01/1990",
       "gioi_tinh": "Nam",
       "ngay_cap": "15/06/2021",
-      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "noi_cap": "CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
       "dia_chi": ""
     }
   },
@@ -231,11 +249,13 @@
     ],
     "expected": {
       "so_giay_to": "038000000012",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "ho_ten": "TRAN THI MAI HUONG",
       "ngay_sinh": "02/03/1988",
       "gioi_tinh": "Nữ",
       "ngay_cap": "22/09/2022",
-      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "noi_cap": "CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
       "dia_chi": ""
     }
   },
@@ -253,6 +273,8 @@
     ],
     "expected": {
       "so_giay_to": "079000000013",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "ho_ten": "LE QUOC BAO",
       "ngay_sinh": "01/01/2001",
       "gioi_tinh": "Nam",
@@ -275,11 +297,13 @@
     ],
     "expected": {
       "so_giay_to": "001000000014",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "ho_ten": "PHAM MINH TUAN",
       "ngay_sinh": "07/09/1979",
       "gioi_tinh": "Nam",
       "ngay_cap": "18/04/2014",
-      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "noi_cap": "CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
       "dia_chi": ""
     }
   },
@@ -297,11 +321,13 @@
     ],
     "expected": {
       "so_giay_to": "036000000015",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false,
       "ho_ten": "VU THI THANH HA",
       "ngay_sinh": "30/12/1993",
       "gioi_tinh": "Nữ",
       "ngay_cap": "30/12/2021",
-      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "noi_cap": "CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
       "dia_chi": ""
     }
   },
@@ -321,6 +347,8 @@
     ],
     "expected": {
       "ho_ten": "Nguyễn Văn Bình",
+      "loai_giay_to": "Trích lục khai tử",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "12/TLKT-BS",
       "ngay_sinh": "01/02/1950",
       "ngay_chet": "12/03/2020",
@@ -345,6 +373,8 @@
     ],
     "expected": {
       "ho_ten": "Trần Thị Hoa",
+      "loai_giay_to": "Trích lục khai tử (bản sao)",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "45/TLKT-UB",
       "ngay_sinh": "25/07/1942",
       "ngay_chet": "03/11/2021",
@@ -369,12 +399,88 @@
     ],
     "expected": {
       "ho_ten": "Lê Đức Anh",
+      "loai_giay_to": "Trích lục khai tử",
+      "chi_co_nam_sinh": false,
       "so_giay_to": "07/TLKT-2023",
       "ngay_sinh": "19/04/1935",
       "ngay_chet": "28/02/2023",
       "dia_chi": "Xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
       "ngay_cap": "05/03/2023",
       "noi_cap": "Uỷ ban nhân dân xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định"
+    }
+  },
+  {
+    "id": "F09",
+    "kind": "cccd_front",
+    "note": "Dòng nhãn có dấu phẩy vẫn nối dòng địa chỉ thứ hai; không lấy BỘ CÔNG AN mặt trước.",
+    "lines": [
+      "BỘ CÔNG AN",
+      "CĂN CƯỚC CÔNG DÂN",
+      "Số: 012000000009",
+      "Họ và tên: Nguyễn Văn Mẫu",
+      "Ngày sinh: 15/08/1995",
+      "Giới tính: Nam",
+      "Nơi thường trú: Số 12, đường Mẫu",
+      "phường Mẫu, thành phố Mẫu",
+      "Có giá trị đến: 15/08/2035"
+    ],
+    "expected": {
+      "ho_ten": "Nguyễn Văn Mẫu",
+      "so_giay_to": "012000000009",
+      "ngay_sinh": "15/08/1995",
+      "gioi_tinh": "Nam",
+      "dia_chi": "Số 12, đường Mẫu, phường Mẫu, thành phố Mẫu",
+      "noi_cap": "",
+      "ngay_cap": "",
+      "loai_giay_to": "Căn cước công dân",
+      "chi_co_nam_sinh": false
+    }
+  },
+  {
+    "id": "D04",
+    "kind": "death_certificate",
+    "note": "Giấy chứng tử chỉ ghi năm sinh; không tự thêm ngày tháng.",
+    "lines": [
+      "GIẤY CHỨNG TỬ",
+      "Số: 09/2020",
+      "Họ và tên người chết: Nguyễn Văn Mẫu",
+      "Ngày, tháng, năm sinh: 1935",
+      "Ngày chết: 12/03/2020",
+      "Nơi chết: Xã Mẫu",
+      "UBND xã Mẫu",
+      "Ngày cấp: 15/03/2020"
+    ],
+    "expected": {
+      "ho_ten": "Nguyễn Văn Mẫu",
+      "so_giay_to": "09/2020",
+      "ngay_sinh": "1935",
+      "ngay_chet": "12/03/2020",
+      "dia_chi": "Xã Mẫu",
+      "noi_cap": "UBND xã Mẫu",
+      "ngay_cap": "15/03/2020",
+      "loai_giay_to": "Giấy chứng tử",
+      "chi_co_nam_sinh": true
+    }
+  },
+  {
+    "id": "B06",
+    "kind": "cccd_back",
+    "note": "Cơ quan tỉnh sau chức danh Giám đốc; thiếu tiêu đề và MRZ thì không đoán loại.",
+    "lines": [
+      "Đặc điểm nhân dạng: Sẹo nhỏ ở cằm",
+      "Ngày cấp: 15/06/2021",
+      "GIÁM ĐỐC CÔNG AN TỈNH MẪU"
+    ],
+    "expected": {
+      "ho_ten": "",
+      "so_giay_to": "",
+      "ngay_sinh": "",
+      "gioi_tinh": "",
+      "dia_chi": "",
+      "noi_cap": "CÔNG AN TỈNH MẪU",
+      "ngay_cap": "15/06/2021",
+      "loai_giay_to": "",
+      "chi_co_nam_sinh": false
     }
   }
 ]
