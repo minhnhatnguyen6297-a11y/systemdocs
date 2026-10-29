@@ -11,7 +11,7 @@ Ký hiệu: ✅ đã mở file/cấu hình để kiểm chứng (2026-10-29) · 
 | Coder | omp (`~/.bun/bin/omp`), cấu hình `~/.omp/agent/config.yml` trên cloud box: `default: openai-codex/gpt-6.1-sol:medium`, `smol: xompet/deepseek-v4.1-flash`, fallback chain có `xompet/glm-5.3-flash`. Chạy không tương tác: `omp -p "<việc>" </dev/null` | ✅ config · ⚠️ lệnh chạy theo quy ước, không có trong repo |
 | Điều phối / review | Mika (coordinator) giao việc, Reviewer bot review diff trước khi báo xong (AGENTS.md "Luật cho coder agent") | ⚠️ chỉ quy ước, không có cấu hình trong repo |
 | Proxy model | CLIProxyAPI nghe `127.0.0.1:8317` trên cloud box | ✅ (process `cli-proxy-api` đang listen) |
-| CI | `.github/workflows/ci.yml`: `js-unit`, `pytest-linux`, `pytest-windows` (bắt buộc), `e2e-smoke` (`continue-on-error`, chưa bắt buộc). `security.yml`: `gitleaks`, `actionlint`. Lỗi đã biết: `tools/ci/known-failures-js.txt`, `known-failures-py-linux.txt` (đọc bởi `tools/ci/known_failures.py`) | ✅ |
+| CI | `.github/workflows/ci.yml`: `js-unit`, `pytest-linux`, `pytest-windows` (bắt buộc), `e2e-smoke` (`continue-on-error`, chưa bắt buộc). `security.yml`: `gitleaks`, `actionlint`. Lỗi đã biết: `tools/ci/known-failures-js.txt`, `known-failures-py-linux.txt`, `known-failures-py-windows.txt` (đọc bởi `tools/ci/known_failures.py`) | ✅ |
 | Branch protection | Nhánh mặc định `consolidate/monorepo`: chỉ qua PR, 5 check bắt buộc pytest-linux, pytest-windows, js-unit, actionlint, gitleaks | ✅ |
 | Python local | venv `/workspace/venv2` (Python 3.13.5); chạy `pytest --basetemp ~/workspace/tmp-pytest` | ✅ venv · ⚠️ basetemp theo quy ước |
 | E2E | `tools/ci/e2e-smoke.sh` (Electron + Xvfb + CDP, profile rỗng); selector trong `docs/screen-map.yaml` (sinh bởi `tools/screen-map/`); harness `/workspace/usability/launch-app-cdp.sh` trên box; skill `.omp/skills/reproduce-and-fix/SKILL.md` | ✅ |
@@ -45,6 +45,6 @@ Mục lục đầy đủ: [`docs/README.md`](README.md).
 
 ## 4. Lộ trình
 
-- **Xong:** CI + known-failures + gitleaks/actionlint + branch protection; fix Linux/Windows CI (#15–#19, PR #25, #27); form lỗi + log xoay vòng + che PII (PR #30); sổ D-001…D-050 (PR #29); mục lục nguồn chuẩn + glossary (PR này).
-- **Đang làm:** PR #32 diagram-rules-v2; #31 câu hỏi nghiệp vụ (ô Chủ đất trống); #33 Zalo hai mặt CCCD thành 2 người.
+- **Xong:** CI + known-failures + gitleaks/actionlint + branch protection; fix Linux/Windows CI (#15–#19, PR #25, #27); form lỗi + log xoay vòng + che PII (PR #30); sổ D-001…D-050 (PR #29); mục lục nguồn chuẩn + glossary (PR #35); tách tên "luật chặn chủ đất còn sống" khỏi Luật A + legal-baseline chưa luật sư rà soát (PR #36); luật sơ đồ v2 (PR #32); D-051 thiếu Chủ đất vẫn Lưu/Evaluate kèm cảnh báo, đóng #31 (PR #37); known-failures py linux/windows rỗng.
+- **Đang làm:** #33 Zalo hai mặt CCCD thành 2 người (chờ quyết định); D-030 mâu thuẫn với `diagram-rules.md` về lưu lỗi cấu trúc (chờ owner).
 - **Tiếp theo:** #7 tier frontier/worker qua CLIProxyAPI; #11 chuyển key omp sang biến môi trường; `e2e-smoke` thành bắt buộc sau ~10 lần xanh liên tiếp; bot theo từng area (⚠️ chưa có issue).

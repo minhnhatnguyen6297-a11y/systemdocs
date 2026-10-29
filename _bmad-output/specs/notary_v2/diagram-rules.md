@@ -397,7 +397,7 @@ Ngày nhập/hiển thị giữ đúng độ đầy đủ; ngày quy ước ch�
 ## 11. Engine
 
 Engine spec duy nhất còn nằm trong archive
-([`engine.md`](diagram/inheritance/engine.md),
+([`engine.md`](../../archive/specs-before-consolidation-20261015/notary_v2/diagram/inheritance/engine.md),
 đã đính chính có giới hạn), nên luật engine của luật sơ đồ v2 viết tại đây.
 Mục này chỉ ghi hành vi engine phải theo; không nâng thiết kế React/API/DB cũ
 trong archive thành spec hiện hành và không chứng minh runtime đã tuân thủ.
