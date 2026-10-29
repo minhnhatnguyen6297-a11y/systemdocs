@@ -1,0 +1,380 @@
+[
+  {
+    "id": "F01",
+    "kind": "cccd_front",
+    "note": "Thẻ 2021, nhãn cùng dòng với giá trị, địa chỉ 1 dòng đầy đủ cấp hành chính.",
+    "lines": [
+      "CĂN CƯỚC CÔNG DÂN",
+      "Số / No.: 012000000001",
+      "Họ và tên / Full name: Nguyễn Văn An",
+      "Ngày sinh / Date of birth: 15/08/1995",
+      "Giới tính / Sex: Nam",
+      "Quốc tịch / Nationality: Việt Nam",
+      "Quê quán / Place of origin: Xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
+      "Nơi thường trú / Place of residence: Số 12, đường Lê Lợi, phường Bến Nghé, quận 1, TP. Hồ Chí Minh"
+    ],
+    "expected": {
+      "ho_ten": "Nguyễn Văn An",
+      "so_giay_to": "012000000001",
+      "ngay_sinh": "15/08/1995",
+      "gioi_tinh": "Nam",
+      "dia_chi": "Số 12, đường Lê Lợi, phường Bến Nghé, quận 1, TP. Hồ Chí Minh",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "F02",
+    "kind": "cccd_front",
+    "note": "Nhãn họ tên đứng riêng, tên ở dòng sau; nơi thường trú nhãn riêng + địa chỉ 2 dòng.",
+    "lines": [
+      "CĂN CƯỚC CÔNG DÂN",
+      "Số / No.: 038000000002",
+      "Họ và tên / Full name:",
+      "Trần Thị Mai Hương",
+      "Ngày sinh / Date of birth: 02/03/1988",
+      "Giới tính / Sex: Nữ",
+      "Quê quán / Place of origin: Phường Lộc Thọ, thành phố Nha Trang, tỉnh Khánh Hòa",
+      "Nơi thường trú / Place of residence:",
+      "Thôn 3, xã Đông Sơn",
+      "huyện Chương Mỹ, thành phố Hà Nội"
+    ],
+    "expected": {
+      "ho_ten": "Trần Thị Mai Hương",
+      "so_giay_to": "038000000002",
+      "ngay_sinh": "02/03/1988",
+      "gioi_tinh": "Nữ",
+      "dia_chi": "Thôn 3, xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "F03",
+    "kind": "cccd_front",
+    "note": "Thẻ mẫu mới: tiêu đề 'CĂN CƯỚC', nhãn 'Nơi cư trú', địa chỉ 2 dòng.",
+    "lines": [
+      "CĂN CƯỚC",
+      "Số / No.: 079000000003",
+      "Họ và tên / Full name: Lê Quốc Bảo",
+      "Ngày sinh / Date of birth: 21/11/2001",
+      "Giới tính / Sex: Nam",
+      "Quốc tịch / Nationality: Việt Nam",
+      "Nơi cư trú / Place of residence: Ấp 4, xã Vĩnh Lộc",
+      "huyện Bình Chánh, TP. Hồ Chí Minh"
+    ],
+    "expected": {
+      "ho_ten": "Lê Quốc Bảo",
+      "so_giay_to": "079000000003",
+      "ngay_sinh": "21/11/2001",
+      "gioi_tinh": "Nam",
+      "dia_chi": "Ấp 4, xã Vĩnh Lộc, huyện Bình Chánh, TP. Hồ Chí Minh",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "F04",
+    "kind": "cccd_front",
+    "note": "Nhiễu OCR nhẹ: nhãn mất dấu (CAN CUOC, Ho va ten, Ngay sinh, Gioi tinh, Noi thuong tru), giá trị vẫn có dấu.",
+    "lines": [
+      "CAN CUOC CONG DAN",
+      "So / No.: 001000000004",
+      "Ho va ten / Full name: Phạm Minh Tuấn",
+      "Ngay sinh / Date of birth: 07/09/1979",
+      "Gioi tinh / Sex: Nam",
+      "Que quan / Place of origin: Xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
+      "Noi thuong tru / Place of residence: Số 8 ngõ 45 phố Huế, phường Hàng Bài, quận Hoàn Kiếm, Hà Nội"
+    ],
+    "expected": {
+      "ho_ten": "Phạm Minh Tuấn",
+      "so_giay_to": "001000000004",
+      "ngay_sinh": "07/09/1979",
+      "gioi_tinh": "Nam",
+      "dia_chi": "Số 8 ngõ 45 phố Huế, phường Hàng Bài, quận Hoàn Kiếm, Hà Nội",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "F05",
+    "kind": "cccd_front",
+    "note": "Nhãn nơi thường trú kèm phần địa chỉ đầu dòng, phần còn lại xuống dòng (2 dòng).",
+    "lines": [
+      "CĂN CƯỚC CÔNG DÂN",
+      "Số / No.: 036000000005",
+      "Họ và tên / Full name: Vũ Thị Thanh Hà",
+      "Ngày sinh / Date of birth: 30/12/1993",
+      "Giới tính / Sex: Nữ",
+      "Quê quán / Place of origin: Xã Xuân Phương, huyện Xuân Trường, tỉnh Nam Định",
+      "Nơi thường trú / Place of residence: 45 Nguyễn Trãi",
+      "phường Thanh Xuân Trung, quận Thanh Xuân, thành phố Hà Nội"
+    ],
+    "expected": {
+      "ho_ten": "Vũ Thị Thanh Hà",
+      "so_giay_to": "036000000005",
+      "ngay_sinh": "30/12/1993",
+      "gioi_tinh": "Nữ",
+      "dia_chi": "45 Nguyễn Trãi, phường Thanh Xuân Trung, quận Thanh Xuân, thành phố Hà Nội",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "F06",
+    "kind": "cccd_front",
+    "note": "Mặt trước bị OCR bịa thêm dòng 'Ngày cấp / Date of issue' — mặt trước không có ngày cấp nên expected rỗng.",
+    "lines": [
+      "CĂN CƯỚC CÔNG DÂN",
+      "Số / No.: 048000000006",
+      "Họ và tên / Full name: Đặng Hữu Phước",
+      "Ngày sinh / Date of birth: 09/05/1986",
+      "Giới tính / Sex: Nam",
+      "Quê quán / Place of origin: Xã Hòa Tiến, huyện Hòa Vang, thành phố Đà Nẵng",
+      "Nơi thường trú / Place of residence: 118 đường Nguyễn Lương Bằng, phường Hòa Khánh, quận Liên Chiểu, Đà Nẵng",
+      "Ngày cấp / Date of issue: 01/01/2025"
+    ],
+    "expected": {
+      "ho_ten": "Đặng Hữu Phước",
+      "so_giay_to": "048000000006",
+      "ngay_sinh": "09/05/1986",
+      "gioi_tinh": "Nam",
+      "dia_chi": "118 đường Nguyễn Lương Bằng, phường Hòa Khánh, quận Liên Chiểu, Đà Nẵng",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "F07",
+    "kind": "cccd_front",
+    "note": "Có dòng quốc hiệu phía trên; nhãn họ tên riêng dòng, tên dòng sau; địa chỉ 1 dòng nhiều cấp.",
+    "lines": [
+      "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM",
+      "Độc lập - Tự do - Hạnh phúc",
+      "CĂN CƯỚC CÔNG DÂN",
+      "Số / No.: 025000000007",
+      "Họ và tên / Full name:",
+      "Bùi Ngọc Lan",
+      "Ngày sinh / Date of birth: 14/02/2000",
+      "Giới tính / Sex: Nữ",
+      "Quê quán / Place of origin: Xã Tân Phú, huyện Vĩnh Lộc, tỉnh Thanh Hóa",
+      "Nơi thường trú / Place of residence: Số 3, ngách 12/5, phố Kim Mã, phường Kim Mã, quận Ba Đình, Hà Nội"
+    ],
+    "expected": {
+      "ho_ten": "Bùi Ngọc Lan",
+      "so_giay_to": "025000000007",
+      "ngay_sinh": "14/02/2000",
+      "gioi_tinh": "Nữ",
+      "dia_chi": "Số 3, ngách 12/5, phố Kim Mã, phường Kim Mã, quận Ba Đình, Hà Nội",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "F08",
+    "kind": "cccd_front",
+    "note": "Ngày sinh đầu tháng/năm cũ; nơi thường trú nhãn riêng + địa chỉ 2 dòng có số nhà và tổ dân phố.",
+    "lines": [
+      "CĂN CƯỚC CÔNG DÂN",
+      "Số / No.: 092000000008",
+      "Họ và tên / Full name: Hoàng Văn Sơn",
+      "Ngày sinh / Date of birth: 01/01/1968",
+      "Giới tính / Sex: Nam",
+      "Quê quán / Place of origin: Xã Bình Minh, huyện Kiến Xương, tỉnh Thái Bình",
+      "Nơi thường trú / Place of residence:",
+      "Số nhà 22, tổ 5, phường Quang Trung",
+      "quận Hà Đông, thành phố Hà Nội"
+    ],
+    "expected": {
+      "ho_ten": "Hoàng Văn Sơn",
+      "so_giay_to": "092000000008",
+      "ngay_sinh": "01/01/1968",
+      "gioi_tinh": "Nam",
+      "dia_chi": "Số nhà 22, tổ 5, phường Quang Trung, quận Hà Đông, thành phố Hà Nội",
+      "ngay_cap": "",
+      "noi_cap": ""
+    }
+  },
+  {
+    "id": "B01",
+    "kind": "cccd_back",
+    "note": "Mặt sau 2021: đặc điểm nhân dạng, ngày cấp, dòng CỤC TRƯỞNG, 3 dòng MRZ; tên lấy theo MRZ.",
+    "lines": [
+      "Đặc điểm nhân dạng: Sẹo nhỏ ở cằm",
+      "Ngày, tháng, năm / Date, month, year: 15/06/2021",
+      "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "IDVNM0120000005012000000011<<<",
+      "9001011M3501014VNM<<<<<<<<<<<8",
+      "NGUYEN<<VAN<AN<<<<<<<<<<<<<<<<"
+    ],
+    "expected": {
+      "so_giay_to": "012000000011",
+      "ho_ten": "NGUYEN VAN AN",
+      "ngay_sinh": "01/01/1990",
+      "gioi_tinh": "Nam",
+      "ngay_cap": "15/06/2021",
+      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "dia_chi": ""
+    }
+  },
+  {
+    "id": "B02",
+    "kind": "cccd_back",
+    "note": "Mặt sau nữ giới, đặc điểm nhân dạng là nốt ruồi; ngày cấp khác năm sinh.",
+    "lines": [
+      "Đặc điểm nhân dạng: Nốt ruồi dưới mắt trái",
+      "Ngày, tháng, năm / Date, month, year: 22/09/2022",
+      "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "IDVNM0380000007038000000012<<<",
+      "8803023F3303023VNM<<<<<<<<<<<8",
+      "TRAN<<THI<MAI<HUONG<<<<<<<<<<<"
+    ],
+    "expected": {
+      "so_giay_to": "038000000012",
+      "ho_ten": "TRAN THI MAI HUONG",
+      "ngay_sinh": "02/03/1988",
+      "gioi_tinh": "Nữ",
+      "ngay_cap": "22/09/2022",
+      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "dia_chi": ""
+    }
+  },
+  {
+    "id": "B03",
+    "kind": "cccd_back",
+    "note": "Mặt sau chỉ in 'BỘ CÔNG AN' (không có dòng CỤC TRƯỞNG); sinh năm 2001.",
+    "lines": [
+      "BỘ CÔNG AN",
+      "Đặc điểm nhân dạng: Không có",
+      "Ngày, tháng, năm / Date, month, year: 05/01/2023",
+      "IDVNM0790000000079000000013<<<",
+      "0101011M3601110VNM<<<<<<<<<<<8",
+      "LE<<QUOC<BAO<<<<<<<<<<<<<<<<<<"
+    ],
+    "expected": {
+      "so_giay_to": "079000000013",
+      "ho_ten": "LE QUOC BAO",
+      "ngay_sinh": "01/01/2001",
+      "gioi_tinh": "Nam",
+      "ngay_cap": "05/01/2023",
+      "noi_cap": "BỘ CÔNG AN",
+      "dia_chi": ""
+    }
+  },
+  {
+    "id": "B04",
+    "kind": "cccd_back",
+    "note": "Dòng MRZ bị OCR chèn khoảng trắng cuối; ngày cấp 2014, sinh 1979.",
+    "lines": [
+      "Đặc điểm nhân dạng: Sẹo dài 3 cm ở cẳng tay phải",
+      "Ngày, tháng, năm / Date, month, year: 18/04/2014",
+      "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "IDVNM0010000001001000000014<<< ",
+      "7909076M3409073VNM<<<<<<<<<<<8 ",
+      "PHAM<<MINH<TUAN<<<<<<<<<<<<<<< "
+    ],
+    "expected": {
+      "so_giay_to": "001000000014",
+      "ho_ten": "PHAM MINH TUAN",
+      "ngay_sinh": "07/09/1979",
+      "gioi_tinh": "Nam",
+      "ngay_cap": "18/04/2014",
+      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "dia_chi": ""
+    }
+  },
+  {
+    "id": "B05",
+    "kind": "cccd_back",
+    "note": "Mặt sau nữ sinh cuối năm 1993; đặc điểm nhân dạng mô tả tóc.",
+    "lines": [
+      "Đặc điểm nhân dạng: Tóc dài ngang vai",
+      "Ngày, tháng, năm / Date, month, year: 30/12/2021",
+      "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "IDVNM0360000005036000000015<<<",
+      "9312306F3512300VNM<<<<<<<<<<<8",
+      "VU<<THI<THANH<HA<<<<<<<<<<<<<<"
+    ],
+    "expected": {
+      "so_giay_to": "036000000015",
+      "ho_ten": "VU THI THANH HA",
+      "ngay_sinh": "30/12/1993",
+      "gioi_tinh": "Nữ",
+      "ngay_cap": "30/12/2021",
+      "noi_cap": "CỤC TRƯỞNG CỤC CẢNH SÁT QUẢN LÝ HÀNH CHÍNH VỀ TRẬT TỰ XÃ HỘI",
+      "dia_chi": ""
+    }
+  },
+  {
+    "id": "D01",
+    "kind": "death_certificate",
+    "note": "Trích lục khai tử, cơ quan cấp là UBND xã, nơi chết là bệnh viện tuyến tỉnh.",
+    "lines": [
+      "TRÍCH LỤC KHAI TỬ",
+      "Số: 12/TLKT-BS",
+      "Họ, chữ đệm, tên người chết: Nguyễn Văn Bình",
+      "Ngày, tháng, năm sinh: 01/02/1950",
+      "Đã chết vào ngày: 12/03/2020",
+      "Nơi chết: Bệnh viện Đa khoa tỉnh Thanh Hóa",
+      "UBND xã Tân Phú, huyện Vĩnh Lộc, tỉnh Thanh Hóa",
+      "Ngày cấp: 20/03/2020"
+    ],
+    "expected": {
+      "ho_ten": "Nguyễn Văn Bình",
+      "so_giay_to": "12/TLKT-BS",
+      "ngay_sinh": "01/02/1950",
+      "ngay_chet": "12/03/2020",
+      "dia_chi": "Bệnh viện Đa khoa tỉnh Thanh Hóa",
+      "ngay_cap": "20/03/2020",
+      "noi_cap": "UBND xã Tân Phú, huyện Vĩnh Lộc, tỉnh Thanh Hóa"
+    }
+  },
+  {
+    "id": "D02",
+    "kind": "death_certificate",
+    "note": "Bản sao trích lục, cơ quan cấp ghi đầy đủ 'Uỷ ban nhân dân xã', nơi chết là nhà riêng.",
+    "lines": [
+      "TRÍCH LỤC KHAI TỬ (BẢN SAO)",
+      "Số: 45/TLKT-UB",
+      "Họ, chữ đệm, tên người chết: Trần Thị Hoa",
+      "Ngày, tháng, năm sinh: 25/07/1942",
+      "Đã chết vào ngày: 03/11/2021",
+      "Nơi chết: Nhà riêng tại thôn 3, xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
+      "Uỷ ban nhân dân xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
+      "Ngày cấp: 10/11/2021"
+    ],
+    "expected": {
+      "ho_ten": "Trần Thị Hoa",
+      "so_giay_to": "45/TLKT-UB",
+      "ngay_sinh": "25/07/1942",
+      "ngay_chet": "03/11/2021",
+      "dia_chi": "Nhà riêng tại thôn 3, xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
+      "ngay_cap": "10/11/2021",
+      "noi_cap": "Uỷ ban nhân dân xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội"
+    }
+  },
+  {
+    "id": "D03",
+    "kind": "death_certificate",
+    "note": "Trích lục khai tử số có hậu tố năm, nơi chết là địa chỉ xã, cơ quan cấp Uỷ ban nhân dân xã.",
+    "lines": [
+      "TRÍCH LỤC KHAI TỬ",
+      "Số: 07/TLKT-2023",
+      "Họ, chữ đệm, tên người chết: Lê Đức Anh",
+      "Ngày, tháng, năm sinh: 19/04/1935",
+      "Đã chết vào ngày: 28/02/2023",
+      "Nơi chết: Xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
+      "Uỷ ban nhân dân xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
+      "Ngày cấp: 05/03/2023"
+    ],
+    "expected": {
+      "ho_ten": "Lê Đức Anh",
+      "so_giay_to": "07/TLKT-2023",
+      "ngay_sinh": "19/04/1935",
+      "ngay_chet": "28/02/2023",
+      "dia_chi": "Xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
+      "ngay_cap": "05/03/2023",
+      "noi_cap": "Uỷ ban nhân dân xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định"
+    }
+  }
+]
