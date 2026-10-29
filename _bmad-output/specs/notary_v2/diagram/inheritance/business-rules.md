@@ -117,7 +117,6 @@
 | R-11, R-25 | Code hiện dùng liên kết vợ/chồng giữa hai node (UI coi một chiều là vợ chồng; server đòi hai chiều; nhánh `agent/omp/hang-2-3` commit `b352aac` thêm lỗi `spouse_conflict` một chiều và UI ghi hai chiều). Theo D-041 phải thay bằng ô vợ/chồng một chiều trên node người chết có tài sản + chuyển đổi hồ sơ cũ — chưa làm. |
 | R-15, R-32 | Engine chỉ có hàng 1; hàng 2/3 đang cài trên nhánh `agent/omp/hang-2-3` (D-038). |
 | R-33, R-34 | Chưa đối chiếu Word: liệt kê người từ chối theo đầu người; cảnh báo khi cách viết gọn khác kết quả. |
-| R-26 | Kiểm vòng tổ tiên báo nhầm khi một người được tới bằng hai đường. |
 | R-27 | Chưa đối chiếu với code gỡ node. |
 | INV-8 | Lưu nhiều bản sao; Word có thể đọc bản cũ hoặc tỷ lệ của bảng người tham gia. |
 
