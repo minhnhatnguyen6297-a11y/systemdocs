@@ -106,6 +106,11 @@ và `contracts/notary-case-drafting/*.schema.json`.
   Đường `diagram_evaluate` vẫn báo nguyên trạng thái chưa tính được của
   engine; `diagram_evaluate` chế độ nháp không chặn vì lỗi field tùy chọn —
   trả `incomplete` kèm warning `stage.incomplete_fields`.
+- D-051 (#31, 29/10/2026): ô Chủ đất trống, thiếu `owner_row_id` hoặc
+  không ai giữ vị trí tài sản không chặn `diagram_save`/`diagram_evaluate`,
+  kể cả evaluate nháp không có `case_id`. Save giữ nháp và tăng revision;
+  cả hai trả `render_model.warnings` có mã `diagram.missing_land_owner`,
+  message `chưa có Chủ đất`. Lỗi cấu trúc khác vẫn chặn như trên.
 - Save chạy đúng một đường đánh giá với `Xem cách tính`: `render_model` đã lưu
   là kết quả evaluate tại thời điểm ghi (gồm warning Pool và trạng thái
   `incomplete`).

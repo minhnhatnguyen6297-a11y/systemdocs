@@ -356,3 +356,9 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Quyết định:** người còn sống được làm Chủ đất. "Luật chặn chủ đất còn sống" (chặn người còn sống làm Chủ đất; trước đây gọi nhầm là Luật A — Luật A trong glossary là D-043) bị bác bỏ.
 - **Hệ quả:** revert `e943fde` (nhánh `agent/omp/diagram-rules-v2`): "luật chặn chủ đất còn sống" không thuộc D-048, mâu thuẫn engine `living_owner` và làm hỏng 11 test reconcile; fixture đã được khôi phục.
 - **Nguồn:** owner 28/10/2026.
+
+### D-051 — Không có Chủ đất vẫn được Lưu và Evaluate, kèm cảnh báo "chưa có Chủ đất" (#31)
+- **Ngày:** 29/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** luật (khớp D-002, D-030)
+- **Quyết định:** khi sơ đồ chưa có Chủ đất (ô Chủ đất trống, hoặc không ai giữ vị trí tài sản), `diagram_save` và `diagram_evaluate` (kể cả nháp) **không chặn**: vẫn lưu nháp / trả kết quả, kèm cảnh báo "chưa có Chủ đất".
+- **Hệ quả:** bỏ từ chối `diagram_invalid_state`/`missing_land_owner` và `workspace_owner_required` cho trường hợp này; 2 contract test `test_diagram_save_engine_invalid_rejected_state_preserved`, `test_diagram_evaluate_draft_owner_required` viết lại theo D-051 và gỡ khỏi known-failures.
+- **Nguồn:** owner trả lời issue #31, 29/10/2026 08:24 (UTC+7).

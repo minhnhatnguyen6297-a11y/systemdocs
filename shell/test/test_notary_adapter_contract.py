@@ -1042,26 +1042,42 @@ def test_diagram_save_incomplete_reopen_keeps_warning(adapter_db):
     assert reopened["data"]["case"]["revision"] == 4
 
 
-def test_diagram_save_engine_invalid_rejected_state_preserved(adapter_db):
-    """Wire hợp lệ nhưng không ai giữ vị trí tài sản → engine từ chối
-    `diagram_invalid_state`; bản cũ + revision giữ nguyên (§6/§9.7)."""
-    case, owner_row = _committed_case(adapter_db)
-    before = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
-    state = _v3_state([_diagram_node("owner", owner_row, own=[])])
+@pytest.mark.parametrize("owner_state", ["no_position", "empty_slot", "unassigned"])
+def test_diagram_save_engine_invalid_rejected_state_preserved(adapter_db, owner_state):
+    """D-051: thiếu Chủ đất vẫn lưu nháp, tăng revision và giữ warning khi mở lại."""
+    if owner_state == "unassigned":
+        created = notary_adapter.workspace_create(
+            _Job(), _create_payload([_person_row()], [_asset_row()],
+                                    _v3_state([])))["data"]
+        case_id = created["case"]["id"]
+        state = _v3_state([])
+    else:
+        case, owner_row = _committed_case(adapter_db)
+        case_id = case.id
+        state = _v3_state([_diagram_node(
+            "owner", owner_row if owner_state == "no_position" else None, own=[])])
+    before = notary_adapter.workspace_get(_Job(), {"case_id": case_id})["data"]
+    saved = notary_adapter.diagram_save(
+        _Job(), _save_payload(case_id, before["case"]["revision"], state))["data"]
+    rm = saved["diagram"]["render_model"]
+    assert rm["status"] == "incomplete"
+    assert {"code": "diagram.missing_land_owner", "message": "chưa có Chủ đất"} \
+        in rm["warnings"]
+    assert saved["revision"] == before["case"]["revision"] + 1
+    saved_nodes = saved["diagram"]["state"]["nodes"]
+    for got, sent in zip(saved_nodes, state["nodes"], strict=True):
+        assert {key: got[key] for key in sent} == sent
+    after = notary_adapter.workspace_get(_Job(), {"case_id": case_id})["data"]
+    assert after["case"]["revision"] == saved["revision"]
+    assert after["case"]["status"] == before["case"]["status"] == "draft"
+    assert after["diagram"]["state"] == saved["diagram"]["state"]
+    assert after["diagram"]["render_model"] == rm
 
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.diagram_save(
-            _Job(), _save_payload(case.id, 2, state))
-    err = exc.value
-    assert err.code == "diagram_invalid_state"
-    assert any(e["code"] == "missing_land_owner"
-               for e in err.details["errors"])
-
-    after = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
-    assert after["case"]["revision"] == before["case"]["revision"]
-    assert after["diagram"]["state"] == before["diagram"]["state"]
-    assert after["diagram"]["render_model"] == \
-        before["diagram"]["render_model"]
+    evaluated = notary_adapter.diagram_evaluate(
+        _Job(), _eval_payload(case_id, state))["data"]
+    assert {"code": "diagram.missing_land_owner", "message": "chưa có Chủ đất"} \
+        in evaluated["render_model"]["warnings"]
+    assert evaluated["evaluated_revision"] == saved["revision"]
 
 
 def test_workspace_commit_stage_keeps_unassigned_pool_warning(adapter_db):
@@ -1828,13 +1844,18 @@ def test_diagram_evaluate_draft_domain_mismatch(adapter_db):
     assert exc.value.details["expected"] == "inheritance"
 
 
-def test_diagram_evaluate_draft_owner_required(adapter_db):
-    """Draft inheritance thieu owner_row_id -> workspace_owner_required."""
+@pytest.mark.parametrize("explicit_null", [False, True])
+def test_diagram_evaluate_draft_owner_required(adapter_db, explicit_null):
+    """D-051: nháp thiếu owner_row_id vẫn evaluate, cảnh báo và không ghi DB."""
     stage = {"people": [_person_row()], "assets": [_asset_row()]}
-    with pytest.raises(CommandError) as exc:
-        notary_adapter.diagram_evaluate(_Job(), {
-            "stage": stage, "diagram": {"state": _v3_state([])}})
-    assert exc.value.code == "workspace_owner_required"
+    if explicit_null:
+        stage["owner_row_id"] = None
+    result = notary_adapter.diagram_evaluate(_Job(), {
+        "stage": stage, "diagram": {"state": _v3_state([])}})
+    assert result["data"]["evaluated_revision"] is None
+    assert {"code": "diagram.missing_land_owner", "message": "chưa có Chủ đất"} \
+        in result["data"]["render_model"]["warnings"]
+    assert adapter_db.query(InheritanceCase).count() == 0
 
 
 def test_diagram_evaluate_null_case_id_is_validation_error(adapter_db):

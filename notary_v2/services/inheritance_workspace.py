@@ -647,6 +647,12 @@ class InheritanceWorkspaceService:
         unassigned = valid_row_ids - assigned
         warnings = list(render_model.get("warnings") or [])
         warned = {w.get("code") for w in warnings}
+        # D-051: thiếu Chủ đất không chặn Save/Evaluate; UI dùng warning chung.
+        if any(e.get("code") == "missing_land_owner"
+               for e in render_model.get("errors") or []):
+            warnings.append({
+                "code": "diagram.missing_land_owner",
+                "message": "chưa có Chủ đất"})
         for row_id in sorted(unassigned):
             if "diagram.unassigned_pool_person" not in warned:
                 warnings.append({
