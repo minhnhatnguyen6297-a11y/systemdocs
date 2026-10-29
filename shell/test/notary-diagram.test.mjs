@@ -1285,6 +1285,85 @@ test('save thiếu dữ liệu: cue chỉ-đọc hiện, không sinh slot', asyn
   assert.match(warn, /Cần bổ sung Cha, Mẹ, Vợ\/chồng, Con/);
 });
 
+test('D-030: save and workspace_get retain invalid graph status and render errors', async (t) => {
+  const calls = [];
+  const renderModel = {
+    engineVersion: 2, status: 'invalid', allocations: {}, breakdowns: [],
+    requiredSlots: [], warnings: [],
+    errors: [
+      { code: 'ancestry_cycle', message: 'Quan hệ cha mẹ tạo vòng lặp' },
+      { code: 'dangling_parent', message: 'Ô cha mẹ không tồn tại trên sơ đồ' },
+    ],
+    unresolvedEstates: [], conservation: {},
+  };
+  const nodes = [
+    { id: 'owner', personId: 'c1', parentSlotIds: ['child_1'],
+      spouseSlotIds: [], ownPositions: [], receivePositions: [],
+      hidden: false, deleted: false },
+    { id: 'child_1', personId: 'c2', parentSlotIds: ['owner', 'missing_parent'],
+      spouseSlotIds: [], ownPositions: [], receivePositions: [],
+      hidden: false, deleted: false },
+  ];
+  let workspace;
+  const client = { run: async (cmd, payload) => {
+    calls.push([cmd, payload]);
+    if (cmd === 'notary.workspace_save_case') {
+      workspace = {
+        case: { ...payload.case, id: payload.case_id,
+          status: 'done', locked: false, revision: payload.base_revision + 1 },
+        backend_mode: 'real',
+        capabilities: { intake: [], diagram: true, word_export: true },
+        stage: structuredClone(payload.stage),
+        diagram: { state: structuredClone(payload.diagram.state),
+          render_model: structuredClone(renderModel) },
+      };
+      return { ok: true, data: { created: false, ...structuredClone(workspace) } };
+    }
+    if (cmd === 'notary.workspace_get') {
+      return { ok: true, data: structuredClone(workspace) };
+    }
+    return { ok: true, data: {} };
+  } };
+  const { model, view } = await build(t, { mode: 'case', client,
+    seed: { people: INH_PEOPLE, nodes } });
+  model.state.stage.owner_row_id = 'c1';
+  model.state.renderModel = structuredClone(renderModel);
+  model.state.diagramDirty = true;
+  model.state.diagramErrors = [{ code: 'self_parent', message: 'Lỗi lần lưu cũ' }];
+  model.dismissNotice();
+  const before = structuredClone(model.state.diagram);
+  const save = findBtns(view.el, 'Lưu hồ sơ')[0];
+  assert.equal(save.disabled, false, 'invalid engine status must not block save');
+  await save.onclick();
+  assert.equal(calls.filter(([cmd]) => cmd === 'notary.workspace_save_case').length, 1);
+  assert.deepEqual(calls.find(([cmd]) =>
+    cmd === 'notary.workspace_save_case')[1].diagram.state, before);
+
+  const assertSavedInvalid = () => {
+    assert.equal(model.state.revision, 4);
+    assert.equal(model.state.diagramDirty, false);
+    assert.equal(model.state.saveRejected, false);
+    assert.deepEqual(model.state.diagram, before);
+    assert.deepEqual(model.state.renderModel, renderModel);
+    assert.deepEqual(model.state.diagramErrors, [],
+      'clearing transient write errors must not clear saved render errors');
+    assert.match(view.el.textContent, /Trạng thái tính: Không hợp lệ/);
+    const errors = byCls(view.el, 'error').map((e) => e.textContent);
+    for (const error of renderModel.errors) {
+      assert.equal(errors.filter((text) => text.includes(error.message)).length, 1);
+    }
+    assert.doesNotMatch(view.el.textContent, /Lỗi lần lưu cũ/);
+    assert.equal(byCls(view.el, 'cd-node').length, nodes.length);
+  };
+  assertSavedInvalid();
+  const reopened = await model.openCase(42);
+  assert.equal(reopened.ok, true);
+  assert.equal(calls.filter(([cmd]) => cmd === 'notary.workspace_get').length, 1);
+  assertSavedInvalid();
+  assert.equal(calls.filter(([cmd]) => cmd === 'notary.diagram_evaluate').length, 0,
+    'save/reopen must render persisted errors without evaluating the invalid graph');
+});
+
 test('mở lại case thiếu dữ liệu: graph giữ nguyên, cue từ render_model', async () => {
   const calls = [];
   const state = { version: 3, domain: 'inheritance', nodes: [

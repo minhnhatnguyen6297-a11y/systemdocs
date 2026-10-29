@@ -582,11 +582,26 @@ def check_diagram_state_v2(state, where, stage_ids, v, case_type):
 
 
 def check_diagram_state(state, where, stage_ids, v, draft_v2=False,
-                        case_type="inheritance"):
+                        case_type="inheritance", allow_invalid=False):
     if not isinstance(state, dict):
         v.append(("diagram_invalid_state", f"{where} not object"))
         return
     if draft_v2:
+        if allow_invalid and state.get("domain") == "inheritance":
+            shape_errors = []
+            check_schema_definition(
+                "draft-v2.schema.json", "diagram_state_save_v3",
+                state, shape_errors, where)
+            if shape_errors:
+                v.extend(("diagram_invalid_state", msg)
+                         for _, msg in shape_errors)
+                return
+            if case_type != "inheritance":
+                v.append(("diagram_domain_mismatch",
+                          f"{where}.domain != case_type"))
+            for i, node in enumerate(state["nodes"]):
+                check_person_id(node, f"{where}.nodes[{i}]", stage_ids, v)
+            return
         check_diagram_state_v2(state, where, stage_ids, v, case_type)
         return
     if state.get("version") != 2:
@@ -1299,7 +1314,9 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
                               "data.diagram.domain != state.domain"))
             check_diagram_state(dg.get("state"), "data.diagram.state",
                                 stage_ids, v, draft_v2=draft_v2,
-                                case_type=ct)
+                                case_type=ct, allow_invalid=(
+                                    (dg.get("render_model") or {}).get("status")
+                                    == "invalid"))
             rm = dg.get("render_model")
             if rm is not None:
                 check_render_model(rm, "data.diagram.render_model", v)
@@ -1353,7 +1370,9 @@ def check_result_data(kind, data, stage_ids, v, draft_v2=False, ctx=None):
         if isinstance(dg, dict):
             check_diagram_state(dg.get("state"), "data.diagram.state",
                                 stage_ids, v, draft_v2=draft_v2,
-                                case_type=ct)
+                                case_type=ct, allow_invalid=(
+                                    (dg.get("render_model") or {}).get("status")
+                                    == "invalid"))
             # M-12: save thành công luôn kèm render_model non-null
             if dg.get("render_model") is None:
                 v.append(("validation_error",
@@ -1643,7 +1662,9 @@ def violations(doc):
         if isinstance(dg, dict) and "state" in dg:
             check_diagram_state(dg["state"], "payload.diagram.state",
                                 stage_ids, v, draft_v2=draft_v2,
-                                case_type=ct)
+                                case_type=ct, allow_invalid=cmd in (
+                                    "notary.diagram_save",
+                                    "notary.workspace_save_case"))
 
     # --- job rules
     if "status" in doc:

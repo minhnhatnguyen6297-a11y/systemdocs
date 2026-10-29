@@ -529,6 +529,55 @@ def _validate_diagram_state(state):
     return errors
 
 
+def _save_wire_errors(state):
+    """D-030: same safe node types as real prepare_diagram; two-party strict."""
+    malformed = (not isinstance(state, dict)
+                 or state.get("version") != DIAGRAM_STATE_VERSION
+                 or state.get("domain") not in CASE_TYPES
+                 or not isinstance(state.get("nodes"), list))
+    if not malformed and state["domain"] == CASE_TYPE_INHERITANCE:
+        for node in state["nodes"]:
+            if (not isinstance(node, dict)
+                    or not isinstance(node.get("id"), str)
+                    or not isinstance(node.get("personId"), (str, type(None)))
+                    or any(not isinstance(node.get(k), bool)
+                           for k in ("hidden", "deleted"))
+                    or any(not isinstance(node.get(k), list)
+                           or any(not isinstance(x, str) for x in node[k])
+                           for k in ("parentSlotIds", "spouseSlotIds"))
+                    or any(not isinstance(node.get(k), list)
+                           or any(type(x) is not int for x in node[k])
+                           for k in ("ownPositions", "receivePositions"))
+                    or any(not isinstance(node.get(k), (str, type(None)))
+                           for k in ("spouseSlotId", "spouseSuggestionId"))):
+                malformed = True
+                break
+    if malformed:
+        raise CommandError(
+            "diagram_invalid_state", "diagram.state có kiểu không an toàn",
+            details={"errors": [{"code": "invalid_input",
+                                 "message": "diagram.state/nodes sai kiểu"}]})
+    errors = _validate_diagram_state(state)
+    if errors and state["domain"] == CASE_TYPE_TWO_PARTY:
+        raise CommandError("diagram_invalid_state",
+                           "diagram state không hợp lệ",
+                           details={"errors": errors})
+    return errors
+
+
+def _save_render(state, stage, errors):
+    if errors:
+        model = _unsupported_render()
+        model.update(status="invalid", warnings=[], errors=errors)
+        return model
+    model = _render(state, stage)
+    if (model.get("status") == "invalid" and model.get("errors")
+            and all(e.get("code") in ("missing_land_owner", "invalid_death_date")
+                    for e in model["errors"])):
+        model = {**model, "status": "incomplete"}
+    return model
+
+
 def _outside_person(state, stage_ids):
     """personId sai định dạng uuid4 hoặc ngoài stage → trả pid đó."""
     for n in (state.get("nodes") or []):
@@ -569,14 +618,16 @@ def _render(state, stage):
 
     Domain two_party khong bao gio vao day (caller tra _unsupported_render).
     Rule don gian mot estate: landowner da chet -> chia deu cho cac node
-    receivePositions non-empty co personId. Khong co landowner -> invalid
-    missing_land_owner. Pool person chua gan -> incomplete + warning.
+    receivePositions non-empty co personId. Khong co landowner -> invalid,
+    + missing_land_owner warning (D-051); Save softens to incomplete.
     """
     stage_people = _person_map({"stage": stage})
     nodes = [n for n in (state.get("nodes") or [])
              if isinstance(n, dict) and not n.get("deleted")]
     empty = {"engineVersion": 2, "status": "invalid", "allocations": {},
-             "breakdowns": [], "requiredSlots": [], "warnings": [],
+             "breakdowns": [], "requiredSlots": [], "warnings": [
+                 {"code": "diagram.missing_land_owner",
+                  "message": "chưa có Chủ đất"}],
              "errors": [{"code": "missing_land_owner",
                          "message": "Sơ đồ chưa có chủ đất"}],
              "unresolvedEstates": [],
@@ -1173,7 +1224,8 @@ def _workspace_data(cid, case):
         stage_out["owner_row_id"] = stage.get("owner_row_id")
     dg = case.get("diagram") or {}
     persisted_state = copy.deepcopy(dg.get("state"))
-    if isinstance(persisted_state, dict) and dom == CASE_TYPE_INHERITANCE:
+    if (isinstance(persisted_state, dict) and dom == CASE_TYPE_INHERITANCE
+            and (dg.get("render_model") or {}).get("status") != "invalid"):
         for node in persisted_state.get("nodes") or []:
             if not isinstance(node, dict):
                 continue
@@ -1736,8 +1788,18 @@ def _save_case_payload(payload):
     return cm, stage, dg.get("state")
 
 
+def _required_land_fields(stage):
+    """D-048: parcel/sheet are required on both Save entrypoints."""
+    return [
+        _err(row.get("row_id"), field, "required", f"{field} bắt buộc")
+        for row in stage.get("assets") or [] if isinstance(row, dict)
+        for field in ("so_thua_dat", "so_to_ban_do")
+        if not isinstance(row.get(field), str) or not row[field].strip()]
+
+
 def _validate_save_stage(stage, ct, *, is_new):
     errs, people_norm, assets_norm = _validate_stage(stage, ct)
+    errs.extend(_required_land_fields(stage))
     if is_new:
         raw_people = stage.get("people") or []
         raw_assets = stage.get("assets") or []
@@ -1758,11 +1820,7 @@ def _validate_save_stage(stage, ct, *, is_new):
 
 def _validate_save_diagram(state, ct, stage, stage_ids):
     _check_domain(state, ct)
-    errors = _validate_diagram_state(state)
-    if errors:
-        raise CommandError("diagram_invalid_state",
-                           "diagram state không hợp lệ",
-                           details={"errors": errors})
+    errors = _save_wire_errors(state)
     outside_pid = _outside_person(state, stage_ids)
     if outside_pid is not None:
         raise CommandError(
@@ -1781,6 +1839,7 @@ def _validate_save_diagram(state, ct, stage, stage_ids):
                 "diagram_owner_mismatch",
                 "node owner.personId phải khớp stage.owner_row_id",
                 details={"owner_row_id": oid, "node_personId": owner_pid})
+    return errors
 
 
 def workspace_save_case(job, payload):
@@ -1789,7 +1848,7 @@ def workspace_save_case(job, payload):
 
     Tạo mới idempotent theo key/hash (`created` chỉ true lần đầu); case
     cũ revision-guarded. Diagram incomplete vẫn done (render_model giữ
-    warning); invalid reject, không đổi case."""
+    warning); lỗi cấu trúc Thừa kế vẫn lưu invalid (D-030)."""
     p = payload if isinstance(payload, dict) else {}
     is_new = "case_id" not in p
     cm_raw, stage, state = _save_case_payload(p)
@@ -1823,19 +1882,17 @@ def workspace_save_case(job, payload):
         scratch["ngay_lap_ho_so"] = cm.get("ngay_lap_ho_so")
         people, assets = _validate_save_stage(stage, ct, is_new=True)
         stage_ids = {r["row_id"] for r in people}
-        _validate_save_diagram(state, ct, stage, stage_ids)
-        clean_state = _persisted_diagram_state(state)
+        errors = _validate_save_diagram(state, ct, stage, stage_ids)
+        clean_state = (copy.deepcopy(state) if errors
+                       else _persisted_diagram_state(state))
         if ct == CASE_TYPE_TWO_PARTY:
             render_model = _unsupported_render()
             warnings = []
         else:
-            pruned = _prune_positions_list(clean_state, len(assets))
-            render_model = _render(clean_state, {"people": people,
-                                                 "assets": assets})
-            if render_model.get("status") == "invalid":
-                raise CommandError(
-                    "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
-                    details={"errors": render_model.get("errors") or []})
+            pruned = (False if errors else
+                      _prune_positions_list(clean_state, len(assets)))
+            render_model = _save_render(
+                clean_state, {"people": people, "assets": assets}, errors)
             warnings = ([{"code": "diagram.selection_pruned",
                           "message": "Các lựa chọn vị trí vượt số tài sản "
                                      "đã bị bỏ"}] if pruned else [])
@@ -1914,18 +1971,16 @@ def workspace_save_case(job, payload):
     if ct == CASE_TYPE_INHERITANCE:
         fresh["stage"]["owner_row_id"] = stage.get("owner_row_id")
     stage_ids = {r["row_id"] for r in people}
-    _validate_save_diagram(state, ct, fresh["stage"], stage_ids)
-    clean_state = _persisted_diagram_state(state)
+    errors = _validate_save_diagram(state, ct, fresh["stage"], stage_ids)
+    clean_state = (copy.deepcopy(state) if errors
+                   else _persisted_diagram_state(state))
     warnings = []
     if ct == CASE_TYPE_TWO_PARTY:
         render_model = _unsupported_render()
     else:
-        pruned = _prune_positions_list(clean_state, len(assets))
-        render_model = _render(clean_state, fresh["stage"])
-        if render_model.get("status") == "invalid":
-            raise CommandError(
-                "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
-                details={"errors": render_model.get("errors") or []})
+        pruned = (False if errors else
+                  _prune_positions_list(clean_state, len(assets)))
+        render_model = _save_render(clean_state, fresh["stage"], errors)
         if pruned:
             warnings.append({
                 "code": "diagram.selection_pruned",
@@ -2327,30 +2382,27 @@ def diagram_save(job, payload):
     _check_supported(case)
     _check_base_revision(case, payload)
     state = _payload_diagram_state(payload)
-    _validate_case_state(case, state)
+    _check_domain(state, case["case_type"])
+    errors = _save_wire_errors(state)
     _check_owner_node(case, state)
     _check_person_refs(state, set(_person_map(case)))
     ct = case["case_type"]
-    clean_state = _persisted_diagram_state(state)
+    field_errors = _required_land_fields(case["stage"])
+    if field_errors:
+        raise CommandError(
+            "stage_validation_error", "Thiếu số thửa/tờ bản đồ",
+            details={"field_errors": field_errors})
+    clean_state = (copy.deepcopy(state) if errors
+                   else _persisted_diagram_state(state))
     warnings = []
     if ct == CASE_TYPE_INHERITANCE:
-        pruned = False
-        allowed = list(range(1, len(case["stage"]["assets"]) + 1))
-        for n in clean_state["nodes"]:
-            for k in ("ownPositions", "receivePositions"):
-                arr = n.get(k) or []
-                pruned = pruned or any(x not in allowed for x in arr)
-                n[k] = [x for x in arr if x in allowed]
+        pruned = (False if errors else _prune_positions_list(
+            clean_state, len(case["stage"]["assets"])))
         if pruned:
             warnings.append({
                 "code": "diagram.selection_pruned",
                 "message": "Các lựa chọn vị trí vượt số tài sản đã bị bỏ"})
-        rm = _render(clean_state, case["stage"])
-        # Parity real (§6/§9.7): engine trả `invalid` → không persist.
-        if rm.get("status") == "invalid":
-            raise CommandError(
-                "diagram_invalid_state", "Sơ đồ chưa hợp lệ",
-                details={"errors": rm.get("errors") or []})
+        rm = _save_render(clean_state, case["stage"], errors)
     else:
         rm = _unsupported_render()
     case["diagram"]["state"] = clean_state

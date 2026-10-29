@@ -301,6 +301,41 @@
         }
       }
     },
+    "diagram_state_save_v3": {
+      "description": "D-030: safely typed inheritance snapshots may contain structural errors; Evaluate keeps diagram_state_v3 strict.",
+      "type": "object",
+      "required": ["version", "domain", "nodes"],
+      "properties": {
+        "version": { "const": 3 },
+        "domain": { "enum": ["inheritance", "two_party"] },
+        "nodes": { "type": "array" }
+      },
+      "if": { "properties": { "domain": { "const": "two_party" } } },
+      "then": { "$ref": "#/definitions/diagram_state_v3" },
+      "else": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "type": "object",
+              "required": ["id", "parentSlotIds", "spouseSlotIds",
+                           "ownPositions", "receivePositions", "hidden", "deleted"],
+              "properties": {
+                "id": { "type": "string" },
+                "personId": { "type": ["string", "null"] },
+                "parentSlotIds": { "type": "array", "items": { "type": "string" } },
+                "spouseSlotIds": { "type": "array", "items": { "type": "string" } },
+                "spouseSlotId": { "type": ["string", "null"] },
+                "spouseSuggestionId": { "type": ["string", "null"] },
+                "ownPositions": { "type": "array", "items": { "type": "integer" } },
+                "receivePositions": { "type": "array", "items": { "type": "integer" } },
+                "hidden": { "type": "boolean" },
+                "deleted": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
     "payload_workspace_create_v2": {
       "type": "object",
       "required": ["idempotency_key", "case", "stage"],
@@ -401,7 +436,7 @@
           "required": ["state"],
           "additionalProperties": false,
           "properties": {
-            "state": { "$ref": "#/definitions/diagram_state_v3" }
+            "state": { "$ref": "#/definitions/diagram_state_save_v3" }
           }
         }
       }

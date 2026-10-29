@@ -103,7 +103,7 @@ def _seed_case(db, *, trang_thai="draft", loai_van_ban="khai_nhan"):
     db.add(CaseAssetRow(
         row_id=asset_row_id, case_id=case.id, property_id=prop.id,
         vitri=1, so_serial=prop.so_serial, dia_chi=prop.dia_chi,
-        land_rows_present=False))
+        so_thua_dat="123", so_to_ban_do="45", land_rows_present=False))
     db.add(InheritanceCaseProperty(
         case_id=case.id, case_asset_row_id=asset_row_id,
         property_id=prop.id, is_primary=True))
@@ -477,6 +477,69 @@ def test_save_persists_state_render_model_and_bumps_revision(
         db2.close()
 
 
+@pytest.mark.parametrize("error_code", [
+    "dangling_parent", "dangling_spouse", "self_parent", "self_spouse",
+    "ancestry_cycle", "too_many_parents",
+])
+def test_save_invalid_inheritance_persists_exact_state_and_errors(
+        db, session_factory, monkeypatch, error_code):
+    from services.case_workspace import CaseWorkspaceService
+
+    case, _people, rows, _prop = _seed_case(db)
+    state = _draft_state(rows)
+    owner = state["nodes"][0]
+    if error_code == "dangling_parent":
+        owner["parentSlotIds"] = ["absent"]
+    elif error_code == "dangling_spouse":
+        owner.update(spouseSlotIds=["absent"], spouseSlotId="absent")
+    elif error_code == "self_parent":
+        owner["parentSlotIds"] = ["owner"]
+    elif error_code == "self_spouse":
+        owner.update(spouseSlotIds=["owner"], spouseSlotId="owner")
+    elif error_code == "ancestry_cycle":
+        owner["parentSlotIds"] = ["gc"]
+    else:
+        # Exercise an invalid engine result independently of wire validation.
+        invalid = _svc(db).evaluate_diagram(case.id, state)["render_model"]
+        invalid.update(status="invalid", errors=[{
+            "code": error_code, "message": "Một người chỉ có tối đa hai cha/mẹ.",
+            "nodeId": "child"}])
+        monkeypatch.setattr(
+            "services.inheritance_workspace.run_inheritance_case",
+            lambda *_args: invalid)
+
+    saved = _svc(db).save_diagram(case.id, 1, state)
+    diagram = saved["diagram"]
+    assert saved["revision"] == 2
+    assert diagram["state"] == state
+    assert diagram["render_model"]["status"] == "invalid"
+    assert error_code in {e["code"] for e in diagram["render_model"]["errors"]}
+    with session_factory() as fresh:
+        reopened = CaseWorkspaceService(fresh).get(case.id)
+        assert reopened["case"]["revision"] == 2
+        assert reopened["diagram"]["state"] == state
+        assert reopened["diagram"]["render_model"] == diagram["render_model"]
+
+
+@pytest.mark.parametrize("field", ["so_thua_dat", "so_to_ban_do"])
+def test_save_diagram_blank_parcel_or_sheet_blocks_without_changes(db, field):
+    from services.case_workspace import CaseWorkspaceService
+
+    case, _people, rows, _prop = _seed_case(db)
+    setattr(case.asset_rows[0], field, "  ")
+    db.commit()
+    before = CaseWorkspaceService(db).get(case.id)
+    before_json = case.case_state_json
+    with pytest.raises(WorkspaceError) as exc:
+        _svc(db).save_diagram(case.id, 1, _draft_state(rows))
+    assert exc.value.code == "stage_validation_error"
+    assert any(e["field"] == field and e["code"] == "required"
+               for e in exc.value.details["field_errors"])
+    db.expire_all()
+    assert CaseWorkspaceService(db).get(case.id) == before
+    assert db.get(InheritanceCase, case.id).case_state_json == before_json
+
+
 def test_save_owner_mismatch(db):
     """§13.6: node 'owner' personId ≠ stage.owner_row_id đã commit →
     diagram_owner_mismatch (server không tự sửa)."""
@@ -599,13 +662,42 @@ def test_save_missing_case(db):
     assert exc.value.code == "case_not_found"
 
 
-def test_save_invalid_state_not_persisted(db):
-    """Atomic: state invalid → không persist, revision không đổi (§13.7)."""
+def test_stage_commit_removes_deleted_person_from_saved_invalid_diagram(db):
+    from services.case_workspace import CaseWorkspaceService
+
+    case, _people, rows, _prop = _seed_case(db)
+    state = _draft_state(rows)
+    state["nodes"][0]["parentSlotIds"] = ["owner"]
+    saved = _svc(db).save_diagram(case.id, 1, state)
+    workspace = CaseWorkspaceService(db)
+    stage = workspace.get(case.id)["stage"]
+    stage["people"] = [p for p in stage["people"] if p["row_id"] != rows["gc"]]
+    committed = workspace.commit_stage(case.id, saved["revision"], stage)
+    reopened = workspace.get(case.id)
+    assert reopened["case"]["revision"] == committed["revision"]
+    assert all(n.get("personId") != rows["gc"]
+               for n in reopened["diagram"]["state"]["nodes"])
+    assert reopened["diagram"]["render_model"]["status"] == "invalid"
+    assert "self_parent" in {
+        e["code"] for e in reopened["diagram"]["render_model"]["errors"]}
+
+
+@pytest.mark.parametrize("state", [
+    None,
+    [],
+    {"version": 1, "nodes": []},
+    {"version": 3, "domain": "unknown", "nodes": []},
+    {"version": 3, "domain": "inheritance", "nodes": {}},
+    {"version": 3, "domain": "inheritance", "nodes": [None]},
+    {"version": 3, "domain": "inheritance", "nodes": [{"id": []}]},
+])
+def test_save_malformed_state_not_persisted(db, state):
+    """D-030 does not admit malformed storage shapes or advance revision."""
     case, _people, _rows, _prop = _seed_case(db)
     before = case.case_state_json
 
     with pytest.raises(WorkspaceError) as exc:
-        _svc(db).save_diagram(case.id, 1, {"version": 1, "nodes": []})
+        _svc(db).save_diagram(case.id, 1, state)
     assert exc.value.code == "diagram_invalid_state"
 
     db.refresh(case)
@@ -905,7 +997,7 @@ def test_save_diagram_keeps_year_only_date_precision(db):
     assert owner["ngay_sinh"] == "1950"
 
 
-def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
+def test_branch_tombstones_coparent_save_invalid_reopen_and_conflict_preserve(
         db, session_factory):
     from copy import deepcopy
     from services.case_workspace import CaseWorkspaceService
@@ -950,14 +1042,21 @@ def test_branch_tombstones_coparent_save_reopen_and_reject_preserve(
         assert reopened["case"]["revision"] == data["revision"]
         bad = deepcopy(removed)
         bad["nodes"][2].update(spouseSlotIds=["child"], spouseSlotId="child")
-        for revision, state, code in [
-            (data["revision"], bad, "diagram_invalid_state"),
-            (first["revision"], removed, "workspace_conflict"),
-        ]:
-            with pytest.raises(WorkspaceError) as exc:
-                _svc(fresh).save_diagram(case.id, revision, state)
-            assert exc.value.code == code
-            assert CaseWorkspaceService(fresh).get(case.id) == reopened
+        invalid = _svc(fresh).save_diagram(case.id, data["revision"], bad)
+        assert invalid["revision"] == data["revision"] + 1
+        assert invalid["diagram"]["state"] == bad
+        assert invalid["diagram"]["render_model"]["status"] == "invalid"
+        assert any(e["code"] == "self_spouse"
+                   for e in invalid["diagram"]["render_model"]["errors"])
+        reopened_invalid = CaseWorkspaceService(fresh).get(case.id)
+        assert reopened_invalid["diagram"]["state"] == bad
+        assert reopened_invalid["diagram"]["render_model"] == \
+            invalid["diagram"]["render_model"]
+        assert reopened_invalid["case"]["revision"] == invalid["revision"]
+        with pytest.raises(WorkspaceError) as exc:
+            _svc(fresh).save_diagram(case.id, first["revision"], removed)
+        assert exc.value.code == "workspace_conflict"
+        assert CaseWorkspaceService(fresh).get(case.id) == reopened_invalid
 
 
 def test_case_landowner_text_transitions_saved_diagram_and_fresh_reopen(

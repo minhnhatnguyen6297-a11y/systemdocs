@@ -22,6 +22,7 @@ Persist path nào cũng normalize state về đúng shape trước khi ghi
 """
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from collections.abc import Mapping
 from typing import Any, Optional
@@ -251,9 +252,64 @@ def _validate_diagram_wire(state: Any) -> list:
     return errors
 
 
+def _save_wire_errors(state: Any) -> list:
+    """D-030: accept semantic wire errors, reject unsafe storage shapes.
+
+    Require a v3 object, known domain, list of object nodes, string IDs,
+    string/null person pointers, boolean flags, string relationship arrays
+    and integer position arrays. Empty/duplicate IDs, out-of-range positions,
+    unknown node fields and invalid relationships remain storable errors.
+    Two-party wire remains strict. References and owner consistency are
+    checked separately with their existing dedicated error codes.
+    """
+    malformed = (
+        not isinstance(state, Mapping)
+        or state.get("version") != DIAGRAM_STATE_VERSION
+        or state.get("domain") not in CASE_TYPES
+        or not isinstance(state.get("nodes"), list))
+    if not malformed and state["domain"] == CASE_TYPE_INHERITANCE:
+        for node in state["nodes"]:
+            if (not isinstance(node, Mapping)
+                    or not isinstance(node.get("id"), str)
+                    or not isinstance(node.get("personId"), (str, type(None)))
+                    or any(not isinstance(node.get(k), bool)
+                           for k in ("hidden", "deleted"))
+                    or any(not isinstance(node.get(k), list)
+                           or any(not isinstance(x, str) for x in node[k])
+                           for k in ("parentSlotIds", "spouseSlotIds"))
+                    or any(not isinstance(node.get(k), list)
+                           or any(type(x) is not int for x in node[k])
+                           for k in ("ownPositions", "receivePositions"))
+                    or any(not isinstance(node.get(k), (str, type(None)))
+                           for k in ("spouseSlotId", "spouseSuggestionId"))):
+                malformed = True
+                break
+    if malformed:
+        code = ("invalid_version" if isinstance(state, Mapping)
+                and state.get("version") != DIAGRAM_STATE_VERSION
+                else "invalid_input")
+        raise WorkspaceError(
+            "diagram_invalid_state", "diagram.state có kiểu không an toàn",
+            details={"errors": [{"code": code,
+                                 "message": "diagram.state phải là object v3 "
+                                            "với nodes đúng kiểu"}]})
+    errors = _validate_diagram_wire(state)
+    if errors and state["domain"] == CASE_TYPE_TWO_PARTY:
+        raise WorkspaceError(
+            "diagram_invalid_state", "diagram state không hợp lệ",
+            details={"errors": errors})
+    return errors
+
+
+def _invalid_wire_render(errors: list) -> dict:
+    model = unsupported_render_model()
+    model.update(status="invalid", warnings=[], errors=errors)
+    return model
+
+
 # Lỗi engine thuộc nhóm "thiếu dữ kiện để tính" (S3, owner 23/10/2026):
 # hồ sơ còn điền dần nên đường Lưu ghi được ở trạng thái incomplete.
-# Mọi lỗi cấu trúc khác (wire/reference/domain/quan hệ) vẫn raise.
+# D-030 giữ mọi lỗi cấu trúc còn lại ở trạng thái invalid khi Lưu.
 _INCOMPLETE_ENGINE_CODES = frozenset({"missing_land_owner",
                                       "invalid_death_date"})
 
@@ -261,7 +317,7 @@ _INCOMPLETE_ENGINE_CODES = frozenset({"missing_land_owner",
 def _softened_incomplete(render_model: Mapping[str, Any]) -> Optional[dict]:
     """render_model `invalid` chỉ vì thiếu dữ kiện → bản `incomplete`.
 
-    Trả None khi còn lỗi cấu trúc/không xác định — caller phải raise.
+    Trả None khi còn lỗi cấu trúc/không xác định — giữ nguyên invalid.
     """
     errors = render_model.get("errors")
     if not isinstance(errors, list) or not errors:
@@ -445,20 +501,14 @@ class InheritanceWorkspaceService:
         khỏi chính case (có trong `previous_stage`) được gỡ; UUID chưa
         từng thuộc bản trước/payload là `diagram_reference_outside_stage`.
 
-        Ranh giới lỗi (S3, owner 23/10/2026): lỗi CẤU TRÚC — wire v3,
-        reference ngoài Stage, owner mismatch, quan hệ/chu kỳ engine —
-        vẫn raise `diagram_invalid_state`/mã riêng. Lỗi chỉ vì THIẾU DỮ
-        KIỆN để tính (`missing_land_owner`, `invalid_death_date`) trả
-        render_model `incomplete` để đường Lưu ghi được; đường evaluate
-        vẫn báo nguyên trạng thái chưa tính được của engine.
+        D-030: wire semantic/engine structural errors persist as invalid.
+        `_save_wire_errors` documents the malformed/unsafe shape boundary.
+        Stage references and owner mismatch still raise their dedicated codes.
+        Missing calculation data alone is softened to incomplete; Evaluate
+        keeps its strict wire validation and existing engine behavior.
         """
         self._check_domain(state, case_type)
-        errors = _validate_diagram_wire(state)
-        if errors:
-            raise WorkspaceError(
-                "diagram_invalid_state",
-                f"diagram state có {len(errors)} lỗi",
-                details={"errors": errors})
+        errors = _save_wire_errors(state)
         people = stage.get("people")
         assets = stage.get("assets")
         if not isinstance(people, list) or not isinstance(assets, list):
@@ -497,8 +547,11 @@ class InheritanceWorkspaceService:
                         "node owner.personId phải khớp stage.owner_row_id",
                         details={"owner_row_id": owner_row_id,
                                  "node_personId": node["personId"]})
-        clean_state = _persisted_state(checked)
-        if case_type == CASE_TYPE_INHERITANCE:
+        # Do not canonicalize away invalid input or its evidence (D-030).
+        clean_state = deepcopy(checked) if errors else _persisted_state(checked)
+        if errors:
+            render_model = _invalid_wire_render(errors)
+        elif case_type == CASE_TYPE_INHERITANCE:
             pruned = _prune_positions(clean_state["nodes"], len(assets))
             if pruned:
                 warnings.append({
@@ -508,13 +561,7 @@ class InheritanceWorkspaceService:
             render_model = self._evaluate_inheritance(
                 clean_state, valid_row_ids=valid_rows, people=people)
             if render_model.get("status") == "invalid":
-                softened = _softened_incomplete(render_model)
-                if softened is None:
-                    raise WorkspaceError(
-                        "diagram_invalid_state",
-                        "diagram state bị engine từ chối",
-                        details={"errors": render_model.get("errors") or []})
-                render_model = softened
+                render_model = _softened_incomplete(render_model) or render_model
         else:
             render_model = unsupported_render_model()
         return clean_state, render_model, warnings
@@ -563,6 +610,14 @@ class InheritanceWorkspaceService:
                 "assets": composed.assets,
                 "owner_row_id": owner_row_id,
             }
+            # D-048 applies to both Save entrypoints, not just save_case.
+            field_errors = [
+                e for e in case_ws._validate_stage([], composed.assets, case_type)
+                if e["field"] in ("so_thua_dat", "so_to_ban_do")]
+            if field_errors:
+                raise WorkspaceError(
+                    "stage_validation_error", "Thiếu số thửa/tờ bản đồ",
+                    details={"field_errors": field_errors})
             clean_state, render_model, diagram_warnings =                 self.prepare_diagram(case_type=case_type,
                                      stage=stage_view, state=state)
 

@@ -65,10 +65,10 @@
         "stage": {"$ref": "draft-v2.schema.json#/definitions/stage_v2_output"},
         "diagram": {
           "type": "object", "additionalProperties": false,
-          "required": ["domain", "state", "render_model", "warnings"],
+          "required": ["domain", "state", "render_model"],
           "properties": {
             "domain": {"enum": ["inheritance", "two_party"]},
-            "state": {"$ref": "draft-v2.schema.json#/definitions/diagram_state_v3"},
+            "state": {"$ref": "draft-v2.schema.json#/definitions/diagram_state_save_v3"},
             "render_model": {"$ref": "common.schema.json#/definitions/render_model"},
             "warnings": {"type": "array", "items": {"$ref": "common.schema.json#/definitions/warning"}}
           }

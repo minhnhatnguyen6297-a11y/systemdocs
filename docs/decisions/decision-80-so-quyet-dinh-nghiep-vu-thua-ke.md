@@ -33,7 +33,7 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 - **Bối cảnh:** chặn lưu khi engine chưa `complete` làm mất công nhập; hàng 2/3 khi đó luôn `unsupported` (nay đã tính, D-038).
 - **Quyết định:** lưu và xuất Word được ở mọi trạng thái; trạng thái (`invalid`/`unsupported`/`incomplete`/`complete`) ghi vào `engineResult` và hiện nhãn trên UI/Word.
 - **Lý do:** công chứng viên mới là người kết luận; app chỉ cảnh báo (BR INV-11).
-- **Hệ quả:** **lệch code/contract hiện tại**: `diagram_invalid_state` vẫn chặn lỗi cấu trúc; README §8 ghi "invalid: save bị chặn". Phải sửa contract + code (BR §13 mục 5). Lỗi cấu trúc làm hỏng dữ liệu (vd. vòng tổ tiên thật) cần quyết định riêng cách lưu — xem Q-012.
+- **Hệ quả:** D-030 xác nhận triển khai 29/10/2026: Thừa kế sai cấu trúc vẫn lưu invalid + errors; giữ ranh giới payload sai kiểu không an toàn và lỗi tham chiếu Stage/owner. D-048 vẫn là ngoại lệ bắt buộc số thửa/tờ bản đồ.
 - **Nguồn:** HT1/HT2; BR §13 mục 5.
 
 ### D-003 — Một nguồn sự thật; mọi màn hình là view của nó
@@ -209,8 +209,8 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 ### D-030 — Lỗi cấu trúc vẫn được lưu (Q-012)
 - **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner); **ngoại lệ ở D-048** · **Loại:** kỹ thuật (khớp D-002)
 - **Quyết định:** lưu nguyên trạng kể cả khi có lỗi cấu trúc, `status: invalid`, có nhãn.
-- **Hệ quả (việc code sau):** code/contract vẫn chặn `diagram_invalid_state` và README §8 ghi "invalid: save bị chặn" — xung đột còn nguyên.
-- **Nguồn:** owner 26/10/2026, trả lời Q-012.
+- **Xung đột đã giải quyết (user trả lời 29/10/2026 08:53 UTC+7: theo D-030, lưu với status `invalid`, không reject `diagram_invalid_state`):** `diagram_save` và `workspace_save_case` ghi lỗi cấu trúc Thừa kế với revision+1, `render_model.status=invalid` và `errors`, giữ qua mở lại. Payload sai object/version/domain/nodes/kiểu node không an toàn vẫn reject; Hai bên wire strict. Giữ `diagram_reference_outside_stage`/`diagram_owner_mismatch`: D-030 không cho phép phá tham chiếu Stage/owner. Evaluate không đổi; D-048 và D-051 giữ nguyên.
+- **Nguồn:** owner 26/10/2026, trả lời Q-012; xác nhận triển khai 29/10/2026 08:53 UTC+7.
 
 ### D-031 — Xoá người gốc: chỉ gỡ nhánh của người đó, không xoá cả hồ sơ (Q-011)
 - **Ngày:** 26/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** kỹ thuật (thao tác diagram, không đổi quyền hưởng theo luật)
@@ -360,5 +360,5 @@ review BLDS 2015) tổng hợp trong brainstorm "Kiến trúc Diagram trong So�
 ### D-051 — Không có Chủ đất vẫn được Lưu và Evaluate, kèm cảnh báo "chưa có Chủ đất" (#31)
 - **Ngày:** 29/10/2026 · **Trạng thái:** Đã chốt (owner) · **Loại:** luật (khớp D-002, D-030)
 - **Quyết định:** khi sơ đồ chưa có Chủ đất (ô Chủ đất trống, hoặc không ai giữ vị trí tài sản), `diagram_save` và `diagram_evaluate` (kể cả nháp) **không chặn**: vẫn lưu nháp / trả kết quả, kèm cảnh báo "chưa có Chủ đất".
-- **Hệ quả:** bỏ từ chối `diagram_invalid_state`/`missing_land_owner` và `workspace_owner_required` cho trường hợp này; 2 contract test `test_diagram_save_engine_invalid_rejected_state_preserved`, `test_diagram_evaluate_draft_owner_required` viết lại theo D-051 và gỡ khỏi known-failures.
+- **Hệ quả:** bỏ từ chối `diagram_invalid_state`/`missing_land_owner` và `workspace_owner_required` cho trường hợp này; contract test `test_diagram_save_missing_owner_saves_incomplete_with_warning` và test evaluate nháp mã hóa D-051, gỡ khỏi known-failures.
 - **Nguồn:** owner trả lời issue #31, 29/10/2026 08:24 (UTC+7).

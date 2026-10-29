@@ -29,7 +29,7 @@
           "additionalProperties": false,
           "properties": {
             "domain": { "enum": ["inheritance", "two_party"] },
-            "state": { "$ref": "draft-v2.schema.json#/definitions/diagram_state_v3" },
+            "state": { "$ref": "draft-v2.schema.json#/definitions/diagram_state_save_v3" },
             "render_model": {
               "anyOf": [
                 { "$ref": "common.schema.json#/definitions/render_model" },

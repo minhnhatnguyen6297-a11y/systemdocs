@@ -226,7 +226,10 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   hiện lỗi tổng. **D-051 (#31, 29/10/2026):** thiếu Chủ đất không còn chặn
   `diagram_save`/`diagram_evaluate` (kể cả nháp không `case_id`); cảnh báo
   `diagram.missing_land_owner` hiện `chưa có Chủ đất`. Save giữ nháp, tăng
-  revision và giữ cảnh báo khi mở lại; lỗi cấu trúc khác vẫn chặn.
+  revision và giữ cảnh báo khi mở lại. **D-030 (29/10/2026 08:53 UTC+7):**
+  lỗi cấu trúc Thừa kế vẫn lưu `invalid`, giữ errors qua mở lại; payload sai
+  kiểu không an toàn, reference ngoài Stage và owner mismatch vẫn chặn.
+  D-048 số thửa/tờ trống vẫn chặn Lưu. Evaluate wire strict không đổi.
 - **Luật sơ đồ v2 — owner 27/10/2026, WP0 spec; WP1 triển khai có giới hạn:** ô do engine tạo/xóa;
   người dùng chỉ thao tác thẻ và Chủ/Nhận. Ô chủ đất mặc định Chủ, mọi ô
   khác không tích (= từ chối), không tự điền Nhận. Gỡ không modal; chỉ cascade
@@ -256,8 +259,8 @@ Việc đang mở được tổng hợp tại [catalog issue](../backlog/README.
   Không sửa các test/code ngoài WP2; toàn suite chưa xanh.
   [Quyết định và Q1–Q4](../decisions/decision-owner-diagram-rules-v2-20261027.md).
 - Sơ đồ: lưu bản hợp lệ còn thiếu giữ warning Pool/`requiredSlots` qua mở lại;
-  state `invalid` bị từ chối và giữ nguyên bản cũ; cue chỉ-đọc (trạng thái +
-  phần thiếu) hiện khi panel cách tính đóng. Bằng chứng service/adapter và
+  theo D-030, state `invalid` Thừa kế vẫn lưu kèm errors; cue chỉ-đọc
+  (trạng thái + lỗi/phần thiếu) hiện khi panel cách tính đóng. Bằng chứng cũ service/adapter và
   Electron thật (service thật, SQLite tạm) đạt; independent Quick t3 CLEAN,
   review xong. Smoke còn ghi nhận toast khởi động thoáng qua
   `engine_unavailable` khi mở danh sách; danh sách tự retry. Đây là giới hạn

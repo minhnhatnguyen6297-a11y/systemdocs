@@ -24,6 +24,7 @@ write bị chặn — giữ semantics "Chưa hỗ trợ" §7 drafting-tab).
 """
 from __future__ import annotations
 
+from copy import deepcopy
 import hashlib
 import json
 import re
@@ -1126,6 +1127,12 @@ class CaseWorkspaceService:
                              in resolved_people})
             diagram_warnings: list = []
             if case_type == CASE_TYPE_INHERITANCE:
+                # Reading invalid snapshots is lossless; a Stage write still
+                # removes assignments to people deleted by this transaction.
+                state["nodes"] = [
+                    node for node in state["nodes"]
+                    if node.get("personId") is None
+                    or node["personId"] in valid_rows]
                 pruned = _prune_positions(state["nodes"],
                                           len(resolved_assets))
                 if pruned:
@@ -1625,18 +1632,9 @@ class CaseWorkspaceService:
 
         from services.inheritance_workspace import (
             InheritanceWorkspaceService,
-            _validate_diagram_wire,
+            _save_wire_errors,
         )
-        if not isinstance(state, Mapping):
-            raise WorkspaceError(
-                "diagram_invalid_state",
-                "diagram.state phải là object")
-        wire_errors = _validate_diagram_wire(state)
-        if wire_errors:
-            raise WorkspaceError(
-                "diagram_invalid_state",
-                f"diagram state có {len(wire_errors)} lỗi",
-                details={"errors": wire_errors})
+        _save_wire_errors(state)
 
         if new_case:
             meta = self._validate_case_meta(case_meta)
@@ -2521,6 +2519,11 @@ class CaseWorkspaceService:
         diagram = payload.get("diagram") if isinstance(
             payload.get("diagram"), Mapping) else {}
         raw_state = diagram.get("state")
+        # D-030 snapshots are evidence, not a migration/repair opportunity.
+        if (domain == CASE_TYPE_INHERITANCE
+                and isinstance(raw_state, Mapping)
+                and (diagram.get("render_model") or {}).get("status") == "invalid"):
+            return deepcopy(raw_state)
 
         if domain == CASE_TYPE_TWO_PARTY:
             if (isinstance(raw_state, Mapping)
