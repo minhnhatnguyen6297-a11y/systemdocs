@@ -283,6 +283,39 @@ def test_evaluate_rejects_string_boolean_and_dangling_ref(db):
                for e in exc2.value.details["errors"])
 
 
+def test_evaluate_diamond_ancestry_is_not_a_cycle(db):
+    """D-030/R-26: A là cha của B và C; D có cha B và mẹ C — một người tới
+    được bằng hai đường (họ hàng lấy nhau) không phải vòng tổ tiên."""
+    case, _people, _rows, _prop = _seed_case(db)
+    state = _v3_state([
+        _node("a"),
+        _node("b", parents=("a",)),
+        _node("c", parents=("a",)),
+        _node("d", parents=("b", "c")),
+    ])
+
+    data = _svc(db).evaluate_diagram(case.id, state)
+
+    assert "ancestry_cycle" not in {
+        e["code"] for e in data["render_model"]["errors"]}
+
+def test_evaluate_real_ancestry_cycle_reports_one_error(db):
+    """A cha B, B cha A → đúng một lỗi ancestry_cycle, giữ code và message."""
+    case, _people, _rows, _prop = _seed_case(db)
+    state = _v3_state([
+        _node("a", parents=("b",)),
+        _node("b", parents=("a",)),
+    ])
+
+    with pytest.raises(WorkspaceError) as exc:
+        _svc(db).evaluate_diagram(case.id, state)
+
+    assert exc.value.code == "diagram_invalid_state"
+    cycles = [e for e in exc.value.details["errors"]
+              if e["code"] == "ancestry_cycle"]
+    assert len(cycles) == 1
+    assert cycles[0]["message"].startswith("vòng tổ tiên qua node '")
+
 def test_evaluate_rejects_legacy_v1_node_fields(db):
     """v1 flags (isLandOwner/willReceive) + legacy js fields (role, kind,
     parentSlotId) không thuộc wire v3 → invalid_node."""
