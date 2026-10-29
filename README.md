@@ -4,6 +4,10 @@ Kho này chứa runtime tích hợp và nguồn tài liệu chung cho hệ thố
 Tài liệu được tổ chức theo **phạm vi và flow**, không theo loại “nghiệp vụ”,
 “kiến trúc”, “UI” hay “quyết định”.
 
+## Cài đặt và chạy
+
+Xem [`docs/SETUP.md`](docs/SETUP.md) (Windows, tiếng Việt). Chuẩn commit: [`docs/COMMIT.md`](docs/COMMIT.md).
+
 ## Bắt đầu đọc
 
 1. Đọc [nền sản phẩm và khái niệm chung](_bmad-output/specs/README.md).

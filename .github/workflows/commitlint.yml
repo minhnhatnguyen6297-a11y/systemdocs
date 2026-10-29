@@ -1,0 +1,27 @@
+# Kiểm tra commit message/PR title theo docs/COMMIT.md. CHƯA bắt buộc (không nằm trong branch protection).
+name: commitlint
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: python tools/ci/commitlint.py --title "$TITLE"
+      - name: Commit messages
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python tools/ci/commitlint.py "$BASE" "$HEAD"

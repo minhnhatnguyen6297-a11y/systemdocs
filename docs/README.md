@@ -12,4 +12,6 @@ Agent đọc [`STACK.md`](STACK.md) trước. Trang này chỉ trỏ tới nơi 
 | Luật làm việc của agent | [`../AGENTS.md`](../AGENTS.md) | |
 | Trạng thái task | GitHub Issues của repo | Không dùng Notion/file riêng cho task. |
 | Thế nào là xong | [`definition-of-done.md`](definition-of-done.md), [PR template](../.github/pull_request_template.md) | |
+| Cài đặt, chạy app, chạy test (Windows) | [`SETUP.md`](SETUP.md) | Kèm cây thư mục. |
+| Chuẩn commit | [`COMMIT.md`](COMMIT.md) | Mẫu `.gitmessage`. |
 | Màn hình / selector e2e | [`screen-map.yaml`](screen-map.yaml) | Sinh tự động. |

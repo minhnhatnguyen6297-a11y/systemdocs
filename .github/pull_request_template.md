@@ -33,6 +33,8 @@ summary: ...
 - [ ] Test mới/sửa cho hành vi đổi; CI xanh, không thêm lỗi mới ngoài `tools/ci/known-failures-*.txt`
 - [ ] Không skip/xoá test để cho xanh; test cách ly có issue ref
 - [ ] Spec/decision cập nhật nếu đổi hành vi
+- [ ] Đã cập nhật `docs/STACK.md` §4 Lộ trình (tracker tiến độ duy nhất)
+- [ ] Commit message và tiêu đề PR theo `docs/COMMIT.md`
 - [ ] Đã review (Superpowers `requesting-code-review` hoặc agent Reviewer) và xử lý góp ý
 - [ ] Chỉ dữ liệu giả lập; gitleaks sạch; không commit secret/dữ liệu khách hàng
 - [ ] Không `git stash`; không code trực tiếp trên `main`
