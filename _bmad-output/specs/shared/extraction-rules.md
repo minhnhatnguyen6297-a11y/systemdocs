@@ -164,6 +164,14 @@ Trong bảng người, ngày sinh ở trước giấy tờ không trở thành n
 
 Ngày cấp từ cấp/ký ngày hoặc cấu trúc `do <cơ quan> ngày` đã hỗ trợ; nơi cấp là cơ quan, không phải ngày sinh/ngày cấp hay địa chỉ. Hộ chiếu riêng không tự điền vào ngày cấp căn cước. Trường thiếu để trống, R03 phản ánh thiếu.
 
+OCR Căn cước: `noi_cap` chỉ lấy ở mặt sau, giữ tên cơ quan đúng chữ in,
+bỏ tiền tố chức danh Cục trưởng/Giám đốc/Phó; mặt trước luôn rỗng, kể cả có
+`BỘ CÔNG AN`. `loai_giay_to` theo tiêu đề: `Căn cước công dân` hoặc `Căn cước`;
+mặt sau thiếu tiêu đề chỉ dùng `Căn cước công dân` khi MRZ bắt đầu `IDVNM`,
+còn lại rỗng. Giấy chết giữ quy tắc loại riêng. Mọi person OCR có
+`chi_co_nam_sinh` kiểu bool: true khi ngày sinh chuẩn hóa chỉ có YYYY,
+false khi ngày đủ hoặc trống.
+
 Ranh giấy tờ kết thúc trước mô tả GCN/tài sản hoặc người kế. Không lấy nơi/ngày cấp ở vùng sau để bù thiếu. Dính chữ/sai chính tả trong nguồn giữ phần đọc được để kiểm tay theo ranh giới chấp nhận, không sửa chữ nguồn.
 
 
@@ -172,6 +180,10 @@ Ranh giấy tờ kết thúc trước mô tả GCN/tài sản hoặc người k�
 Đọc Thường trú/Cư trú/Hộ khẩu/Địa chỉ và các nhãn liên hệ đã hỗ trợ. Cắt phần quan hệ, nhãn người kế và đuôi giới từ treo; không nhận “Nơi chết” làm địa chỉ cuối nếu không có nhãn phù hợp.
 
 Địa chỉ chung chỉ áp cho nhóm được nguồn chỉ rõ; địa chỉ keyed áp cho tên được nhãn chỉ. Giá trị chỉ là DD/MM/YYYY không phải địa chỉ: để trống ở mọi đường đọc (riêng, chung, keyed, bảng và địa chỉ cấp bên). R03 kiểm thiếu, không lấy lại ngày từ một đường bổ sung.
+
+OCR giữ địa chỉ hai dòng kể cả dòng nhãn đã chứa dấu phẩy; vẫn dừng trước
+nhãn trường khác (hạn dùng, đặc điểm nhân dạng, quê quán, ngày tháng), không
+ghép các giá trị đó vào địa chỉ. Giữ quy tắc skip/stop nhiễu hai cột hiện có.
 
 **Kiểm:** `Cả hai cùng thường trú tại: 23/10/2023` không điền ngày làm địa chỉ cho bất kỳ người nào.
 

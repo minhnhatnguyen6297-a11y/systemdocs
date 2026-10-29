@@ -156,11 +156,13 @@ def _normalize_gender(value: Any) -> str:
     return ""
 
 
-def _normalize_person_data(data: dict[str, Any]) -> dict[str, str]:
+def _normalize_person_data(data: dict[str, Any]) -> dict[str, Any]:
+    birth = _normalize_date(data.get("ngay_sinh"))
     return {
         "ho_ten": _clean_text(data.get("ho_ten")),
         "so_giay_to": norm_doc_no(_clean_text(data.get("so_giay_to")))[0] or "",
-        "ngay_sinh": _normalize_date(data.get("ngay_sinh")),
+        "ngay_sinh": birth,
+        "chi_co_nam_sinh": bool(re.fullmatch(r"\d{4}", birth)),
         "gioi_tinh": _normalize_gender(data.get("gioi_tinh")),
         "dia_chi": _clean_text(data.get("dia_chi")),
         "ngay_cap": _normalize_date(data.get("ngay_cap")),
@@ -172,11 +174,12 @@ def _normalize_person_data(data: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _field_sources(data: dict[str, str], source: str) -> dict[str, str]:
-    return {k: source for k, v in data.items() if _clean_text(v)}
+def _field_sources(data: dict[str, Any], source: str) -> dict[str, str]:
+    return {k: source for k, v in data.items()
+            if (data.get("ngay_sinh") if k == "chi_co_nam_sinh" else _clean_text(v))}
 
 
-def parse_cccd_qr(text: str) -> dict[str, str] | None:
+def parse_cccd_qr(text: str) -> dict[str, Any] | None:
     raw = (text or "").strip()
     if not raw:
         return None
@@ -477,7 +480,7 @@ def _extract_mrz_lines(lines: list[str]) -> list[str]:
     return mrz
 
 
-def _parse_person_mrz(lines: list[str]) -> dict[str, str]:
+def _parse_person_mrz(lines: list[str]) -> dict[str, Any]:
     joined = " ".join(lines)
     old_new = re.search(r"IDVNM(\d{9})(\d)(\d{12})", re.sub(r"\s+", "", joined))
     so_giay_to = old_new.group(3) if old_new else ""
@@ -581,6 +584,13 @@ _ADDRESS_STOP_LABELS = [
     "noi dang ky khai sinh",
     "place of birth",
     "que quan",
+    "place of origin",
+    "dac diem nhan dang",
+    "ngay thang nam",
+    "ho va ten",
+    "ngay sinh",
+    "gioi tinh",
+    "quoc tich",
 ]
 
 # Standalone values from other fields that can be interleaved into the address area
@@ -607,6 +617,13 @@ def _strip_address_noise(value: str) -> str:
         r"\bnÆ¡i\s+Ä‘Äƒng\s+kÃ½\s+khai\s+sinh\b",
         r"\bnoi\s+dang\s+ky\s+khai\s+sinh\b",
         r"\bplace\s+of\s+birth\b",
+        r"\bquê\s+quán\b",
+        r"\bque\s+quan\b",
+        r"\bplace\s+of\s+origin\b",
+        r"\bđặc\s+điểm\s+nhân\s+dạng\b",
+        r"\bdac\s+diem\s+nhan\s+dang\b",
+        r"\bngày\s*,?\s*tháng\s*,?\s*năm\b",
+        r"\bngay\s*,?\s*thang\s*,?\s*nam\b",
     ]
     for pattern in noise_patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
@@ -639,9 +656,7 @@ def _extract_address(lines: list[str]) -> str:
             continue
 
         after = _sanitize_address(line.split(":", 1)[1].strip()) if ":" in line else ""
-
-        # Label line already contains a full address (comma = multiple admin levels).
-        if after and "," in after:
+        if ":" in line and _looks_like_label(line.split(":", 1)[1], _ADDRESS_STOP_LABELS):
             return after
 
         parts = [after] if after else []
@@ -662,6 +677,8 @@ def _extract_address(lines: list[str]) -> str:
                 if next_clean and not _looks_like_label(next_clean, _ADDRESS_STOP_LABELS):
                     parts.append(next_clean)
                     collected += 1
+                break
+            if _normalize_date(next_line) or _extract_dates_from_line(next_line):
                 break
 
             # "Không thời hạn" and similar values appear in the left column at the
@@ -709,6 +726,10 @@ def _extract_birth_date(lines: list[str]) -> str:
             dates = _extract_dates_from_line(line)
             if dates:
                 return dates[0]
+            after = line.split(":", 1)[1].strip() if ":" in line else ""
+            year = _normalize_date(after)
+            if year:
+                return year
             if idx + 1 < len(lines):
                 next_dates = _extract_dates_from_line(lines[idx + 1])
                 if next_dates:
@@ -2143,6 +2164,23 @@ def _normalize_native_ocr_doc(lines: list[str], filename: str) -> dict[str, Any]
     side = _detect_side(cleaned_lines)
     mrz_lines = _extract_mrz_lines(cleaned_lines)
     mrz_data = _parse_person_mrz(mrz_lines) if mrz_lines else _normalize_person_data({})
+    title = next((_ascii_text(line) for line in cleaned_lines
+                  if re.fullmatch(r"can cuoc(?: cong dan)?", _ascii_text(line))), "")
+    card_type = ("Căn cước công dân" if title == "can cuoc cong dan"
+                 else "Căn cước" if title == "can cuoc" else "")
+    if not card_type and side == "back" and any(
+            re.sub(r"\s+", "", line).upper().startswith("IDVNM") for line in mrz_lines):
+        card_type = "Căn cước công dân"
+
+    issuer = ""
+    if side == "back":
+        for line in cleaned_lines:
+            agency = re.sub(
+                r"^(?:(?:PHÓ|PHO)\s+)?(?:CỤC\s+TRƯỞNG|CUC\s+TRUONG|GIÁM\s+ĐỐC|GIAM\s+DOC)\s+",
+                "", line, flags=re.IGNORECASE)
+            if re.match(r"^(?:cuc canh sat|cong an|bo cong an)\b", _ascii_text(agency)):
+                issuer = agency
+                break
 
     ai_data = _normalize_person_data(
         {
@@ -2153,6 +2191,8 @@ def _normalize_native_ocr_doc(lines: list[str], filename: str) -> dict[str, Any]
             "dia_chi": _extract_address(cleaned_lines),
             "ngay_cap": _extract_issue_date(cleaned_lines, side=side),
             "ngay_het_han": "",
+            "loai_giay_to": card_type,
+            "noi_cap": issuer,
         }
     )
 
@@ -2171,6 +2211,8 @@ def _normalize_native_ocr_doc(lines: list[str], filename: str) -> dict[str, Any]
             ai_data["ngay_sinh"] = mrz_data["ngay_sinh"]
         if mrz_data.get("gioi_tinh"):
             ai_data["gioi_tinh"] = mrz_data["gioi_tinh"]
+
+    ai_data["chi_co_nam_sinh"] = bool(re.fullmatch(r"\d{4}", ai_data["ngay_sinh"]))
 
     non_empty = sum(1 for v in ai_data.values() if _clean_text(v))
     doc_type = "person" if non_empty > 0 else "unknown"
@@ -2289,7 +2331,7 @@ def _merge_person_group(group: list[dict[str, Any]]) -> dict[str, Any]:
             if clean_warning and clean_warning not in merged["warnings"]:
                 merged["warnings"].append(clean_warning)
 
-        for key in ("ho_ten", "so_giay_to", "ngay_sinh", "gioi_tinh", "dia_chi", "ngay_cap", "ngay_het_han", "ngay_chet"):
+        for key in ("ho_ten", "so_giay_to", "ngay_sinh", "gioi_tinh", "dia_chi", "ngay_cap", "ngay_het_han", "ngay_chet", "loai_giay_to", "noi_cap", "loai_dia_chi"):
             current = _clean_text(merged.get(key))
             incoming = _clean_text(item.get(key))
             if not incoming:
@@ -2301,6 +2343,12 @@ def _merge_person_group(group: list[dict[str, Any]]) -> dict[str, Any]:
             if len(incoming) > len(current):
                 merged[key] = incoming
                 merged["field_sources"][key] = src.lower()
+
+    front_type = next((item for item in group
+                       if item.get("side") == "front" and item.get("loai_giay_to")), None)
+    if front_type:
+        merged["loai_giay_to"] = _clean_text(front_type["loai_giay_to"])
+        merged["field_sources"]["loai_giay_to"] = str(front_type.get("source_type") or "AI").lower()
 
     # Prefer front over unknown/back, then Vietnamese diacritics over MRZ-style ASCII.
     best_name = ""
@@ -2324,6 +2372,10 @@ def _merge_person_group(group: list[dict[str, Any]]) -> dict[str, Any]:
     if best_name:
         merged["ho_ten"] = best_name
         merged["field_sources"]["ho_ten"] = best_name_source
+
+    merged["chi_co_nam_sinh"] = bool(re.fullmatch(r"\d{4}", merged["ngay_sinh"]))
+    if merged["ngay_sinh"]:
+        merged["field_sources"]["chi_co_nam_sinh"] = merged["field_sources"]["ngay_sinh"]
 
     merged["paired"] = len(group) > 1 or ("front" in side_seen and "back" in side_seen)
     if "front" in side_seen and "back" in side_seen:
