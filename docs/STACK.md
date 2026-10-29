@@ -46,5 +46,5 @@ Mục lục đầy đủ: [`docs/README.md`](README.md).
 ## 4. Lộ trình
 
 - **Xong:** CI + known-failures + gitleaks/actionlint + branch protection; fix Linux/Windows CI (#15–#19, PR #25, #27); form lỗi + log xoay vòng + che PII (PR #30); sổ D-001…D-050 (PR #29); mục lục nguồn chuẩn + glossary (PR #35); tách tên "luật chặn chủ đất còn sống" khỏi Luật A + legal-baseline chưa luật sư rà soát (PR #36); luật sơ đồ v2 (PR #32); D-051 thiếu Chủ đất vẫn Lưu/Evaluate kèm cảnh báo, đóng #31 (PR #37); known-failures py linux/windows rỗng.
-- **Đang làm:** #33 Zalo hai mặt CCCD thành 2 người (chờ quyết định); D-030 mâu thuẫn với `diagram-rules.md` về lưu lỗi cấu trúc (chờ owner).
+- **Đang làm:** #33 Zalo hai mặt CCCD thành 2 người (chờ quyết định). D-030 đã chốt 29/10 08:53 UTC+7: diagram Thừa kế lỗi cấu trúc được lưu với `status: invalid` (PR agent/omp/d030-save-invalid).
 - **Tiếp theo:** #7 tier frontier/worker qua CLIProxyAPI; #11 chuyển key omp sang biến môi trường; `e2e-smoke` thành bắt buộc sau ~10 lần xanh liên tiếp; bot theo từng area (⚠️ chưa có issue).
