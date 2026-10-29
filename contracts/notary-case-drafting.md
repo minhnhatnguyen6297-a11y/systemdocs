@@ -938,15 +938,18 @@ result.data:
     render_model: <render_model>    # kết quả evaluate tại thời điểm save
 ```
 
-- Atomic write: validate state → evaluate → persist → `revision+1` →
-  commit. State sai CẤU TRÚC → không persist (`diagram_invalid_state`).
-  Lỗi engine chỉ vì THIẾU DỮ KIỆN (`missing_land_owner`,
-  `invalid_death_date`) không chặn ghi: `render_model.status=incomplete`
-  giữ nguyên `errors` (S3, owner 23/10/2026); đường evaluate vẫn trả
-  nguyên trạng thái chưa tính được của engine.
+- Atomic write: validate safe shape → evaluate → persist → `revision+1` →
+  commit. **D-030 (owner 29/10/2026 08:53 UTC+7):** Thừa kế có lỗi cấu trúc
+  wire/quan hệ/chu kỳ vẫn lưu `render_model.status=invalid` và `errors`;
+  mở lại giữ nguyên state và lỗi. Wire có lỗi không đưa vào engine.
+  Chỉ reject object/version/domain/nodes hoặc kiểu field node không an toàn;
+  Hai bên vẫn strict. Reference ngoài Stage và owner mismatch giữ mã lỗi riêng.
+  Engine chỉ thiếu dữ kiện (`missing_land_owner`, `invalid_death_date`) vẫn
+  lưu `incomplete`, giữ errors; thiếu Chủ đất có warning D-051.
+  Evaluate giữ strict wire và hành vi hiện tại. D-048: số thửa/tờ trống chặn Lưu.
 - Chỉ lưu Diagram trên rows đã commit, không Stage/meta và không đổi status.
   Nút **Lưu hồ sơ** dùng workspace_save_case, không gọi đường này.
-  Incomplete hợp lệ giữ warnings/requiredSlots/Pool; lỗi cấu trúc reject và rollback.
+  Incomplete giữ warnings/requiredSlots/Pool; structural-invalid Thừa kế vẫn lưu.
 - base_revision khác server → workspace_conflict; Done vẫn lưu Diagram được.
 
 ## 8. `notary.word_export_options` + `notary.word_export_batch`
@@ -1132,7 +1135,7 @@ Namespace `notary.*` (snake_case không chấm):
 | `intake_too_many_sources` | sources > 8 | `{count, limit}` |
 | `intake_text_too_long` | text > 100.000 ký tự | `{source_id, length, limit}` |
 | `diagram_reference_outside_stage` | `personId` không thuộc Stage của thao tác (DB hoặc cùng payload); prune refs pending khi save_case theo §13.19 | `{personId}` |
-| `diagram_invalid_state` | state sai cấu trúc; engine reject vì lỗi quan hệ/wire. Trên đường Lưu, engine `invalid` chỉ vì `missing_land_owner`/`invalid_death_date` → render_model `incomplete`, không lỗi | `{errors:[{code,message,...}]}` |
+| `diagram_invalid_state` | Evaluate wire strict; Save chỉ reject shape/kiểu không an toàn hoặc wire Hai bên. D-030: lỗi cấu trúc Thừa kế lưu invalid + errors; thiếu dữ kiện đơn thuần lưu incomplete | `{errors:[{code,message,...}]}` |
 | `word_no_documents_selected` | `document_keys` rỗng | — |
 | `word_duplicate_document_key` | key lặp | `{document_key}` |
 | `word_unknown_document_key` | key ngoài catalog/sai pattern | `{document_key}` |
@@ -1461,12 +1464,12 @@ diagram_state v3 (domain inheritance):
 - **Con sinh sau khi người chết:** không luật, không cảnh báo.
 - Luật đầy đủ và bố cục: `_bmad-output/specs/notary_v2/diagram-rules.md`
   §9.2/§9.6/§9.7/§11.
-- `isLandOwner`/`willReceive` **cấm** trên wire v2 →
-  `diagram_invalid_state` (`invalid_node` — trường lạ trên node).
-- `ownPositions`/`receivePositions`: array không trùng phần tử ⊆
-  {1..5}; phần tử ngoài khoảng / trùng / không phải int →
-  `diagram_invalid_state{errors:[{code:"invalid_position"}]}`.
-  `null`/thiếu → `diagram_invalid_state` (`invalid_node`).
+- `isLandOwner`/`willReceive` không có nghĩa trên wire v2: Evaluate reject
+  `invalid_node`; D-030 Save giữ nguyên field lỗi trong snapshot `invalid`.
+- `ownPositions`/`receivePositions`: array không trùng phần tử ⊆ {1..5}.
+  Ngoài khoảng/trùng là `invalid_position`: Evaluate reject; Save giữ invalid
+  và errors. `null`/thiếu/không phải mảng số nguyên là kiểu không an toàn,
+  Save vẫn trả `diagram_invalid_state`.
 - Hai mảng **độc lập**: một người vừa sở hữu vừa nhận, vừa chọn nhiều
   vị trí, đều hợp lệ. **Nhiều node cùng chọn một vị trí** = đồng sở
   hữu / nhận chung — hợp lệ (Q10).
@@ -2181,7 +2184,9 @@ thuộc bản cũ/payload là diagram_reference_outside_stage, không sanitize.
 Prune positions > asset count với diagram.selection_pruned, không remap khi
 reorder. Owner mirror mâu thuẫn → diagram_owner_mismatch. Inheritance evaluate
 bằng rows mới; two_party trả unsupported_render_model, không engine thừa kế.
-Incomplete hợp lệ giữ warning/requiredSlots/Pool và vẫn done; invalid reject.
+Incomplete giữ warning/requiredSlots/Pool và vẫn done; D-030 structural-invalid
+Thừa kế cũng done, revision+1, giữ state/errors qua workspace_get. State có lỗi
+wire không canonicalize/prune mất bằng chứng lỗi. Shape/kiểu không an toàn vẫn reject.
 Bất kỳ lỗi sau flush rollback cả case/identity mới/rows/đất/projections/JSON/
 status/revision/key/hash. Không publish success trước commit.
 

@@ -96,13 +96,16 @@ và `contracts/notary-case-drafting/*.schema.json`.
 - `personId` phải thuộc Stage đang sửa được gửi cùng lần evaluate/Lưu hồ sơ; người vừa thêm gán được ngay, không cần ghi trung gian. Xóa người dọn tham chiếu trong bản Diagram đang sửa.
 - Save mang đúng `base_revision` khi đã có hồ sơ; conflict giữ bản đang sửa, cho tải mới hoặc sao chép, không được ghi đè.
 - Frontend không gửi kết quả tính như sự thật. Backend luôn tính lại từ input; bản committed chỉ là mốc đã lưu/dirty/revision.
-- State sai cấu trúc/nghiệp vụ (`invalid` do wire, tham chiếu, quan hệ) không
-  được persist. State hợp lệ nhưng kết quả `incomplete` vẫn được lưu; backend
-  trả `requiredSlots`/warning để người dùng bổ sung sau.
-- Ranh giới "không tính được" (owner 23/10/2026): engine chỉ báo thiếu dữ
-  kiện (`missing_land_owner`, `invalid_death_date`) thì Lưu hồ sơ vẫn ghi với
-  `render_model.status = incomplete` và giữ danh sách lỗi; lỗi cấu trúc
-  (wire/reference/domain/quan hệ/chu kỳ) vẫn bị từ chối trước khi ghi.
+- D-030 (owner xác nhận 29/10/2026 08:53 UTC+7): lỗi cấu trúc Thừa kế
+  (quan hệ, chu kỳ, wire v3 trên object có kiểu an toàn) vẫn được lưu,
+  tăng revision, trả và giữ `render_model.status = invalid` cùng `errors`
+  khi mở lại. Không tự sửa mất nội dung lỗi.
+- Chỉ từ chối payload không thể dùng an toàn: không phải object, sai version/
+  domain, nodes không phải mảng object hoặc field node sai kiểu; Hai bên vẫn
+  giữ wire strict. Reference ngoài Stage và owner mismatch vẫn chặn bằng mã riêng.
+  D-048 vẫn chặn Lưu khi số thửa hoặc tờ bản đồ trống.
+- Thiếu dữ kiện (`missing_land_owner`, `invalid_death_date`) vẫn lưu dạng
+  `incomplete`; không hạ lỗi cấu trúc thành thiếu dữ kiện.
   Đường `diagram_evaluate` vẫn báo nguyên trạng thái chưa tính được của
   engine; `diagram_evaluate` chế độ nháp không chặn vì lỗi field tùy chọn —
   trả `incomplete` kèm warning `stage.incomplete_fields`.
@@ -110,19 +113,21 @@ và `contracts/notary-case-drafting/*.schema.json`.
   không ai giữ vị trí tài sản không chặn `diagram_save`/`diagram_evaluate`,
   kể cả evaluate nháp không có `case_id`. Save giữ nháp và tăng revision;
   cả hai trả `render_model.warnings` có mã `diagram.missing_land_owner`,
-  message `chưa có Chủ đất`. Lỗi cấu trúc khác vẫn chặn như trên.
-- Save chạy đúng một đường đánh giá với `Xem cách tính`: `render_model` đã lưu
-  là kết quả evaluate tại thời điểm ghi (gồm warning Pool và trạng thái
-  `incomplete`).
+  message `chưa có Chủ đất`.
+- `diagram_evaluate` giữ kiểm tra wire strict; kết quả Save có lỗi wire được
+  lưu `invalid` mà không chạy engine trên input lỗi. Kết quả engine invalid
+  khác được giữ nguyên; warning Pool/requiredSlots hiện có vẫn được lưu.
 - Save lỗi không đổi Stage, Diagram và projection đã lưu trong DB; giữ bản đang sửa để sửa tiếp.
 - Reload và Word phải dùng cùng snapshot đã lưu, không tự xuất nội dung chưa Lưu hồ sơ.
 
 ## 7. Lỗi và ngoại lệ
 
 - Node trỏ ra ngoài Stage: `diagram_reference_outside_stage`.
-- Quan hệ sai, vòng lặp, slot/position không hợp lệ: `diagram_invalid_state`.
+- Quan hệ sai, vòng lặp, slot/position sai: Save Thừa kế giữ `invalid` + errors;
+  Evaluate strict trả `diagram_invalid_state`.
 - Domain không khớp `case_type`: `diagram_domain_mismatch`.
-- Field legacy trong state v2: reject, không âm thầm chuyển nghĩa.
+- Field legacy: Evaluate reject; Save Thừa kế giữ field lỗi trong snapshot invalid,
+  không âm thầm chuyển nghĩa.
 
 <a id="two-party"></a>
 ## 8. Hai bên — vị trí hợp đồng

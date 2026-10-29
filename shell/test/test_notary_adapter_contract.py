@@ -921,6 +921,87 @@ def test_diagram_save_persists_and_bumps_revision(adapter_db):
     assert case.workspace_revision == 3
 
 
+@pytest.mark.parametrize("error_code", [
+    "dangling_parent", "dangling_spouse", "self_parent", "self_spouse",
+    "ancestry_cycle", "too_many_parents",
+])
+def test_diagram_save_invalid_inheritance_reopens_exact_state_and_errors(
+        adapter_db, monkeypatch, error_code):
+    case, owner_row = _committed_case(adapter_db)
+    state = _v3_state([
+        _diagram_node("owner", owner_row, own=[1]),
+        _diagram_node("child", parents=("owner",)),
+    ])
+    for node in state["nodes"]:
+        node.update(spouseSlotId=None, spouseSuggestionId=None)
+    owner = state["nodes"][0]
+    if error_code == "dangling_parent":
+        owner["parentSlotIds"] = ["absent"]
+    elif error_code == "dangling_spouse":
+        owner.update(spouseSlotIds=["absent"], spouseSlotId="absent")
+    elif error_code == "self_parent":
+        owner["parentSlotIds"] = ["owner"]
+    elif error_code == "self_spouse":
+        owner.update(spouseSlotIds=["owner"], spouseSlotId="owner")
+    elif error_code == "ancestry_cycle":
+        owner["parentSlotIds"] = ["child"]
+    else:
+        invalid = notary_adapter.diagram_evaluate(
+            _Job(), _eval_payload(case.id, state))["data"]["render_model"]
+        invalid.update(status="invalid", errors=[{
+            "code": error_code, "message": "Một người chỉ có tối đa hai cha/mẹ.",
+            "nodeId": "child"}])
+        monkeypatch.setattr(
+            inheritance_workspace, "run_inheritance_case", lambda *_args: invalid)
+
+    saved = notary_adapter.diagram_save(
+        _Job(), _save_payload(case.id, 2, state))["data"]
+    assert saved["revision"] == 3
+    assert saved["diagram"]["state"] == state
+    rm = saved["diagram"]["render_model"]
+    assert rm["status"] == "invalid"
+    assert error_code in {e["code"] for e in rm["errors"]}
+    reopened = notary_adapter.workspace_get(
+        _Job(), {"case_id": case.id})["data"]
+    assert reopened["case"]["revision"] == 3
+    assert reopened["diagram"]["state"] == state
+    assert reopened["diagram"]["render_model"] == rm
+
+
+@pytest.mark.parametrize("state", [
+    None, [], {"version": 2, "domain": "inheritance", "nodes": []},
+    {"version": 3, "domain": "inheritance", "nodes": "bad"},
+    {"version": 3, "domain": "inheritance", "nodes": [None]},
+    _v3_state([dict(_diagram_node("owner"), parentSlotIds=[{}])]),
+    _v3_state([dict(_diagram_node("owner"), hidden="false")]),
+])
+def test_diagram_save_malformed_state_preserves_workspace(adapter_db, state):
+    case, _owner_row = _committed_case(adapter_db)
+    before = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_save(_Job(), _save_payload(case.id, 2, state))
+    assert exc.value.code == "diagram_invalid_state"
+    assert notary_adapter.workspace_get(
+        _Job(), {"case_id": case.id})["data"] == before
+
+
+@pytest.mark.parametrize("field", ["so_thua_dat", "so_to_ban_do"])
+def test_diagram_save_blank_parcel_or_sheet_preserves_workspace(adapter_db, field):
+    case, owner_row = _committed_case(adapter_db)
+    adapter_db.refresh(case)
+    setattr(case.asset_rows[0], field, "  ")
+    adapter_db.commit()
+    before = notary_adapter.workspace_get(_Job(), {"case_id": case.id})["data"]
+    state = _v3_state([_diagram_node("owner", owner_row, own=[1])])
+    with pytest.raises(CommandError) as exc:
+        notary_adapter.diagram_save(_Job(), _save_payload(case.id, 2, state))
+    assert exc.value.code == "stage_validation_error"
+    assert any(e["field"] == field and e["code"] == "required"
+               for e in exc.value.details["field_errors"])
+    assert notary_adapter.workspace_get(
+        _Job(), {"case_id": case.id})["data"] == before
+
+
 def test_diagram_save_owner_mismatch(adapter_db):
     """Node 'owner' personId != owner_row_id da commit ->
     diagram_owner_mismatch (§13.4)."""
@@ -1043,7 +1124,7 @@ def test_diagram_save_incomplete_reopen_keeps_warning(adapter_db):
 
 
 @pytest.mark.parametrize("owner_state", ["no_position", "empty_slot", "unassigned"])
-def test_diagram_save_engine_invalid_rejected_state_preserved(adapter_db, owner_state):
+def test_diagram_save_missing_owner_saves_incomplete_with_warning(adapter_db, owner_state):
     """D-051: thiếu Chủ đất vẫn lưu nháp, tăng revision và giữ warning khi mở lại."""
     if owner_state == "unassigned":
         created = notary_adapter.workspace_create(

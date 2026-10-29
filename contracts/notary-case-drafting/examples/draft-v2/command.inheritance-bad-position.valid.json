@@ -8,9 +8,8 @@
       "11111111-1111-4111-8111-111111111111",
       "33333333-3333-4333-8333-333333333333"
     ],
-    "note": "ownPositions chứa 6 (ngoài 1..5) → invalid_position (§13.4)"
+    "note": "D-030: ownPositions chứa 6 vẫn được Save; trả invalid_position trong render_model invalid, giữ nguyên state."
   },
-  "expected_error": "diagram_invalid_state",
   "contract_version": "desktopcommand.v1",
   "command": "notary.diagram_save",
   "command_id": "a1b2c3d4-2006-4001-8001-000000000001",

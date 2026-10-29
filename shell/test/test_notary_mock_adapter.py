@@ -1538,6 +1538,63 @@ class TestDiagram:
         got = _call("workspace_get", {"case_id": 42})
         assert got["data"]["case"]["revision"] == 8
 
+    @pytest.mark.parametrize("error_code", [
+        "dangling_parent", "dangling_spouse", "self_parent", "self_spouse",
+        "ancestry_cycle", "too_many_parents", "invalid_node",
+    ])
+    def test_save_invalid_inheritance_reopens_exact_state_and_errors(
+            self, monkeypatch, error_code):
+        mock.reset_backend(_load_fixture("ready.json"))
+        state = _ready_state()
+        owner = state["nodes"][0]
+        if error_code == "dangling_parent":
+            owner["parentSlotIds"] = ["absent"]
+        elif error_code == "dangling_spouse":
+            owner.update(spouseSlotIds=["absent"], spouseSlotId="absent")
+        elif error_code == "self_parent":
+            owner["parentSlotIds"] = ["owner"]
+        elif error_code == "self_spouse":
+            owner.update(spouseSlotIds=["owner"], spouseSlotId="owner")
+        elif error_code == "ancestry_cycle":
+            owner["parentSlotIds"] = ["child_1"]
+        elif error_code == "invalid_node":
+            owner["spouseUndetermined"] = True
+        else:
+            invalid = copy.deepcopy(_call(
+                "workspace_get", {"case_id": 42})["data"]["diagram"]["render_model"])
+            invalid.update(status="invalid", errors=[{
+                "code": error_code, "message": "Một người chỉ có tối đa hai cha/mẹ.",
+                "nodeId": "child_1"}])
+            monkeypatch.setattr(mock, "_render", lambda *_args: invalid)
+        saved = _call("diagram_save", {
+            "case_id": 42, "base_revision": 7,
+            "diagram": {"state": state}})["data"]
+        assert saved["revision"] == 8
+        assert saved["diagram"]["state"] == state
+        rm = saved["diagram"]["render_model"]
+        assert rm["status"] == "invalid"
+        assert error_code in {e["code"] for e in rm["errors"]}
+        reopened = _call("workspace_get", {"case_id": 42})["data"]
+        assert reopened["case"]["revision"] == 8
+        assert reopened["diagram"]["state"] == state
+        assert reopened["diagram"]["render_model"] == rm
+        monkeypatch.undo()
+
+    @pytest.mark.parametrize("field", ["so_thua_dat", "so_to_ban_do"])
+    def test_save_blank_parcel_or_sheet_preserves_workspace(self, field):
+        doc = _load_fixture("ready.json")
+        doc["cases"]["42"]["stage"]["assets"][0][field] = "  "
+        mock.reset_backend(doc)
+        before = _call("workspace_get", {"case_id": 42})["data"]
+        with pytest.raises(CommandError) as exc:
+            _call("diagram_save", {
+                "case_id": 42, "base_revision": 7,
+                "diagram": {"state": _ready_state()}})
+        assert exc.value.code == "stage_validation_error"
+        assert any(e["field"] == field and e["code"] == "required"
+                   for e in exc.value.details["field_errors"])
+        assert _call("workspace_get", {"case_id": 42})["data"] == before
+
     def test_save_owner_mismatch(self):
         """Node owner personId != owner_row_id da commit ->
         diagram_owner_mismatch (§13.4 mirror rule)."""
@@ -1584,22 +1641,30 @@ class TestDiagram:
         assert rm["status"] == "incomplete"
         assert res["data"]["revision"] == 6
 
-    def test_save_engine_invalid_missing_land_owner_rejected(self):
-        """Parity real: không ai giữ vị trí tài sản → engine từ chối,
-        không persist, revision giữ nguyên (§6/§9.7)."""
+    def test_save_missing_owner_saves_incomplete_with_warning(self):
         mock.reset_backend(_load_fixture("ready.json"))
         state = _ready_state()
-        for n in state["nodes"]:
-            n["ownPositions"] = []
-        with pytest.raises(CommandError) as exc:
-            _call("diagram_save", {
-                "case_id": 42, "base_revision": 7,
-                "diagram": {"state": state}})
-        assert exc.value.code == "diagram_invalid_state"
-        assert any(e["code"] == "missing_land_owner"
-                   for e in exc.value.details["errors"])
-        got = _call("workspace_get", {"case_id": 42})
-        assert got["data"]["case"]["revision"] == 7
+        for node in state["nodes"]:
+            node["ownPositions"] = []
+        saved = _call("diagram_save", {
+            "case_id": 42, "base_revision": 7,
+            "diagram": {"state": state}})["data"]
+        assert saved["revision"] == 8
+        assert saved["diagram"]["state"] == state
+        rm = saved["diagram"]["render_model"]
+        assert rm["status"] == "incomplete"
+        assert any(w["code"] == "diagram.missing_land_owner"
+                   for w in rm["warnings"])
+        reopened = _call("workspace_get", {"case_id": 42})["data"]
+        assert reopened["case"]["revision"] == 8
+        assert reopened["diagram"]["state"] == state
+        assert reopened["diagram"]["render_model"] == rm
+        evaluated = _call("diagram_evaluate", {
+            "case_id": 42, "diagram": {"state": state}})["data"]["render_model"]
+        assert evaluated["status"] == "invalid"
+        assert any(e["code"] == "missing_land_owner" for e in evaluated["errors"])
+        assert any(w["code"] == "diagram.missing_land_owner"
+                   for w in evaluated["warnings"])
 
     def test_save_two_party(self):
         mock.reset_backend(_load_fixture("ready-two-party.json"))
@@ -1639,16 +1704,24 @@ class TestDiagram:
             "diagram": {"state": _ready_state()}})
         assert res["data"]["revision"] == 8
 
-    def test_save_invalid_state_not_persisted(self):
+    @pytest.mark.parametrize("state", [
+        None, [], {"version": 2, "domain": "inheritance", "nodes": []},
+        {"version": 3, "domain": "inheritance", "nodes": "bad"},
+        {"version": 3, "domain": "inheritance", "nodes": [None]},
+        {"version": 3, "domain": "inheritance", "nodes": [
+            dict(_node("owner"), parentSlotIds=[{}])]},
+        {"version": 3, "domain": "inheritance", "nodes": [
+            dict(_node("owner"), hidden="false")]},
+    ])
+    def test_save_invalid_state_not_persisted(self, state):
         mock.reset_backend(_load_fixture("ready.json"))
-        with pytest.raises(CommandError):
+        before = _call("workspace_get", {"case_id": 42})["data"]
+        with pytest.raises(CommandError) as exc:
             _call("diagram_save", {
                 "case_id": 42, "base_revision": 7,
-                "diagram": {"state": {"version": 2,
-                                      "domain": "inheritance",
-                                      "nodes": []}}})
-        res = _call("workspace_get", {"case_id": 42})
-        assert res["data"]["case"]["revision"] == 7
+                "diagram": {"state": state}})
+        assert exc.value.code == "diagram_invalid_state"
+        assert _call("workspace_get", {"case_id": 42})["data"] == before
 
 
 # ---------- word_export_options / word_export_batch ----------

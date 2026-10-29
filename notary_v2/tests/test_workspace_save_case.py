@@ -280,9 +280,10 @@ def test_save_case_keeps_valid_unsupported_diagram_done(db, dataset):
 @pytest.mark.parametrize(("state_factory", "expected_error"), [
     (lambda: {"version": 2, "domain": "inheritance", "nodes": []},
      "invalid_version"),
+    (lambda: {"version": 3, "domain": "inheritance", "nodes": "bad"},
+     "invalid_input"),
     (lambda: {"version": 3, "domain": "inheritance", "nodes": [
-        _node("owner", "00000000-0000-4000-8000-000000000101",
-              spouses=("owner",))]}, "self_spouse"),
+        dict(_node("owner"), hidden="false")]}, "invalid_input"),
 ])
 def test_save_case_invalid_diagram_rolls_back_everything(
         db, dataset, state_factory, expected_error):
@@ -307,6 +308,30 @@ def test_save_case_invalid_diagram_rolls_back_everything(
     db.expire_all()
     assert _snapshot(db, case_id) == before
     assert _counts(db) == counts
+
+
+def test_save_case_self_spouse_persists_invalid_with_stage_and_revision(db, dataset):
+    create = _create_draft(db, dataset)
+    case_id = create["case"]["id"]
+    stage = _f1_stage(dataset)
+    stage["people"][1]["dia_chi"] = "Địa chỉ đã sửa"
+    state = _f1_state()
+    state["nodes"][0]["spouseSlotIds"] = ["owner"]
+    saved = CaseWorkspaceService(db).save_case(
+        case_id=case_id, base_revision=1, idempotency_key=None,
+        case_meta=_meta(ghi_chu="Lưu cả sơ đồ chưa hợp lệ"),
+        stage=stage, state=state)
+    assert saved["case"]["revision"] == 2
+    assert saved["diagram"]["state"] == state
+    rm = saved["diagram"]["render_model"]
+    assert rm["status"] == "invalid"
+    assert any(e["code"] == "self_spouse" for e in rm["errors"])
+    reopened = CaseWorkspaceService(db).get(case_id)
+    assert reopened["case"]["revision"] == 2
+    assert reopened["diagram"]["state"] == state
+    assert reopened["diagram"]["render_model"] == rm
+    assert reopened["stage"]["people"][1]["dia_chi"] == "Địa chỉ đã sửa"
+    assert reopened["case"]["ghi_chu"] == "Lưu cả sơ đồ chưa hợp lệ"
 
 
 # ---------------------------------------------------------------- B1
@@ -635,6 +660,29 @@ def test_save_case_asset_requires_thua_and_to(db):
         assert any(e["field"] == field and e["code"] == "required"
                    for e in errors), field
     assert db.query(InheritanceCase).count() == 0
+
+
+@pytest.mark.parametrize("field", ["so_thua_dat", "so_to_ban_do"])
+def test_save_case_blank_parcel_or_sheet_preserves_existing_workspace(
+        db, dataset, field):
+    created = _create_draft(db, dataset)
+    case_id = created["case"]["id"]
+    svc = CaseWorkspaceService(db)
+    before = svc.get(case_id)
+    before_snapshot = _snapshot(db, case_id)
+    stage = _f1_stage(dataset)
+    stage["assets"][0][field] = "  "
+    with pytest.raises(WorkspaceError) as exc:
+        svc.save_case(
+            case_id=case_id, base_revision=1, idempotency_key=None,
+            case_meta=_meta(ghi_chu="không được lưu"), stage=stage,
+            state=_f1_state())
+    assert exc.value.code == "stage_validation_error"
+    assert any(e["field"] == field and e["code"] == "required"
+               for e in exc.value.details["field_errors"])
+    db.expire_all()
+    assert svc.get(case_id) == before
+    assert _snapshot(db, case_id) == before_snapshot
 
 
 def test_save_case_asset_ngay_cap_year_only(db):
