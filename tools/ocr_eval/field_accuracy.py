@@ -39,12 +39,31 @@ FIELD_ORDER = [
     "ngay_cap",
     "noi_cap",
     "ngay_chet",
+    "so_trich_luc_khai_tu",
+    "noi_cap_khai_tu",
+    "ngay_ky",
+    "noi_chet",
+    "noi_thuong_tru_cuoi",
+    "so_serial",
+    "so_vao_so",
+    "co_quan_cap",
+    "so_thua_dat",
+    "so_to_ban_do",
+    "dien_tich",
+    "loai_dat",
+    "hinh_thuc_su_dung",
+    "thoi_han",
+    "nguon_goc",
+    "land_rows.loai_dat",
+    "land_rows.dien_tich",
+    "land_rows.thoi_han",
 ]
 
 EXPECTED_SIDE = {
     "cccd_front": "front",
     "cccd_back": "back",
     "death_certificate": "single",
+    "gcn": "unknown",
 }
 
 _TRAILING_PUNCT = " ,.;:"
@@ -59,6 +78,46 @@ def normalize_value(value: object) -> str:
     return text.casefold().rstrip(_TRAILING_PUNCT)
 
 
+def _matches_value(want: object, got: object) -> bool:
+    if type(want) is bool:
+        return type(got) is bool and got == want
+    return normalize_value(want) == normalize_value(got)
+
+
+def _land_row_fields(want: object, got: object) -> list[dict]:
+    """So từng ô theo vị trí; thiếu dòng/khóa không tương đương ô rỗng."""
+    expected_rows = want if isinstance(want, list) else []
+    actual_rows = got if isinstance(got, list) else []
+    valid_lists = isinstance(want, list) and isinstance(got, list)
+    row_count = max(len(expected_rows), len(actual_rows), 0 if valid_lists else 1)
+    fields = []
+    for row_index in range(row_count):
+        expected_row = expected_rows[row_index] if row_index < len(expected_rows) else None
+        actual_row = actual_rows[row_index] if row_index < len(actual_rows) else None
+        for child in ("loai_dat", "dien_tich", "thoi_han"):
+            expected_present = isinstance(expected_row, dict) and child in expected_row
+            got_present = isinstance(actual_row, dict) and child in actual_row
+            expected_value = expected_row[child] if expected_present else None
+            actual_value = actual_row[child] if got_present else None
+            fields.append(
+                {
+                    "field": f"land_rows.{child}",
+                    "row_index": row_index,
+                    "expected": expected_value,
+                    "got": actual_value,
+                    "expected_present": expected_present,
+                    "got_present": got_present,
+                    "ok": (
+                        valid_lists
+                        and expected_present
+                        and got_present
+                        and _matches_value(expected_value, actual_value)
+                    ),
+                }
+            )
+    return fields
+
+
 def evaluate(cases: list[dict]) -> list[dict]:
     results: list[dict] = []
     for case in cases:
@@ -71,13 +130,15 @@ def evaluate(cases: list[dict]) -> list[dict]:
         fields = []
         for field, want in expected.items():
             got = data.get(field, "")
+            if field == "land_rows":
+                fields.extend(_land_row_fields(want, got))
+                continue
             fields.append(
                 {
                     "field": field,
                     "expected": want,
                     "got": got,
-                    "ok": (type(got) is bool and got == want) if type(want) is bool
-                          else normalize_value(want) == normalize_value(got),
+                    "ok": _matches_value(want, got),
                 }
             )
         results.append(
@@ -271,7 +332,12 @@ def render(results: list[dict], cases_path: Path) -> list[str]:
     lines.append(f"side lệch: {', '.join(mismatched) if mismatched else 'không'}")
 
     failures = [
-        (result["id"], item["field"], item["expected"], item["got"])
+        (
+            result["id"],
+            f'{item["field"]}[{item["row_index"]}]' if "row_index" in item else item["field"],
+            item["expected"],
+            item["got"],
+        )
         for result in results
         for item in result["fields"]
         if not item["ok"]

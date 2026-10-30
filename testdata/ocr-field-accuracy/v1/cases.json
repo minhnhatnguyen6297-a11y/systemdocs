@@ -349,12 +349,17 @@
       "ho_ten": "Nguyễn Văn Bình",
       "loai_giay_to": "Trích lục khai tử",
       "chi_co_nam_sinh": false,
-      "so_giay_to": "12/TLKT-BS",
+      "so_giay_to": "",
       "ngay_sinh": "01/02/1950",
       "ngay_chet": "12/03/2020",
       "dia_chi": "Bệnh viện Đa khoa tỉnh Thanh Hóa",
-      "ngay_cap": "20/03/2020",
-      "noi_cap": "UBND xã Tân Phú, huyện Vĩnh Lộc, tỉnh Thanh Hóa"
+      "ngay_cap": "",
+      "noi_cap": "",
+      "so_trich_luc_khai_tu": "12/TLKT-BS",
+      "noi_cap_khai_tu": "UBND xã Tân Phú, huyện Vĩnh Lộc, tỉnh Thanh Hóa",
+      "ngay_ky": "20/03/2020",
+      "noi_chet": "Bệnh viện Đa khoa tỉnh Thanh Hóa",
+      "noi_thuong_tru_cuoi": ""
     }
   },
   {
@@ -375,12 +380,17 @@
       "ho_ten": "Trần Thị Hoa",
       "loai_giay_to": "Trích lục khai tử (bản sao)",
       "chi_co_nam_sinh": false,
-      "so_giay_to": "45/TLKT-UB",
+      "so_giay_to": "",
       "ngay_sinh": "25/07/1942",
       "ngay_chet": "03/11/2021",
       "dia_chi": "Nhà riêng tại thôn 3, xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
-      "ngay_cap": "10/11/2021",
-      "noi_cap": "Uỷ ban nhân dân xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội"
+      "ngay_cap": "",
+      "noi_cap": "",
+      "so_trich_luc_khai_tu": "45/TLKT-UB",
+      "noi_cap_khai_tu": "Uỷ ban nhân dân xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
+      "ngay_ky": "10/11/2021",
+      "noi_chet": "Nhà riêng tại thôn 3, xã Đông Sơn, huyện Chương Mỹ, thành phố Hà Nội",
+      "noi_thuong_tru_cuoi": ""
     }
   },
   {
@@ -401,12 +411,17 @@
       "ho_ten": "Lê Đức Anh",
       "loai_giay_to": "Trích lục khai tử",
       "chi_co_nam_sinh": false,
-      "so_giay_to": "07/TLKT-2023",
+      "so_giay_to": "",
       "ngay_sinh": "19/04/1935",
       "ngay_chet": "28/02/2023",
       "dia_chi": "Xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
-      "ngay_cap": "05/03/2023",
-      "noi_cap": "Uỷ ban nhân dân xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định"
+      "ngay_cap": "",
+      "noi_cap": "",
+      "so_trich_luc_khai_tu": "07/TLKT-2023",
+      "noi_cap_khai_tu": "Uỷ ban nhân dân xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
+      "ngay_ky": "05/03/2023",
+      "noi_chet": "Xã Hải Anh, huyện Hải Hậu, tỉnh Nam Định",
+      "noi_thuong_tru_cuoi": ""
     }
   },
   {
@@ -452,12 +467,17 @@
     ],
     "expected": {
       "ho_ten": "Nguyễn Văn Mẫu",
-      "so_giay_to": "09/2020",
+      "so_giay_to": "",
       "ngay_sinh": "1935",
       "ngay_chet": "12/03/2020",
       "dia_chi": "Xã Mẫu",
-      "noi_cap": "UBND xã Mẫu",
-      "ngay_cap": "15/03/2020",
+      "noi_cap": "",
+      "ngay_cap": "",
+      "so_trich_luc_khai_tu": "09/2020",
+      "noi_cap_khai_tu": "UBND xã Mẫu",
+      "ngay_ky": "15/03/2020",
+      "noi_chet": "Xã Mẫu",
+      "noi_thuong_tru_cuoi": "",
       "loai_giay_to": "Giấy chứng tử",
       "chi_co_nam_sinh": true
     }
@@ -481,6 +501,553 @@
       "ngay_cap": "15/06/2021",
       "loai_giay_to": "",
       "chi_co_nam_sinh": false
+    }
+  },
+  {
+    "id": "G01",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: sổ đỏ 2004, mục đánh chữ; địa chỉ chủ ở trước địa chỉ thửa, chỉ lấy địa chỉ thửa. Một cụm ONT với thời hạn in rõ.",
+    "lines": [
+      "GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT",
+      "Số phát hành: AA 000101",
+      "I. Người sử dụng đất: Đào Văn Mô Phỏng",
+      "Nơi thường trú: Số 11 đường Mây Giấy, xã Lam Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "II. Thửa đất được quyền sử dụng",
+      "a) Thửa đất số: 101; tờ bản đồ số: 7",
+      "b) Địa chỉ thửa đất: Thôn Sương Giấy, xã Lam Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "c) Diện tích: 240 m2",
+      "d) Hình thức sử dụng: Sử dụng riêng: 240 m2; sử dụng chung: Không",
+      "đ) Mục đích sử dụng: Đất ở tại nông thôn 240 m2",
+      "e) Thời hạn sử dụng: Đất ở tại nông thôn: Lâu dài",
+      "g) Nguồn gốc sử dụng: Nhà nước công nhận quyền sử dụng đất",
+      "Vân Mẫu, ngày 12 tháng 05 năm 2004",
+      "ỦY BAN NHÂN DÂN HUYỆN MỘC GIẢ",
+      "Số vào sổ cấp giấy chứng nhận quyền sử dụng đất: H 00101"
+    ],
+    "expected": {
+      "so_serial": "AA 000101",
+      "so_vao_so": "H 00101",
+      "co_quan_cap": "ỦY BAN NHÂN DÂN HUYỆN MỘC GIẢ",
+      "ngay_cap": "12/05/2004",
+      "dia_chi": "Thôn Sương Giấy, xã Lam Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "so_thua_dat": "101",
+      "so_to_ban_do": "7",
+      "dien_tich": "240",
+      "loai_dat": "ONT",
+      "hinh_thuc_su_dung": "Sử dụng riêng: 240 m2; sử dụng chung: Không",
+      "thoi_han": "Đất ở tại nông thôn: Lâu dài",
+      "nguon_goc": "Nhà nước công nhận quyền sử dụng đất",
+      "land_rows": [
+        {
+          "loai_dat": "ONT",
+          "dien_tich": "240",
+          "thoi_han": "Lâu dài"
+        }
+      ]
+    }
+  },
+  {
+    "id": "G02",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: sổ đỏ 2008, nhãn và giá trị tách dòng, địa chỉ thửa hai dòng, diện tích có dấu nghìn và thập phân. Ngày cuối thời hạn không phải ngày cấp.",
+    "lines": [
+      "GIẤY CHỨNG NHẬN",
+      "QUYỀN SỬ DỤNG ĐẤT",
+      "Số phát hành:",
+      "AA 000102",
+      "Thửa đất số:",
+      "208",
+      "Tờ bản đồ số:",
+      "16",
+      "Địa chỉ thửa đất:",
+      "Khu Vườn Giấy, xã Trúc Mẫu",
+      "huyện Suối Giả, tỉnh Vân Mẫu",
+      "Diện tích: 1.200,5 m²",
+      "Hình thức sử dụng:",
+      "Sử dụng riêng",
+      "Mục đích sử dụng: Đất trồng cây lâu năm",
+      "Chi tiết mục đích, diện tích, thời hạn:",
+      "CLN | 1.200,5 m² | 15/10/2058",
+      "Thời hạn sử dụng: Đến ngày 15/10/2058",
+      "Nguồn gốc sử dụng:",
+      "Nhà nước giao đất không thu tiền sử dụng đất",
+      "Ngày cấp: 20/10/2008",
+      "ỦY BAN NHÂN DÂN HUYỆN SUỐI GIẢ",
+      "Số vào sổ cấp GCN:",
+      "H 00102"
+    ],
+    "expected": {
+      "so_serial": "AA 000102",
+      "so_vao_so": "H 00102",
+      "co_quan_cap": "ỦY BAN NHÂN DÂN HUYỆN SUỐI GIẢ",
+      "ngay_cap": "20/10/2008",
+      "dia_chi": "Khu Vườn Giấy, xã Trúc Mẫu, huyện Suối Giả, tỉnh Vân Mẫu",
+      "so_thua_dat": "208",
+      "so_to_ban_do": "16",
+      "dien_tich": "1200.5",
+      "loai_dat": "CLN",
+      "hinh_thuc_su_dung": "Sử dụng riêng",
+      "thoi_han": "Đến ngày 15/10/2058",
+      "nguon_goc": "Nhà nước giao đất không thu tiền sử dụng đất",
+      "land_rows": [
+        {
+          "loai_dat": "CLN",
+          "dien_tich": "1200.5",
+          "thoi_han": "15/10/2058"
+        }
+      ]
+    }
+  },
+  {
+    "id": "G03",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: sổ hồng 2012, ba loại đất viết cùng dòng ONT 200 m2; CLN 150,5 m2; NTS 300 m2. Giữ đủ ba cụm theo thứ tự; loai_dat lẻ là mã đầu, thoi_han lẻ giữ nguyên nội dung nhãn, không thay thế thời hạn từng cụm.",
+    "lines": [
+      "GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT, QUYỀN SỞ HỮU NHÀ Ở VÀ TÀI SẢN KHÁC GẮN LIỀN VỚI ĐẤT",
+      "Số phát hành: AA 000103",
+      "I. Người sử dụng đất: Lưu Thị Bản Nháp",
+      "II. Thửa đất, nhà ở và tài sản khác gắn liền với đất",
+      "Thửa đất số: 303",
+      "Tờ bản đồ số: 23",
+      "Địa chỉ thửa đất: Ấp Sen Giấy, xã Hồ Mẫu, huyện Suối Giả, tỉnh Vân Mẫu",
+      "Diện tích: 650,5 m2",
+      "Hình thức sử dụng: Sử dụng riêng",
+      "Mục đích sử dụng: ONT 200 m2; CLN 150,5 m2; NTS 300 m2",
+      "Thời hạn sử dụng: ONT: Lâu dài; CLN: 21/06/2062; NTS: 21/06/2032",
+      "Nguồn gốc sử dụng: Nhận chuyển nhượng quyền sử dụng đất hợp pháp",
+      "Ngày cấp: 21/06/2012",
+      "SỞ TÀI NGUYÊN VÀ MÔI TRƯỜNG TỈNH VÂN MẪU",
+      "Số vào sổ cấp GCN: CS 00103"
+    ],
+    "expected": {
+      "so_serial": "AA 000103",
+      "so_vao_so": "CS 00103",
+      "co_quan_cap": "SỞ TÀI NGUYÊN VÀ MÔI TRƯỜNG TỈNH VÂN MẪU",
+      "ngay_cap": "21/06/2012",
+      "dia_chi": "Ấp Sen Giấy, xã Hồ Mẫu, huyện Suối Giả, tỉnh Vân Mẫu",
+      "so_thua_dat": "303",
+      "so_to_ban_do": "23",
+      "dien_tich": "650.5",
+      "loai_dat": "ONT",
+      "hinh_thuc_su_dung": "Sử dụng riêng",
+      "thoi_han": "ONT: Lâu dài; CLN: 21/06/2062; NTS: 21/06/2032",
+      "nguon_goc": "Nhận chuyển nhượng quyền sử dụng đất hợp pháp",
+      "land_rows": [
+        {
+          "loai_dat": "ONT",
+          "dien_tich": "200",
+          "thoi_han": "Lâu dài"
+        },
+        {
+          "loai_dat": "CLN",
+          "dien_tich": "150.5",
+          "thoi_han": "21/06/2062"
+        },
+        {
+          "loai_dat": "NTS",
+          "dien_tich": "300",
+          "thoi_han": "21/06/2032"
+        }
+      ]
+    }
+  },
+  {
+    "id": "G04",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: sổ hồng 2018, bảng nhiều dòng có STT trước mã, tên loại đất xuống dòng và thời hạn từng hàng khác nhau; địa chỉ chủ không phải thửa. Thoi_han lẻ giữ lời dẫn bảng.",
+    "lines": [
+      "GIẤY CHỨNG NHẬN",
+      "QUYỀN SỬ DỤNG ĐẤT, QUYỀN SỞ HỮU NHÀ Ở VÀ TÀI SẢN KHÁC GẮN LIỀN VỚI ĐẤT",
+      "Số phát hành: AA 000104",
+      "Người sử dụng đất: Phan Văn Giả Lập",
+      "Địa chỉ thường trú: Số 44 ngõ Mực Tím, phường Mây Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Thửa đất số: 404; Tờ bản đồ số: 34",
+      "Địa chỉ thửa đất: Thôn Cánh Giấy, xã Trúc Mẫu, huyện Suối Giả, tỉnh Vân Mẫu",
+      "Diện tích: 840 m²",
+      "Hình thức sử dụng: Sử dụng riêng",
+      "Mục đích sử dụng:",
+      "Đất ở tại nông thôn; Đất trồng cây lâu năm; Đất nuôi trồng thủy sản",
+      "Thời hạn sử dụng: Theo từng mục đích tại bảng dưới đây",
+      "STT | Loại đất | Diện tích (m²) | Thời hạn sử dụng",
+      "1 | ONT | 180 | Lâu dài",
+      "Đất ở tại nông thôn",
+      "2 | CLN | 420 | 20/08/2068",
+      "Đất trồng cây lâu năm",
+      "3 | NTS | 240 | 20/08/2038",
+      "Đất nuôi trồng thủy sản",
+      "Nguồn gốc sử dụng: Công nhận quyền sử dụng đất như giao đất có thu tiền sử dụng đất",
+      "Suối Giả, ngày 20 tháng 08 năm 2018",
+      "ỦY BAN NHÂN DÂN HUYỆN SUỐI GIẢ",
+      "Số vào sổ cấp GCN: CH 00104"
+    ],
+    "expected": {
+      "so_serial": "AA 000104",
+      "so_vao_so": "CH 00104",
+      "co_quan_cap": "ỦY BAN NHÂN DÂN HUYỆN SUỐI GIẢ",
+      "ngay_cap": "20/08/2018",
+      "dia_chi": "Thôn Cánh Giấy, xã Trúc Mẫu, huyện Suối Giả, tỉnh Vân Mẫu",
+      "so_thua_dat": "404",
+      "so_to_ban_do": "34",
+      "dien_tich": "840",
+      "loai_dat": "ONT",
+      "hinh_thuc_su_dung": "Sử dụng riêng",
+      "thoi_han": "Theo từng mục đích tại bảng dưới đây",
+      "nguon_goc": "Công nhận quyền sử dụng đất như giao đất có thu tiền sử dụng đất",
+      "land_rows": [
+        {
+          "loai_dat": "ONT",
+          "dien_tich": "180",
+          "thoi_han": "Lâu dài"
+        },
+        {
+          "loai_dat": "CLN",
+          "dien_tich": "420",
+          "thoi_han": "20/08/2068"
+        },
+        {
+          "loai_dat": "NTS",
+          "dien_tich": "240",
+          "thoi_han": "20/08/2038"
+        }
+      ]
+    }
+  },
+  {
+    "id": "G05",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: tiêu đề mới 2024 với vùng mã QR; số phát hành và số vào sổ đứng xa nhau, thửa và tờ cùng dòng đảo thứ tự. Mã QR là chuỗi giả, không có thông tin ngoài các dòng in.",
+    "lines": [
+      "GIẤY CHỨNG NHẬN",
+      "QUYỀN SỬ DỤNG ĐẤT, QUYỀN SỞ HỮU TÀI SẢN GẮN LIỀN VỚI ĐẤT",
+      "Mã QR: GCN-G05-TONG-HOP",
+      "AA 000105",
+      "Người sử dụng đất: Tạ Thị Trang Mẫu",
+      "Tờ bản đồ số: 45; Thửa đất số: 505",
+      "Địa chỉ thửa đất: Số 25 đường Nắng Giấy, phường Mây Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Diện tích: 120,75 m²",
+      "Loại đất: Đất ở tại đô thị 120,75 m²",
+      "Hình thức sử dụng: Sử dụng riêng",
+      "Thời hạn sử dụng: Đất ở tại đô thị: Lâu dài",
+      "Nguồn gốc sử dụng: Nhà nước giao đất có thu tiền sử dụng đất",
+      "Số vào sổ cấp giấy chứng nhận: CT 00105",
+      "Ngày cấp: 18/11/2024",
+      "VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI TỈNH VÂN MẪU"
+    ],
+    "expected": {
+      "so_serial": "AA 000105",
+      "so_vao_so": "CT 00105",
+      "co_quan_cap": "VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI TỈNH VÂN MẪU",
+      "ngay_cap": "18/11/2024",
+      "dia_chi": "Số 25 đường Nắng Giấy, phường Mây Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "so_thua_dat": "505",
+      "so_to_ban_do": "45",
+      "dien_tich": "120.75",
+      "loai_dat": "ODT",
+      "hinh_thuc_su_dung": "Sử dụng riêng",
+      "thoi_han": "Đất ở tại đô thị: Lâu dài",
+      "nguon_goc": "Nhà nước giao đất có thu tiền sử dụng đất",
+      "land_rows": [
+        {
+          "loai_dat": "ODT",
+          "dien_tich": "120.75",
+          "thoi_han": "Lâu dài"
+        }
+      ]
+    }
+  },
+  {
+    "id": "G06",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: mẫu QR 2025, nhãn địa chỉ bị xuống dòng; bảng ba loại có từng ô OCR thành một dòng, thứ tự cột là loại–thời hạn–diện tích. CCCD và nơi cư trú chủ không được dùng làm thông tin thửa.",
+    "lines": [
+      "GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT, QUYỀN SỞ HỮU TÀI SẢN GẮN LIỀN VỚI ĐẤT",
+      "Mã QR: GCN-G06-TONG-HOP",
+      "Số phát hành: AA 000106",
+      "Người sử dụng đất: Mạc Văn Hình Mẫu",
+      "CCCD của người sử dụng đất: 021000000106",
+      "Nơi cư trú: Số 66 đường Mây Giấy, phường Bút Mẫu, thành phố Vân Mẫu",
+      "Thửa đất số: 606",
+      "Tờ bản đồ số: 56",
+      "Địa chỉ",
+      "thửa đất:",
+      "Khu Ao Giấy, phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Diện tích: 480,25 m2",
+      "Hình thức sử dụng:",
+      "Sử dụng chung",
+      "Loại đất: ODT; CLN; NTS",
+      "Thời hạn sử dụng: Theo bảng chi tiết",
+      "Loại đất | Thời hạn | Diện tích (m2)",
+      "ODT",
+      "Lâu dài",
+      "80",
+      "CLN",
+      "06/02/2075",
+      "250,25",
+      "NTS",
+      "06/02/2045",
+      "150",
+      "Nguồn gốc sử dụng: Nhận thừa kế quyền sử dụng đất",
+      "Ngày cấp: 06/02/2025",
+      "VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI TỈNH VÂN MẪU",
+      "Số vào sổ cấp GCN:",
+      "CT 00106"
+    ],
+    "expected": {
+      "so_serial": "AA 000106",
+      "so_vao_so": "CT 00106",
+      "co_quan_cap": "VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI TỈNH VÂN MẪU",
+      "ngay_cap": "06/02/2025",
+      "dia_chi": "Khu Ao Giấy, phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "so_thua_dat": "606",
+      "so_to_ban_do": "56",
+      "dien_tich": "480.25",
+      "loai_dat": "ODT",
+      "hinh_thuc_su_dung": "Sử dụng chung",
+      "thoi_han": "Theo bảng chi tiết",
+      "nguon_goc": "Nhận thừa kế quyền sử dụng đất",
+      "land_rows": [
+        {
+          "loai_dat": "ODT",
+          "dien_tich": "80",
+          "thoi_han": "Lâu dài"
+        },
+        {
+          "loai_dat": "CLN",
+          "dien_tich": "250.25",
+          "thoi_han": "06/02/2075"
+        },
+        {
+          "loai_dat": "NTS",
+          "dien_tich": "150",
+          "thoi_han": "06/02/2045"
+        }
+      ]
+    }
+  },
+  {
+    "id": "G07",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: sổ hồng 2023, OCR mất dấu ở nhãn và đảo thứ tự khối; số tờ có trước số thửa, nơi ở chủ xen trước địa chỉ thửa. Hàng CLN in đủ diện tích và thời hạn.",
+    "lines": [
+      "GIAY CHUNG NHAN QUYEN SU DUNG DAT, QUYEN SO HUU NHA O VA TAI SAN KHAC GAN LIEN VOI DAT",
+      "So vao so cap GCN: CS 00107",
+      "To ban do so: 67",
+      "Nguoi su dung dat: Cao Thị Dữ Liệu Mẫu",
+      "Noi thuong tru: So 77 duong But Gia, phuong May Mau, thanh pho Van Mau",
+      "Nguon goc su dung: Nhận tặng cho quyền sử dụng đất",
+      "Hinh thuc su dung: Sử dụng riêng",
+      "Dien tich: 725,5 m2",
+      "Thua dat so: 707",
+      "Dia chi thua dat: Thôn Mực Giấy, xã Hồ Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "Loai dat: CLN",
+      "CLN | 725,5 m2 | 09/09/2073",
+      "Thoi han su dung: Đến ngày 09/09/2073",
+      "So phat hanh:",
+      "AA 000107",
+      "Ngay cap: 09/09/2023",
+      "SỞ TÀI NGUYÊN VÀ MÔI TRƯỜNG TỈNH VÂN MẪU"
+    ],
+    "expected": {
+      "so_serial": "AA 000107",
+      "so_vao_so": "CS 00107",
+      "co_quan_cap": "SỞ TÀI NGUYÊN VÀ MÔI TRƯỜNG TỈNH VÂN MẪU",
+      "ngay_cap": "09/09/2023",
+      "dia_chi": "Thôn Mực Giấy, xã Hồ Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "so_thua_dat": "707",
+      "so_to_ban_do": "67",
+      "dien_tich": "725.5",
+      "loai_dat": "CLN",
+      "hinh_thuc_su_dung": "Sử dụng riêng",
+      "thoi_han": "Đến ngày 09/09/2073",
+      "nguon_goc": "Nhận tặng cho quyền sử dụng đất",
+      "land_rows": [
+        {
+          "loai_dat": "CLN",
+          "dien_tich": "725.5",
+          "thoi_han": "09/09/2073"
+        }
+      ]
+    }
+  },
+  {
+    "id": "G08",
+    "kind": "gcn",
+    "note": "Tổng hợp hư cấu: phần trang sổ đỏ đầu 2009 chỉ còn vùng thửa và số vào sổ. Không có số phát hành, cơ quan cấp, ngày cấp hay nguồn gốc thì để rỗng; không lấy ngày hết hạn làm ngày cấp.",
+    "lines": [
+      "GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT",
+      "Số vào sổ cấp GCN: H 00108",
+      "Thửa số: 808",
+      "Tờ số: 78",
+      "Địa chỉ thửa đất: Khu Đầm Giấy, xã Sen Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "Diện tích: 900 m2",
+      "Hình thức sử dụng: Sử dụng riêng",
+      "Mục đích sử dụng: Đất nuôi trồng thủy sản",
+      "NTS | 900 m2 | 12/09/2039",
+      "Thời hạn sử dụng: Đến ngày 12/09/2039"
+    ],
+    "expected": {
+      "so_serial": "",
+      "so_vao_so": "H 00108",
+      "co_quan_cap": "",
+      "ngay_cap": "",
+      "dia_chi": "Khu Đầm Giấy, xã Sen Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "so_thua_dat": "808",
+      "so_to_ban_do": "78",
+      "dien_tich": "900",
+      "loai_dat": "NTS",
+      "hinh_thuc_su_dung": "Sử dụng riêng",
+      "thoi_han": "Đến ngày 12/09/2039",
+      "nguon_goc": "",
+      "land_rows": [
+        {
+          "loai_dat": "NTS",
+          "dien_tich": "900",
+          "thoi_han": "12/09/2039"
+        }
+      ]
+    }
+  },
+  {
+    "id": "D05",
+    "kind": "death_certificate",
+    "note": "Tổng hợp hư cấu: giấy chứng tử cũ 1999 có số kèm quyển, nhãn họ tên và nơi chết tách dòng. Chính sách địa chỉ cũ được giữ: chỉ một nơi chết rõ thì dia_chi vẫn giữ nơi đó; không có CCCD thì so_giay_to rỗng.",
+    "lines": [
+      "UBND xã Sen Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "GIẤY CHỨNG TỬ",
+      "Số: 05/1999, quyển số 01",
+      "Họ và tên người chết:",
+      "Đào Văn Bản Mẫu",
+      "Ngày, tháng, năm sinh: 1930",
+      "Giới tính: Nam",
+      "Ngày, tháng, năm chết: 04/05/1999",
+      "Nơi chết:",
+      "Nhà riêng tại thôn Mực Giấy, xã Sen Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "Ngày cấp: 07/05/1999"
+    ],
+    "expected": {
+      "ho_ten": "Đào Văn Bản Mẫu",
+      "loai_giay_to": "Giấy chứng tử",
+      "chi_co_nam_sinh": true,
+      "so_giay_to": "",
+      "ngay_sinh": "1930",
+      "gioi_tinh": "Nam",
+      "ngay_chet": "04/05/1999",
+      "dia_chi": "Nhà riêng tại thôn Mực Giấy, xã Sen Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "noi_cap": "",
+      "ngay_cap": "",
+      "so_trich_luc_khai_tu": "05/1999, quyển số 01",
+      "noi_cap_khai_tu": "UBND xã Sen Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "ngay_ky": "07/05/1999",
+      "noi_chet": "Nhà riêng tại thôn Mực Giấy, xã Sen Mẫu, huyện Mộc Giả, tỉnh Vân Mẫu",
+      "noi_thuong_tru_cuoi": ""
+    }
+  },
+  {
+    "id": "D06",
+    "kind": "death_certificate",
+    "note": "Tổng hợp hư cấu: trích lục mới 2024, CCCD người yêu cầu đứng trước CCCD người chết; chỉ lấy số của người chết. Nơi chết khác thường trú cuối nên dia_chi rỗng; hai trường địa điểm riêng vẫn giữ đủ.",
+    "lines": [
+      "ỦY BAN NHÂN DÂN PHƯỜNG MÂY MẪU, THÀNH PHỐ VÂN MẪU, TỈNH VÂN MẪU",
+      "TRÍCH LỤC KHAI TỬ",
+      "Số: 06/TLKT-2024",
+      "Họ và tên người yêu cầu: Lưu Thị Trang Giả",
+      "CCCD của người yêu cầu: 021000000206",
+      "Họ, chữ đệm, tên người chết: Lưu Văn Mô Hình",
+      "CCCD của người chết: 021000000106",
+      "Ngày, tháng, năm sinh: 18/02/1956",
+      "Giới tính: Nam",
+      "Đã chết vào ngày: 08/04/2024",
+      "Nơi chết: Bệnh viện Mây Giấy, phường Bút Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Nơi thường trú cuối cùng: Số 16 đường Sen Giấy, phường Mây Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Ngày ký: 10/04/2024"
+    ],
+    "expected": {
+      "ho_ten": "Lưu Văn Mô Hình",
+      "loai_giay_to": "Trích lục khai tử",
+      "chi_co_nam_sinh": false,
+      "so_giay_to": "021000000106",
+      "ngay_sinh": "18/02/1956",
+      "gioi_tinh": "Nam",
+      "ngay_chet": "08/04/2024",
+      "dia_chi": "",
+      "noi_cap": "",
+      "ngay_cap": "",
+      "so_trich_luc_khai_tu": "06/TLKT-2024",
+      "noi_cap_khai_tu": "ỦY BAN NHÂN DÂN PHƯỜNG MÂY MẪU, THÀNH PHỐ VÂN MẪU, TỈNH VÂN MẪU",
+      "ngay_ky": "10/04/2024",
+      "noi_chet": "Bệnh viện Mây Giấy, phường Bút Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "noi_thuong_tru_cuoi": "Số 16 đường Sen Giấy, phường Mây Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu"
+    }
+  },
+  {
+    "id": "D07",
+    "kind": "death_certificate",
+    "note": "Tổng hợp hư cấu: bản sao trích lục 2025 với nhãn nhiều dòng; chỉ in CCCD người yêu cầu nên so_giay_to người chết rỗng. Nơi chết và cư trú cuối trùng nhau nên giữ một địa chỉ rõ, không coi là xung đột.",
+    "lines": [
+      "TRÍCH LỤC KHAI TỬ (BẢN SAO)",
+      "Số:",
+      "07/TLKT-BS-2025",
+      "Họ, chữ đệm, tên người chết:",
+      "Tạ Thị Mây Mẫu",
+      "Ngày, tháng, năm sinh:",
+      "11/12/1941",
+      "Giới tính: Nữ",
+      "Ngày chết: 14/03/2025",
+      "Nơi chết: Số 27 đường Bút Giấy, phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Nơi cư trú cuối cùng:",
+      "Số 27 đường Bút Giấy, phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Họ và tên người yêu cầu: Tạ Văn Nét Giả",
+      "CCCD của người yêu cầu: 021000000207",
+      "Nơi cấp trích lục khai tử:",
+      "UBND phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "Ngày ký:",
+      "19/03/2025"
+    ],
+    "expected": {
+      "ho_ten": "Tạ Thị Mây Mẫu",
+      "loai_giay_to": "Trích lục khai tử (bản sao)",
+      "chi_co_nam_sinh": false,
+      "so_giay_to": "",
+      "ngay_sinh": "11/12/1941",
+      "gioi_tinh": "Nữ",
+      "ngay_chet": "14/03/2025",
+      "dia_chi": "Số 27 đường Bút Giấy, phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "noi_cap": "",
+      "ngay_cap": "",
+      "so_trich_luc_khai_tu": "07/TLKT-BS-2025",
+      "noi_cap_khai_tu": "UBND phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "ngay_ky": "19/03/2025",
+      "noi_chet": "Số 27 đường Bút Giấy, phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu",
+      "noi_thuong_tru_cuoi": "Số 27 đường Bút Giấy, phường Hồ Mẫu, thành phố Vân Mẫu, tỉnh Vân Mẫu"
+    }
+  },
+  {
+    "id": "D08",
+    "kind": "death_certificate",
+    "note": "Tổng hợp hư cấu: phần giấy chứng tử bản sao mẫu cũ 2010 chỉ còn tên, năm sinh và thường trú cuối. Không in số giấy, ngày chết, cơ quan, ngày ký, CCCD hay nơi chết thì các trường đó rỗng. Loại bản sao giấy chứng tử quy về Giấy chứng tử; địa chỉ lấy nơi thường trú cuối duy nhất.",
+    "lines": [
+      "GIẤY CHỨNG TỬ (BẢN SAO)",
+      "Họ và tên người chết: Mạc Thị Giấy Mẫu",
+      "Ngày, tháng, năm sinh: 1948",
+      "Giới tính: Nữ",
+      "Nơi thường trú cuối cùng: Thôn Trăng Giấy, xã Trúc Mẫu, huyện Suối Giả, tỉnh Vân Mẫu"
+    ],
+    "expected": {
+      "ho_ten": "Mạc Thị Giấy Mẫu",
+      "loai_giay_to": "Giấy chứng tử",
+      "chi_co_nam_sinh": true,
+      "so_giay_to": "",
+      "ngay_sinh": "1948",
+      "gioi_tinh": "Nữ",
+      "ngay_chet": "",
+      "dia_chi": "Thôn Trăng Giấy, xã Trúc Mẫu, huyện Suối Giả, tỉnh Vân Mẫu",
+      "noi_cap": "",
+      "ngay_cap": "",
+      "so_trich_luc_khai_tu": "",
+      "noi_cap_khai_tu": "",
+      "ngay_ky": "",
+      "noi_chet": "",
+      "noi_thuong_tru_cuoi": "Thôn Trăng Giấy, xã Trúc Mẫu, huyện Suối Giả, tỉnh Vân Mẫu"
     }
   }
 ]

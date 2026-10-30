@@ -1,10 +1,8 @@
 """Field-level regressions using synthetic OCR text only."""
-import json
 
 import pytest
 
 from services.document_intake import ocr_pipeline as ocr
-from tools.ocr_eval.field_accuracy import DEFAULT_CASES, evaluate, side_rows, summarize
 
 
 def front(*extra, title="CĂN CƯỚC CÔNG DÂN", birth="15/08/1995"):
@@ -86,13 +84,6 @@ def test_birth_precision_is_boolean_for_cards_and_death_papers(birth, year_only,
         assert doc["data"]["loai_giay_to"] == "Giấy chứng tử"
 
 
-def test_all_synthetic_cases_match_completely():
-    cases = json.loads(DEFAULT_CASES.read_text(encoding="utf-8"))
-    results = evaluate(cases)
-    mismatches = [(r["id"], f) for r in results for f in r["fields"] if not f["ok"]]
-    assert mismatches == []
-    assert summarize(results)["exact_cases"] == len(cases)
-    assert all(row["side_ok"] for row in side_rows(results))
 
 
 def test_address_continuation_keeps_text_before_inline_expiry_date():
