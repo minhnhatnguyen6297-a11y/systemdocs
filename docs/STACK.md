@@ -66,5 +66,5 @@ Mục lục đầy đủ: [`docs/README.md`](README.md).
 
 - **Xong:** CI + known-failures + gitleaks/actionlint + branch protection; fix Linux/Windows CI (#15–#19, PR #25, #27); form lỗi + log xoay vòng + che PII (PR #30); sổ D-001…D-050 (PR #29); mục lục nguồn chuẩn + glossary (PR #35); tách tên "luật chặn chủ đất còn sống" khỏi Luật A + legal-baseline chưa luật sư rà soát (PR #36); luật sơ đồ v2 (PR #32); D-051 thiếu Chủ đất vẫn Lưu/Evaluate kèm cảnh báo, đóng #31 (PR #37); known-failures py linux/windows rỗng.
 - **Xong (tiếp):** D-030 sơ đồ Thừa kế lỗi cấu trúc lưu với `status: invalid` (PR #39); môi trường test local giống CI, SETUP.md, chuẩn commit + job `commitlint` chưa bắt buộc, mục "Agent luôn nạp" (PR này).
-- **Đang làm:** #33 Zalo hai mặt CCCD thành 2 người (chờ quyết định).
+- **Đang làm:** thử skill omp dự án `interrogate` + `tdd` (chuyển từ pstack, `.omp/skills/`) trên việc Word MVP — xem docs/pstack-assessment.md (PR này); #33 Zalo hai mặt CCCD thành 2 người (chờ quyết định).
 - **Tiếp theo:** `commitlint` thành bắt buộc khi các PR mới đều đạt; #7 tier frontier/worker qua CLIProxyAPI; #11 chuyển key omp sang biến môi trường; `e2e-smoke` thành bắt buộc sau ~10 lần xanh liên tiếp; bot theo từng area (⚠️ chưa có issue).

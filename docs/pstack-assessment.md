@@ -31,3 +31,16 @@ Nguồn: https://github.com/cursor/plugins/tree/main/pstack (v0.15.36, MIT, tác
 - Harness chưa quay video (pstack yêu cầu recording) — hiện chỉ có jsonl replay + ảnh.
 - Harness nằm ngoài repo (`/workspace/usability`), CI không dùng được; nên đưa vào `tools/ux/`.
 - `tools/file-bug.sh` chỉ có trên nhánh agent/mika/bug-evidence (chưa merge vào consolidate/monorepo).
+
+## Cập nhật 2026-10-30: nhận `interrogate` và `tdd`
+- Đã đưa vào skill dự án omp: `.omp/skills/interrogate/` và `.omp/skills/tdd/` (cạnh `reproduce-and-fix`).
+  Vẫn **không cài cả gói**, không đụng `~/.omp/agent/config.yml`. Giữ ghi công MIT: dòng nguồn ở đầu
+  mỗi SKILL.md + `LICENSE-pstack` trong từng thư mục.
+- Vì sao: `tdd` ép có test hỏng-trước/qua-sau cho bug có đường test rẻ (khớp vòng chuẩn + CI pytest/js-unit);
+  `interrogate` cho review đối kháng mà chỉ giữ phát hiện đã chạy ra lỗi — bù khoảng trống review một người.
+- Chuyển thể: `tdd` giữ nguyên. `interrogate` gốc phụ thuộc skill `arena` (Phase A/B/F), `in-your-own-words`,
+  `poteto-mode` và model/subagent kiểu Cursor (README nói độc lập nhưng thực tế không) ⇒ đã viết gộp các bước
+  cần dùng vào skill, dùng tool `task` của omp và 2 đối thủ theo role `default`/`smol`.
+- Cả hai có `disable-model-invocation: true` ⇒ omp không liệt kê trong system prompt; gọi tường minh
+  (`/skill:<tên>` hoặc yêu cầu trực tiếp).
+- Thử nghiệm: dùng trên việc Word MVP (bot Soạn thảo & Word); đánh giá lại sau đợt đó.
