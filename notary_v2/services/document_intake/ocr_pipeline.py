@@ -171,6 +171,11 @@ def _normalize_person_data(data: dict[str, Any]) -> dict[str, Any]:
         "loai_giay_to": _clean_text(data.get("loai_giay_to")),
         "noi_cap": _clean_text(data.get("noi_cap")),
         "loai_dia_chi": _clean_text(data.get("loai_dia_chi")),
+        "so_trich_luc_khai_tu": _clean_text(data.get("so_trich_luc_khai_tu")),
+        "noi_cap_khai_tu": _clean_text(data.get("noi_cap_khai_tu")),
+        "ngay_ky": _normalize_date(data.get("ngay_ky")),
+        "noi_chet": _clean_text(data.get("noi_chet")),
+        "noi_thuong_tru_cuoi": _clean_text(data.get("noi_thuong_tru_cuoi")),
     }
 
 
@@ -1155,23 +1160,9 @@ def _normalize_property_area_number(value: str) -> str:
 
 
 def _extract_property_area(lines: list[str]) -> str:
-    for line in lines:
-        if not _looks_like_label(line, ["dien tich"]):
-            continue
-        m = re.search(
-            r"(?<!\d)(\d+(?:[.,]\d+)?)(?:\s*(?:m2|m²|m\^2|met vuong))?",
-            _clean_text(line),
-            flags=re.IGNORECASE,
-        )
-        if m:
-            return _normalize_property_area_number(m.group(1))
-    for line in lines:
-        if not _looks_like_label(line, ["dien tich"]):
-            continue
-        m = re.search(r"(?<!\d)(\d+(?:[.,]\d+)?)(?:\s*(?:m2|m²))?", line, flags=re.IGNORECASE)
-        if m:
-            return m.group(1).replace(",", ".")
-    return ""
+    value = _extract_property_field_by_label(lines, ["dien tich"])
+    match = re.search(r"(?<!\d)(\d+(?:[.,]\d+)*)(?!\d)", value)
+    return _normalize_property_area_number(match.group(1)) if match else ""
 
 
 _PROPERTY_ADDRESS_STOP_LABELS = [
@@ -1263,6 +1254,8 @@ def _extract_property_address(lines: list[str]) -> str:
                 break
             next_line = lines[idx + offset]
             next_key = _ascii_text(next_line)
+            if next_key.strip(" :") == "thua dat":
+                continue
             if _looks_like_label(next_line, _PROPERTY_ADDRESS_STOP_LABELS):
                 break
             if _looks_like_property_footer_date_line(next_line):
@@ -1289,12 +1282,13 @@ def _extract_property_address(lines: list[str]) -> str:
 
 def _extract_property_field_by_label(lines: list[str], labels: list[str]) -> str:
     for idx, line in enumerate(lines):
-        if not _looks_like_label(line, labels):
+        label = re.match(r"^(?:[a-z0-9đ]+[.)]\s*)?(?:" + "|".join(
+            re.escape(label) for label in labels) + r")(?=\s|:|$)", _ascii_text(line))
+        if not label:
             continue
-        if ":" in line:
-            after = _clean_text(line.split(":", 1)[1])
-            if after:
-                return after
+        after = _clean_text(line[label.end():]).lstrip(" :")
+        if after:
+            return after
         if idx + 1 < len(lines):
             nxt = _clean_text(lines[idx + 1])
             if nxt and not _looks_like_label(nxt, labels):
@@ -1372,111 +1366,86 @@ def _extract_property_owner(lines: list[str]) -> str:
     return value if _property_owner_score(value) > 0 else ""
 
 
-def _extract_land_rows_from_named_lines(lines: list[str]) -> list[dict[str, str]]:
-    """Parse land rows từ GCN format dùng tên đầy đủ:
-    'c. Loại đất: Đất ở tại nông thôn 200,0m²; Đất trồng cây lâu năm 247,0m²,'
-    'd. Thời hạn sử dụng: Đất ở tại nông thôn: Lâu dài; Đất trồng cây lâu năm: 12/2043,'
-    """
-    land_line = ""
-    term_line = ""
-    for line in lines:
-        if not land_line and _looks_like_label(line, ["loai dat", "muc dich su dung"]):
-            land_line = line
-        elif not term_line and _looks_like_label(line, ["thoi han su dung", "thoi han"]):
-            term_line = line
-
-    if not land_line:
-        return []
-
-    land_content = land_line.split(":", 1)[1] if ":" in land_line else land_line
-    rows: list[dict[str, str]] = []
-    for seg in re.split(r";", land_content):
-        seg = seg.strip(" ,.")
-        if not seg:
-            continue
-        area_m = re.search(r"(\d+(?:[.,]\d+)?)\s*m[²2]", seg, re.IGNORECASE)
-        if not area_m:
-            continue
-        area = area_m.group(1).replace(",", ".")
-        name_part = seg[: area_m.start()].strip()
-        code = _land_name_to_code(name_part)
-        if not code:
-            continue
-        rows.append({"loai_dat": code, "dien_tich": area, "thoi_han": "", "_name_key": _fold_text(name_part)})
-
-    if not rows:
-        return []
-
-    if term_line:
-        term_content = term_line.split(":", 1)[1] if ":" in term_line else term_line
-        for seg in re.split(r";", term_content):
-            seg = seg.strip(" ,.")
-            if ":" not in seg:
-                continue
-            name_part, term_raw = seg.split(":", 1)
-            matched_code = _land_name_to_code(name_part.strip())
-            term_val = _clean_text(term_raw.strip(" ,."))
-            if not term_val or not matched_code:
-                continue
-            if "lau dai" in _fold_text(term_val):
-                term_val = "Lâu dài"
-            for row in rows:
-                if row.get("loai_dat") == matched_code:
-                    row["thoi_han"] = term_val
-                    break
-
-    for row in rows:
-        row.pop("_name_key", None)
-    return rows
-
-
 def _extract_property_land_rows(lines: list[str]) -> list[dict[str, str]]:
-    # Pass 1: parse GCN structured format dùng tên đầy đủ tiếng Việt
-    named_rows = _extract_land_rows_from_named_lines(lines)
-
-    # Pass 2: scan từng dòng tìm code rõ ràng (ONT, CLN, ...)
-    code_rows: list[dict[str, str]] = []
-    existing_codes = {r["loai_dat"] for r in named_rows}
-    for line in lines:
-        upper = _clean_text(line).upper()
-        if not upper:
+    rows: list[dict[str, str]] = []
+    terms: dict[str, str] = {}
+    code_pattern = r"\b(?:" + "|".join(sorted(_PROPERTY_LAND_TYPE_CODES)) + r")\b"
+    area_pattern = r"(\d+(?:[.,]\d+)*)\s*(?:m2|m²|m\^2)\b"
+    table_columns: list[str] = []
+    named_land_block = False
+    for index, line in enumerate(lines):
+        folded = _ascii_text(line)
+        if re.match(r"^(?:[a-z0-9]+[.)]\s*)?(?:loai dat|muc dich su dung)\b", folded):
+            named_land_block = True
+        elif re.match(r"^(?:[a-z0-9]+[.)]\s*)?(?:ghi chu|nguon goc|nhung thay doi|ngay cap)\b", folded):
+            named_land_block = False
+            table_columns = []
             continue
-        code_match = re.search(r"\b([A-Z]{2,4})\b", upper)
-        if not code_match:
+        if "|" in line and "dien tich" in folded and "loai dat" in folded:
+            table_columns = [
+                "loai_dat" if "loai dat" in cell else
+                "dien_tich" if "dien tich" in cell else
+                "thoi_han" if "thoi han" in cell else ""
+                for cell in folded.split("|")
+            ]
             continue
-        land_code = code_match.group(1)
-        if land_code not in _PROPERTY_LAND_TYPE_CODES:
+        # OCR can flatten a table to one cell per line; its header fixes the order.
+        if (table_columns and re.fullmatch(code_pattern, line.upper())
+                and table_columns[0] == "loai_dat"):
+            cells = lines[index:index + len(table_columns)]
+            if len(cells) == len(table_columns):
+                item = dict(zip(table_columns, cells))
+                area = item.get("dien_tich", "")
+                if re.fullmatch(r"\d+(?:[.,]\d+)*", area):
+                    rows.append({"loai_dat": line.upper(),
+                                 "dien_tich": _normalize_property_area_number(area),
+                                 "thoi_han": _clean_text(item.get("thoi_han"))})
             continue
-        if land_code in existing_codes:
-            continue
-        area_match = re.search(r"(?<!\d)(\d+(?:[.,]\d+)?)(?:\s*(?:M2|M²))?", upper)
-        if not area_match:
-            continue
-        term = ""
-        lower = _fold_text(line)
-        if "lau dai" in lower:
-            term = "Lâu dài"
-        else:
-            term_match = re.search(r"(\d{1,3}\s*nam)", lower)
-            if term_match:
-                term = _clean_text(term_match.group(1))
-        code_rows.append(
-            {
-                "loai_dat": land_code,
-                "dien_tich": area_match.group(1).replace(",", "."),
-                "thoi_han": term,
-            }
-        )
-
-    rows = named_rows + code_rows
+        for segment in line.split(";"):
+            match = re.search(code_pattern, segment.upper())
+            code = match.group() if match else _land_name_to_code(segment)
+            if not match and not (named_land_block or "thoi han" in folded):
+                continue
+            if not code:
+                continue
+            area_match = re.search(area_pattern, segment, re.IGNORECASE)
+            area = area_match.group(1) if area_match else ""
+            tail = segment[area_match.end():] if area_match else ""
+            if (not area and match and "thoi han" not in folded
+                    and re.match(r"^\s*(?:\d+\s*[|.]\s*)?" + code_pattern, segment.upper())):
+                bare_area = re.match(r"\s*:?\s*(\d+(?:[.,]\d+)*)(?![\d/])(?=\s|$)",
+                                     segment[match.end():])
+                if bare_area:
+                    area = bare_area.group(1)
+                    tail = segment[match.end() + bare_area.end():]
+            if "|" in segment:
+                cells = [cell.strip() for cell in segment.split("|")]
+                columns = table_columns or ["loai_dat", "dien_tich", "thoi_han"]
+                if len(cells) == len(columns):
+                    item = dict(zip(columns, cells))
+                    area = re.sub(r"\s*(?:m2|m²|m\^2)\s*$", "",
+                                  item.get("dien_tich", ""), flags=re.IGNORECASE)
+                    tail = item.get("thoi_han", "")
+            if area and re.fullmatch(r"\d+(?:[.,]\d+)*", area):
+                term = _clean_text(tail).strip(" ,.;:|")
+                rows.append({"loai_dat": code,
+                             "dien_tich": _normalize_property_area_number(area),
+                             "thoi_han": term})
+            elif "thoi han" in folded:
+                # A type-labelled term belongs only to that type, never to every row.
+                term = segment[match.end():] if match else segment.rsplit(":", 1)[-1]
+                term = _clean_text(term).strip(" ,.;:|")
+                if term:
+                    terms[code] = "Lâu dài" if "lau dai" in _ascii_text(term) else term
     unique_rows: list[dict[str, str]] = []
     seen: set[tuple[str, str, str]] = set()
     for row in rows:
-        key = (row.get("loai_dat", ""), row.get("dien_tich", ""), row.get("thoi_han", ""))
-        if key in seen:
-            continue
-        seen.add(key)
-        unique_rows.append(row)
+        if not row["thoi_han"]:
+            row["thoi_han"] = terms.get(row["loai_dat"], "")
+        key = (row["loai_dat"], row["dien_tich"], row["thoi_han"])
+        if key not in seen:
+            seen.add(key)
+            unique_rows.append(row)
     return unique_rows
 
 
@@ -1516,6 +1485,9 @@ def _extract_property_issue_date(lines: list[str]) -> str:
     # Pass 1: định dạng tiếng Việt "ngày DD tháng MM năm YYYY"
     # Dùng NFKD + strip combining (không thay digits như _fold_text làm)
     for idx, line in enumerate(lines):
+        if "thoi han" in _ascii_text(line) or (
+                "|" in line and not re.match(r"^(?:ngay cap|ngay ky)\b", _ascii_text(line))):
+            continue
         nfkd = unicodedata.normalize("NFKD", line)
         stripped = "".join(ch for ch in nfkd if not unicodedata.combining(ch)).lower().replace("đ", "d")
         m = re.search(r"ngay\s+(\d{1,2})\s+thang\s+(\d{1,2})\s+nam\s+(\d{4})", stripped)
@@ -1534,6 +1506,9 @@ def _extract_property_issue_date(lines: list[str]) -> str:
 
     # Pass 2: định dạng số DD/MM/YYYY hoặc DD-MM-YYYY
     for idx, line in enumerate(lines):
+        if "thoi han" in _ascii_text(line) or (
+                "|" in line and not re.match(r"^(?:ngay cap|ngay ky)\b", _ascii_text(line))):
+            continue
         dates = _extract_dates_from_line(line)
         if not dates:
             continue
@@ -1548,6 +1523,8 @@ def _extract_property_issue_date(lines: list[str]) -> str:
             if any(marker in n_key for marker in authority_markers):
                 score += 1
                 break
+        if score == 0:
+            continue
         for date_val in dates:
             candidates.append((score, idx, date_val))
 
@@ -2108,27 +2085,67 @@ def _looks_like_death_certificate(lines: list[str]) -> bool:
 def _normalize_death_certificate_doc(lines: list[str], filename: str) -> dict[str, Any]:
     name = _labeled_value(lines, ["ho, chu dem, ten nguoi chet", "ho va ten nguoi chet"])
     birth = _labeled_value(lines, ["ngay sinh", "ngay, thang, nam sinh"])
-    address = _labeled_value(lines, ["noi chet", "noi thuong tru cuoi cung", "noi cu tru cuoi cung", "noi cu tru"])
+    death_place = _labeled_value(lines, ["noi chet"])
+    residence = _labeled_value(lines, [
+        "noi thuong tru cuoi cung", "noi cu tru cuoi cung", "noi thuong tru truoc khi chet",
+        "noi cu tru truoc khi chet", "noi cu tru",
+    ])
+    address = death_place or residence
+    if death_place and residence and _ascii_text(death_place) != _ascii_text(residence):
+        address = ""
     death = _labeled_value(lines, ["da chet vao ngay", "ngay, thang, nam chet", "ngay chet"])
     text = "\n".join(lines)
     title = next((line for line in lines if re.fullmatch(
         r"(?:trich luc khai tu|giay chung tu)(?:\s*\(\s*ban sao\s*\))?",
         _ascii_text(line))), "")
-    number = re.search(r"(?im)^\s*(?:S[oố]\s*:|(?:Trích\s+lục\s+khai\s+tử|"
-                       r"Giấy\s+chứng\s+tử)(?:\s*\(\s*bản\s+sao\s*\))?\s+số\s*:?)"
-                       r"\s*(.+?)\s*$", text)
+    number_match = re.search(
+        r"(?im)^\s*(?:S[oố]\s*:|(?:Trích\s+lục\s+khai\s+tử|Giấy\s+chứng\s+tử)"
+        r"(?:\s*\(\s*bản\s+sao\s*\))?\s+số\s*:?)\s*(.+?)\s*$", text)
+    number = number_match[1] if number_match else ""
+    # Generic identity labels are valid only inside the deceased's own block.
+    personal_id = ""
+    in_deceased = False
+    for line in lines:
+        key = _ascii_text(line)
+        if re.match(r"^(?:ho.*ten\s+)?nguoi (?:yeu cau|di khai|khai)|^ho.*ten nguoi (?:yeu cau|di khai)", key):
+            in_deceased = False
+        if re.match(r"^ho.*ten nguoi chet", key):
+            in_deceased = True
+        if re.match(r"^\s*\(?\s*(?:ho.*ten\s+)?(?:vo|chong|cha|me)\b", key):
+            in_deceased = False
+        identity_line = re.split(r"\b(?:vo|chong|cha|me)\b", key, maxsplit=1)[0]
+        if (in_deceased and not re.search(r"nguoi (?:yeu cau|di khai|khai)", key)
+                and re.search(r"\b(?:cccd|can cuoc|so dinh danh|giay to tuy than)\b", identity_line)):
+            found = re.search(r"(?<!\d)(\d{12})(?!\d)", identity_line)
+            if found:
+                personal_id = found[1]
+                break
     issuer = next((line for line in lines if re.match(
         r"^(?:uy ban nhan dan|ubnd)\b", _ascii_text(line))), "")
-    issued = _labeled_value(lines, ["ngay cap", "ngay, thang, nam cap"])
+    issued = _labeled_value(lines, ["ngay cap", "ngay, thang, nam cap", "ngay ky"])
+    if not _normalize_date(issued):
+        footer = [line for index, line in enumerate(lines) if re.search(
+            r"\bngay\s+\d{1,2}\s+thang\s+\d{1,2}\s+nam\s+\d{4}\b", _ascii_text(line))
+            and not re.search(r"sinh|chet|dang ky", _ascii_text(line))
+            and not (index and re.search(
+                r"\b(?:sinh|chet|dang ky)\b[^:]*:?\s*$",
+                _ascii_text(lines[index - 1])))]
+        issued = _extract_property_issue_date(footer)
     data = _normalize_person_data(
         {
             "ho_ten": name,
-            "so_giay_to": number[1] if number else "",
+            "so_giay_to": personal_id,
+            "so_trich_luc_khai_tu": number,
+            "noi_cap_khai_tu": issuer,
+            "ngay_ky": issued,
+            "noi_chet": death_place,
+            "noi_thuong_tru_cuoi": residence,
+            "gioi_tinh": _labeled_value(lines, ["gioi tinh"]),
             "ngay_sinh": birth,
             "dia_chi": address,
             "ngay_chet": death,
             "loai_giay_to": norm_document_type(title)[0] if title else "",
-            "noi_cap": issuer, "ngay_cap": issued, "loai_dia_chi": "Nơi chết",
+            "noi_cap": "", "ngay_cap": "", "loai_dia_chi": "Nơi chết",
         }
     )
     warnings = []

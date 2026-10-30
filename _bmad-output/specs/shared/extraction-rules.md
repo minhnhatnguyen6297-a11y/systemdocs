@@ -189,6 +189,35 @@ ghép các giá trị đó vào địa chỉ. Giữ quy tắc skip/stop nhiễu 
 
 ### 2.3. Người chết — Theo spec hiện hành
 
+**Ngoại lệ native OCR — owner 30/10/2026:** áp dụng riêng cho
+`ocr_pipeline._normalize_native_ocr_doc` và `_normalize_person_data`, không đổi
+luật bóc Word hoặc contract lưu Hồ sơ bên dưới:
+- `so_trich_luc_khai_tu`: số trích lục/chứng tử nguyên văn, không gồm nhãn Số.
+- `noi_cap_khai_tu`: cơ quan đăng ký/cấp theo nguồn, giữ xã/phường/thị trấn.
+- `ngay_ky`: ngày ký/cấp chính giấy; chuẩn OCR `DD/MM/YYYY`, hoặc `YYYY`
+  khi nguồn chỉ ghi năm; không lấy ngày chết hay ngày đăng ký thay ngày ký.
+- `noi_chet` và `noi_thuong_tru_cuoi`: giữ riêng nơi chết và nơi thường trú/
+  cư trú cuối cùng/trước khi chết, không ghép hai giá trị.
+- `so_giay_to` chỉ lấy số định danh/CCCD được in trong vùng người chết;
+  thiếu thì `""`, không lấy số giấy chết hoặc CCCD người đi khai.
+  `noi_cap` và `ngay_cap` luôn `""` trên giấy chết.
+- Giữ `loai_giay_to` là loại giấy chết canonical hiện có. `dia_chi` giữ
+  chính sách đã có khi chỉ có một địa chỉ rõ; hai địa chỉ khác nhau thì
+  để `""`, giữ cả hai ở trường riêng. Không lấy nơi chết làm thường trú cuối.
+- Năm trường riêng hiện chỉ ở đầu ra OCR, chưa có mapping Stage/DB/Word
+  được duyệt. Không đẩy vào trường khác nghĩa, không đổi contract để lấp gap.
+  Quy tắc owner 21/10 bên dưới vẫn áp cho luồng Word và lưu Hồ sơ hiện hành,
+  không được dùng để ghi đè ngoại lệ OCR này.
+
+**GCN native OCR — kiểm chứng tổng hợp 30/10/2026:** diện tích là chuỗi số
+không kèm đơn vị, dấu thập phân `"."`; ngày cấp là `DD/MM/YYYY`. Giữ số
+serial/số vào sổ tách biệt, địa chỉ lấy vùng thửa đất thay địa chỉ người dùng
+đất. Cụm đất giữ thứ tự nguồn, mỗi phần tử có
+`loai_dat/dien_tich/thoi_han`; nhận mã rõ hoặc tên đất đã có mapping, diện tích
+và thời hạn đúng dòng/cột hoặc nhãn cùng loại. Không lấy số thứ tự bảng làm
+diện tích, không tự đắp thời hạn lẻ chưa xác định cụm. Chuẩn OCR này là lớp
+trước adapter; DB-wire vẫn theo contract hiện hành, không đổi kiểu DB.
+
 Dùng chung bộ trường Người và quy tắc tên/ngày/giới tính trong đúng vùng nguồn.
 Luật lọc tên/phạm vi hiện có không cho phép đổi sang người khác để làm đầy
 dữ liệu. Không lấy căn cước vợ/chồng trong ngoặc làm giấy của người chết.

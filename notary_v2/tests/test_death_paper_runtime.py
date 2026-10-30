@@ -178,20 +178,23 @@ def test_router_create_and_update_require_explicit_id_not_number(db):
     assert db.get(Customer, second['id']).ho_ten == 'Sửa người hai'
 
 
-def test_native_death_paper_does_not_take_deceased_personal_id_or_guess_date():
+def test_native_death_paper_separates_paper_from_personal_id_without_guessing_date():
     from services.document_intake.ocr_pipeline import _normalize_native_ocr_doc
     paper = _normalize_native_ocr_doc([
         'Ủy ban nhân dân thị trấn Mẫu', 'GIẤY CHỨNG TỬ (bản sao)',
         'Số: 12/2024, quyển số 1/2024', 'Họ và tên người chết: Lê Văn Mẫu',
-        'Ngày sinh: 1940', 'Giấy tờ tùy thân: CCCD 001234567890',
+        'Ngày sinh: 1940', 'Giấy tờ tùy thân: CCCD 012000000090',
         'Nơi chết: Xã Mẫu', 'Ngày cấp: 2024',
     ], 'controlled-paper.png')
-    assert paper['data']['so_giay_to'] == '12/2024, quyển số 1/2024'
+    assert paper['data']['so_giay_to'] == '012000000090'
+    assert paper['data']['so_trich_luc_khai_tu'] == '12/2024, quyển số 1/2024'
     assert paper['data']['loai_giay_to'] == 'Giấy chứng tử'
     assert paper['data']['ngay_chet'] == ''
     assert paper['data']['ngay_sinh'] == '1940'
-    assert paper['data']['ngay_cap'] == '2024'
-    assert paper['data']['noi_cap'] == 'Ủy ban nhân dân thị trấn Mẫu'
+    assert paper['data']['ngay_cap'] == ''
+    assert paper['data']['noi_cap'] == ''
+    assert paper['data']['ngay_ky'] == '2024'
+    assert paper['data']['noi_cap_khai_tu'] == 'Ủy ban nhân dân thị trấn Mẫu'
     assert paper['data']['loai_dia_chi'] == 'Nơi chết'
 
 
